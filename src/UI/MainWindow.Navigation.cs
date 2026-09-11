@@ -136,7 +136,7 @@ public sealed partial class MainWindow
                 var cachedSongs = cached.Songs;
                 Application.Invoke(() =>
                 {
-                    _songListView.SetSongs(cachedSongs, $"每日30首: 今日精选 {cachedSongs.Count} 首 (按 R 刷新)");
+                    _songListView.SetSongs(cachedSongs, $"每日30首: 今日精选 {cachedSongs.Count} 首");
                     if (_activeSong != null)
                     {
                         _songListView.SetPlayingSong(_activeSong.Mid);
@@ -170,7 +170,7 @@ public sealed partial class MainWindow
                 return;
             }
 
-            _songListView.SetSongs(songs, $"每日30首: 今日精选 {songs.Count} 首 (按 R 刷新)");
+            _songListView.SetSongs(songs, $"每日30首: 今日精选 {songs.Count} 首");
             if (_activeSong != null)
             {
                 _songListView.SetPlayingSong(_activeSong.Mid);

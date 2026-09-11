@@ -61,7 +61,7 @@ public sealed partial class MainWindow
                 }
             }
 
-            var title = $"我的喜欢: 共 {cached.Songs.Count} 首 (按 G 过滤 / 按 R 刷新)";
+            var title = $"我的喜欢: 共 {cached.Songs.Count} 首 (按 G 查找)";
             _songListView.SetSongs(cached.Songs, title);
             if (_activeSong != null)
             {
@@ -99,7 +99,7 @@ public sealed partial class MainWindow
                         {
                             if (_currentViewMode == ViewMode.Favorite)
                             {
-                                _songListView.Title = $"我的喜欢: 共 {cached.Songs.Count} 首 (已是最新，按 G 过滤 / 按 R 刷新)";
+                                _songListView.Title = $"我的喜欢: 共 {cached.Songs.Count} 首 (已是最新，按 G 查找)";
                                 _controlBar.UpdateStatus($"[同步完成] 我的喜欢已是最新状态（共 {cached.Songs.Count} 首）");
                             }
                         });
@@ -168,7 +168,7 @@ public sealed partial class MainWindow
                                 if (s.Id > 0) _favoriteSongIds.Add(s.Id);
                             }
                         }
-                        _songListView.SetSongs(allSongs, $"我的喜欢: 共 {allSongs.Count} 首 (已同步最新，按 G 过滤 / 按 R 刷新)");
+                        _songListView.SetSongs(allSongs, $"我的喜欢: 共 {allSongs.Count} 首 (已同步最新，按 G 查找)");
                         if (_activeSong != null)
                         {
                             _songListView.SetPlayingSong(_activeSong.Mid);
@@ -356,7 +356,7 @@ public sealed partial class MainWindow
 
                 if (_currentViewMode == ViewMode.Favorite)
                 {
-                    Application.Invoke(() => _songListView.InsertSong(0, song, $"我的喜欢: 共 {_songListView.Songs.Count + 1} 首 (按 G 过滤 / 按 R 刷新)"));
+                    Application.Invoke(() => _songListView.InsertSong(0, song, $"我的喜欢: 共 {_songListView.Songs.Count + 1} 首 (按 G 查找)"));
                 }
 
                 _controlBar.UpdateStatus($"[收藏成功] 已将《{song.Title}》添加至我的喜欢");

@@ -850,7 +850,7 @@ public sealed partial class MainWindow : Window
         // 底部快捷键操作指南（独立放置在控制栏UI方框下方最底行，干净平整无边框干扰）
         _hotkeyHintLabel = new Label
         {
-            Text = " [V]播放界面  [A]添加歌单  [B]通知  [M]静音  [/]搜索  [E]队列  [G]查找  [N]插入",
+            Text = " [V]播放界面  [R]识曲  [A]添加歌单  [B]通知  [M]静音  [/]搜索  [E]队列  [G]查找",
             X = 0,
             Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),

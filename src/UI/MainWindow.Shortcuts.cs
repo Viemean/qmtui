@@ -342,25 +342,6 @@ public sealed partial class MainWindow
                 }
             }
 
-            if (_currentViewMode == ViewMode.DailyRecommend && !_isSearchActive)
-            {
-                if (c == 'R')
-                {
-                    k.Handled = true;
-                    await LoadDailyRecommendSongsAsync(forceRefresh: true);
-                    return;
-                }
-            }
-
-            if (_currentViewMode == ViewMode.Favorite && !_isSearchActive)
-            {
-                if (c == 'R')
-                {
-                    k.Handled = true;
-                    await LoadFavoriteSongsAsync(forceRefresh: true);
-                    return;
-                }
-            }
 
             if (_currentViewMode == ViewMode.WebDav && !_isSearchActive)
             {
