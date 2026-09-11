@@ -98,13 +98,13 @@ public sealed class ArtistAlbumDetailView : View
             X = Pos.Center(),
             Y = Pos.Bottom(_imageContainer),
             Height = 1,
-            Width = 28,
+            Width = 32,
             CanFocus = false
         };
 
         _subModeBtn = new Button
         {
-            Text = "专辑 (1)",
+            Text = "1专辑",
             X = 0,
             Y = 0,
             NoDecorations = true,
@@ -125,8 +125,8 @@ public sealed class ArtistAlbumDetailView : View
 
         _orderBtn = new Button
         {
-            Text = "最新 (2)",
-            X = Pos.Right(_subModeBtn) + 2,
+            Text = "2最新",
+            X = Pos.Right(_subModeBtn) + 3,
             Y = 0,
             NoDecorations = true,
             CanFocus = false,
@@ -146,8 +146,8 @@ public sealed class ArtistAlbumDetailView : View
 
         _favBtn = new Button
         {
-            Text = "关注 (3)",
-            X = Pos.Right(_orderBtn) + 2,
+            Text = "3关注",
+            X = Pos.Right(_orderBtn) + 3,
             Y = 0,
             NoDecorations = true,
             CanFocus = false,
@@ -267,14 +267,14 @@ public sealed class ArtistAlbumDetailView : View
         _orderBtn.Visible = subMode == SingerSubMode.Songs;
         _favBtn.Visible = true;
 
-        _subModeBtn.Text = subMode == SingerSubMode.Songs ? "专辑 (1)" : "歌曲 (1)";
-        _orderBtn.Text = order == 1 ? "最新 (2)" : "热门 (2)";
-        _favBtn.Text = isFavorite ? "已关注 (3)" : "关注 (3)";
+        _subModeBtn.Text = subMode == SingerSubMode.Songs ? "1专辑" : "1歌曲";
+        _orderBtn.Text = order == 1 ? "2最新" : "2热门";
+        _favBtn.Text = isFavorite ? "3已关注" : "3关注";
 
         _subModeBtn.X = 0;
-        _orderBtn.X = Pos.Right(_subModeBtn) + 2;
-        _favBtn.X = subMode == SingerSubMode.Songs ? Pos.Right(_orderBtn) + 2 : Pos.Right(_subModeBtn) + 2;
-        _buttonBar.Width = subMode == SingerSubMode.Songs ? 28 : 18;
+        _orderBtn.X = Pos.Right(_subModeBtn) + 3;
+        _favBtn.X = subMode == SingerSubMode.Songs ? Pos.Right(_orderBtn) + 3 : Pos.Right(_subModeBtn) + 3;
+        _buttonBar.Width = subMode == SingerSubMode.Songs ? 32 : 22;
 
         SetNeedsLayout();
     }
@@ -304,14 +304,14 @@ public sealed class ArtistAlbumDetailView : View
         _subLabel.Text = $"{detail.Artist} · {detail.Songs.Count} 首歌曲";
 
         _subModeBtn.Visible = true;
-        _subModeBtn.Text = "歌曲 (1)";
+        _subModeBtn.Text = "1歌曲";
         _orderBtn.Visible = false;
         _favBtn.Visible = true;
-        _favBtn.Text = isSingerFavorite ? "已关注 (3)" : "关注 (3)";
+        _favBtn.Text = isSingerFavorite ? "3已关注" : "3关注";
 
         _subModeBtn.X = 0;
-        _favBtn.X = Pos.Right(_subModeBtn) + 2;
-        _buttonBar.Width = 18;
+        _favBtn.X = Pos.Right(_subModeBtn) + 3;
+        _buttonBar.Width = 22;
 
         var desc = string.IsNullOrWhiteSpace(detail.Description) ? "暂无专辑详细背景资料。" : detail.Description.Trim();
         _descFrame.Title = "专辑介绍";
