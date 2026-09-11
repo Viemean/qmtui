@@ -16,7 +16,7 @@ src/Services/AudioRecognition/Native/qafp_runner
 src/Services/AudioRecognition/Runtime/
 .docker/
 mod/
-
+qqmusiclinux/
 # 前端开发依赖
 node_modules/
 歌单类.md
