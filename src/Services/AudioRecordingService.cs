@@ -111,9 +111,14 @@ public sealed class AudioRecordingSession : IDisposable
         }
     }
 
-    public AudioRecordingSession(AudioRecordSource source)
+    public AudioRecordingSession(AudioRecordSource source, byte[]? initialPreRollBytes = null)
     {
         _source = source;
+        if (initialPreRollBytes != null && initialPreRollBytes.Length > 0)
+        {
+            _pcmStream.Write(initialPreRollBytes, 0, initialPreRollBytes.Length);
+        }
+
         var inputDevice = source == AudioRecordSource.SystemInternal
             ? AudioDeviceHelper.GetDefaultSinkMonitorDevice()
             : AudioDeviceHelper.GetDefaultMicrophoneDevice();
@@ -379,8 +384,8 @@ public static class AudioRecordingService
     /// <summary>
     /// 启动流式录音会话
     /// </summary>
-    public static AudioRecordingSession StartRecordingSession(AudioRecordSource source)
+    public static AudioRecordingSession StartRecordingSession(AudioRecordSource source, byte[]? initialPreRollBytes = null)
     {
-        return new AudioRecordingSession(source);
+        return new AudioRecordingSession(source, initialPreRollBytes);
     }
 }

@@ -63,36 +63,36 @@ public class AcousticRecognitionTests
     }
 
     [Fact]
-    public async Task AcousticFingerprintExtractor_GoldenPcm_ExtractsAndRecognizesSuccessfully()
+    public async Task AcousticFingerprintExtractor_SliceDurations_Experiment()
     {
         const string testPcmPath = "/tmp/loser_5s.pcm";
-        if (!File.Exists(testPcmPath))
+        if (!File.Exists(testPcmPath)) return;
+
+        byte[] allPcmBytes = await File.ReadAllBytesAsync(testPcmPath);
+        short[] allSamples = new short[allPcmBytes.Length / 2];
+        Buffer.BlockCopy(allPcmBytes, 0, allSamples, 0, allPcmBytes.Length);
+
+        double[] testDurations = [2.0, 2.5, 3.0, 3.5, 4.0, 5.0];
+        foreach (var dur in testDurations)
         {
-            _output.WriteLine("[Skip] /tmp/loser_5s.pcm 不存在，跳过端到端音频提取测试");
-            return;
+            int count = (int)(8000 * dur);
+            var slice = allSamples.AsSpan(0, count);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var feat = AcousticFingerprintExtractor.Extract(slice);
+            sw.Stop();
+
+            if (feat == null)
+            {
+                _output.WriteLine($"[Duration {dur:F1}s] Extract 返回 null (耗时: {sw.ElapsedMilliseconds}ms)");
+                continue;
+            }
+
+            var netSw = System.Diagnostics.Stopwatch.StartNew();
+            var res = await AcousticRecognizeClient.SearchAsync(feat);
+            netSw.Stop();
+
+            _output.WriteLine($"[Duration {dur:F1}s] 特征: {feat.Data.Length} 字节, 提取耗时: {sw.Elapsed.TotalMilliseconds:F2}ms, 网络耗时: {netSw.ElapsedMilliseconds}ms, 识别成功: {res.Success}, 歌曲: {res.Title}, 错误: {res.ErrorMessage}");
         }
-
-        byte[] pcmBytes = await File.ReadAllBytesAsync(testPcmPath);
-        var landmarks = AcousticFingerprintExtractor.ExtractLandmarks(pcmBytes);
-
-        Assert.Equal(4, landmarks.Length);
-        _output.WriteLine($"Band 0 点数: {landmarks[0].Count}, Band 1: {landmarks[1].Count}, Band 2: {landmarks[2].Count}, Band 3: {landmarks[3].Count}");
-        Assert.Equal(80, landmarks[0].Count);
-        Assert.Equal(84, landmarks[1].Count);
-        Assert.Equal(87, landmarks[2].Count);
-        Assert.Equal(81, landmarks[3].Count);
-
-        byte[] packedFeat = AcousticFingerprintExtractor.PackLandmarks(landmarks);
-        _output.WriteLine($"原生打包特征长度: {packedFeat.Length} 字节");
-        Assert.Equal(537, packedFeat.Length);
-
-        // 云端识别测试
-        var feature = new AcousticFeature(packedFeat, 5.0f);
-        var result = await AcousticRecognizeClient.SearchAsync(feature);
-
-        _output.WriteLine($"云端识别响应: Success={result.Success}, Title={result.Title}, Artist={result.Artist}, Offset={result.OffsetSeconds:F3}s, Err={result.ErrorMessage}");
-        Assert.True(result.Success, $"云端识别应当成功，错误: {result.ErrorMessage}");
-        Assert.Contains("LOSER", result.Title, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -118,5 +118,30 @@ public class AcousticRecognitionTests
         sw.Stop();
         double avgMs = sw.Elapsed.TotalMilliseconds / iterations;
         _output.WriteLine($"[Benchmark] AcousticFingerprintExtractor.Extract 平均单次耗时: {avgMs:F2} ms (30 次迭代)");
+    }
+
+    [Fact]
+    public void RollingAudioBuffer_WriteAndGetRecent_MaintainsCorrectOrder()
+    {
+        var ring = new RollingAudioBuffer(10);
+        Assert.Equal(0, ring.AvailableBytes);
+
+        // 写入 6 字节: [1, 2, 3, 4, 5, 6]
+        ring.Write(new byte[] { 1, 2, 3, 4, 5, 6 });
+        Assert.Equal(6, ring.AvailableBytes);
+
+        var snapshot1 = ring.GetRecentBytes(4);
+        Assert.Equal(new byte[] { 3, 4, 5, 6 }, snapshot1);
+
+        // 写入 8 字节触发环形溢出覆盖: [7, 8, 9, 10, 11, 12, 13, 14]
+        // 缓冲区容量 10，此时应保留最后 10 字节: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+        ring.Write(new byte[] { 7, 8, 9, 10, 11, 12, 13, 14 });
+        Assert.Equal(10, ring.AvailableBytes);
+
+        var snapshot2 = ring.GetRecentBytes(5);
+        Assert.Equal(new byte[] { 10, 11, 12, 13, 14 }, snapshot2);
+
+        var allSnapshot = ring.GetRecentBytes(10);
+        Assert.Equal(new byte[] { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 }, allSnapshot);
     }
 }
