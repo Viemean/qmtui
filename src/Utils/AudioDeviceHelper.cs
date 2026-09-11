@@ -42,6 +42,41 @@ public static class AudioDeviceHelper
     }
 
     /// <summary>
+    /// 检测系统是否存在活跃的音频播放流（排除暂停/Corked 状态的流）
+    /// </summary>
+    public static bool HasActiveAudioPlayback()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "pactl",
+                Arguments = "list sink-inputs",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process != null)
+            {
+                var output = process.StandardOutput.ReadToEnd();
+                if (process.WaitForExit(600) && process.ExitCode == 0)
+                {
+                    return output.Contains("Corked: no", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AudioDeviceHelper", $"HasActiveAudioPlayback error: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// 获取当前默认输出设备的物理 Monitor 名称，防止使用 @DEFAULT_SINK@.monitor 时触发 PipeWire 回退至麦克风
     /// </summary>
     public static string GetDefaultSinkMonitorDevice()

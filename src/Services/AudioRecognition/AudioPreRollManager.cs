@@ -145,6 +145,15 @@ public static class AudioPreRollManager
     }
 
     /// <summary>
+    /// 主动唤醒预录（例如用户打开识别对话框时）
+    /// </summary>
+    public static void WakeUp()
+    {
+        s_isSleeping = false;
+        s_consecutiveSilenceChunks = 0;
+    }
+
+    /// <summary>
     /// 确保预录线程已启动
     /// </summary>
     public static void EnsureStarted()
@@ -209,8 +218,8 @@ public static class AudioPreRollManager
                         try { PulseAudioSimpleNative.pa_simple_free(localHandle); } catch { }
                         localHandle = IntPtr.Zero;
                     }
-                    Thread.Sleep(500);
-                    if (AudioDeviceHelper.HasInternalRecordDevice())
+                    Thread.Sleep(1000);
+                    if (AudioDeviceHelper.HasActiveAudioPlayback())
                     {
                         s_isSleeping = false;
                         s_consecutiveSilenceChunks = 0;
@@ -270,8 +279,8 @@ public static class AudioPreRollManager
                 else
                 {
                     s_consecutiveSilenceChunks++;
-                    // 连续 30 秒（约 460 个分片）持续静音，触发深度休眠释放句柄，避免占用声卡或亮指示器
-                    if (s_consecutiveSilenceChunks > 460)
+                    // 连续 6 秒（约 90 个分片）持续静音，触发深度休眠释放句柄，立即熄灭系统托盘录音指示器
+                    if (s_consecutiveSilenceChunks > 90)
                     {
                         if (localHandle != IntPtr.Zero)
                         {

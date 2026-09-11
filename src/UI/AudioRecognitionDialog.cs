@@ -70,8 +70,9 @@ public sealed class AudioRecognitionDialog : Dialog
         _onSongSelected = onSongSelected;
         _currentSource = s_currentSource;
 
-        // 预热网络连接池
+        // 预热网络连接池与唤醒预录
         AudioRecognitionService.PreWarm();
+        AudioPreRollManager.WakeUp();
 
         Title = "听歌识曲";
         int dlgW = 62;
