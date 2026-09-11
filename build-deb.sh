@@ -64,18 +64,10 @@ if [ -d "www" ]; then
     cp -r www/* "$STAGE_DIR/usr/share/qmtui/www/"
 fi
 
-if [ -f "scripts/setup-qafp.sh" ]; then
-    cp scripts/setup-qafp.sh "$STAGE_DIR/usr/share/qmtui/setup-qafp.sh"
-    chmod 755 "$STAGE_DIR/usr/share/qmtui/setup-qafp.sh"
-fi
-
 # 生成 DEBIAN/postinst 钩子脚本
 cat << 'EOF' > "$STAGE_DIR/DEBIAN/postinst"
 #!/bin/sh
 set -e
-if [ "$1" = "configure" ]; then
-    echo "==> 运行 /usr/share/qmtui/setup-qafp.sh 启用 QAFP 识曲"
-fi
 exit 0
 EOF
 chmod 755 "$STAGE_DIR/DEBIAN/postinst"
@@ -84,10 +76,6 @@ chmod 755 "$STAGE_DIR/DEBIAN/postinst"
 cat << 'EOF' > "$STAGE_DIR/DEBIAN/postrm"
 #!/bin/sh
 set -e
-if [ "$1" = "purge" ] || [ "$1" = "remove" ]; then
-    echo "==> [qmtui] 清理外部运行时目录..."
-    rm -rf /usr/share/qmtui/qafp
-fi
 exit 0
 EOF
 chmod 755 "$STAGE_DIR/DEBIAN/postrm"

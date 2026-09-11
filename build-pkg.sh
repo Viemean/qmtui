@@ -37,15 +37,10 @@ if [ -d "www" ]; then
     cp -r www/* "$STAGE_DIR/usr/share/qmtui/www/"
 fi
 
-if [ -f "scripts/setup-qafp.sh" ]; then
-    cp scripts/setup-qafp.sh "$STAGE_DIR/usr/share/qmtui/setup-qafp.sh"
-    chmod 755 "$STAGE_DIR/usr/share/qmtui/setup-qafp.sh"
-fi
-
 # 生成 Pacman .INSTALL 安装后钩子脚本
 cat << 'EOF' > "$STAGE_DIR/.INSTALL"
 post_install() {
-    echo "==> 运行 /usr/share/qmtui/setup-qafp.sh 启用 QAFP 识曲"
+    :
 }
 
 post_upgrade() {
@@ -53,8 +48,7 @@ post_upgrade() {
 }
 
 post_remove() {
-    echo "==> [qmtui] 清理外部运行时目录..."
-    rm -rf /usr/share/qmtui/qafp
+    :
 }
 EOF
 chmod 755 "$STAGE_DIR/.INSTALL"
@@ -83,7 +77,6 @@ depend = libpulse
 optdepend = gst-libav: additional audio codecs (AAC/M4A) support
 optdepend = wl-clipboard: Wayland clipboard support for copying song links
 optdepend = xclip: X11 clipboard support for copying song links
-optdepend = qemu-user: ARM64 emulation for external QAFP recognition plugin
 provides = qmtui
 provides = qqmusic-tui
 provides = qmtui-bin

@@ -43,8 +43,4 @@ package() {
     if [ -d "${_www_src}" ]; then
         cp -r "${_www_src}" "${pkgdir}/usr/share/qmtui/"
     fi
-
-    if [ -f "${srcdir}/../scripts/setup-qafp.sh" ]; then
-        install -Dm755 "${srcdir}/../scripts/setup-qafp.sh" "${pkgdir}/usr/share/qmtui/setup-qafp.sh"
-    fi
 }
