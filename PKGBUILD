@@ -4,7 +4,7 @@ pkgname=qmtui-bin
 _pkgname=qmtui
 pkgver=0.3.2
 pkgrel=1
-pkgdesc="Linux terminal music player (.NET 10 Native AOT pre-built binary package)"
+pkgdesc="Linux terminal qqmusic player (.NET 10 Native AOT pre-built binary package)"
 arch=('x86_64' 'aarch64')
 url="https://github.com/Viemean/qmtui"
 license=('MIT')
@@ -24,7 +24,7 @@ optdepends=(
     'qemu-user: ARM64 sidecar/plugin emulation on x86_64'
 )
 
-provides=('qmtui' 'qqmusic-tui')
+provides=('qmtui' 'qqmusic-tui' 'qmtui-bin')
 conflicts=('qmtui' 'qqmusic-tui' 'qqmusic-tui-bin')
 replaces=('qqmusic-tui' 'qqmusic-tui-bin')
 

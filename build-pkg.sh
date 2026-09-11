@@ -68,7 +68,7 @@ cat << EOF > "$STAGE_DIR/.PKGINFO"
 pkgname = ${PKGNAME}
 pkgbase = ${PKGNAME}
 pkgver = ${VERSION}-${PKGREL}
-pkgdesc = Linux terminal music player (.NET 10 Native AOT pre-built package)
+pkgdesc = Linux terminal qqmusic player (.NET 10 Native AOT pre-built package)
 url = https://github.com/Viemean/qmtui
 builddate = ${BUILD_DATE}
 packager = Yuzuki <lxf74663@gmail.com>
@@ -86,6 +86,7 @@ optdepend = xclip: X11 clipboard support for copying song links
 optdepend = qemu-user: ARM64 emulation for external QAFP recognition plugin
 provides = qmtui
 provides = qqmusic-tui
+provides = qmtui-bin
 conflict = qmtui
 conflict = qqmusic-tui
 conflict = qqmusic-tui-bin
