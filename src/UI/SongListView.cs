@@ -163,7 +163,7 @@ public sealed partial class SongListView : FrameView
                 var curSong = _songs[idx];
                 if (_focusedSubColumn == SongSubColumn.Artist)
                 {
-                    if (!curSong.IsLocal)
+                    if (!string.IsNullOrWhiteSpace(curSong.Artist))
                     {
                         ArtistClicked?.Invoke(curSong);
                         return;
@@ -171,7 +171,7 @@ public sealed partial class SongListView : FrameView
                 }
                 else if (_focusedSubColumn == SongSubColumn.Album)
                 {
-                    if (!curSong.IsLocal && !string.IsNullOrWhiteSpace(curSong.AlbumMid))
+                    if (!string.IsNullOrWhiteSpace(curSong.AlbumMid) || !string.IsNullOrWhiteSpace(curSong.Album))
                     {
                         AlbumClicked?.Invoke(curSong);
                         return;
@@ -293,6 +293,27 @@ public sealed partial class SongListView : FrameView
                 }
             }
 
+            if (k == Key.Enter || k.AsRune.Value == '\r' || k.AsRune.Value == '\n')
+            {
+                int curIdx = _listView.SelectedItem ?? -1;
+                if (curIdx >= 0 && curIdx < _songs.Count)
+                {
+                    var curSong = _songs[curIdx];
+                    if (_focusedSubColumn == SongSubColumn.Artist && !string.IsNullOrWhiteSpace(curSong.Artist))
+                    {
+                        k.Handled = true;
+                        ArtistClicked?.Invoke(curSong);
+                        return;
+                    }
+                    if (_focusedSubColumn == SongSubColumn.Album && (!string.IsNullOrWhiteSpace(curSong.AlbumMid) || !string.IsNullOrWhiteSpace(curSong.Album)))
+                    {
+                        k.Handled = true;
+                        AlbumClicked?.Invoke(curSong);
+                        return;
+                    }
+                }
+            }
+
             if (k == Key.CursorLeft)
             {
                 k.Handled = true;
@@ -384,7 +405,8 @@ public sealed partial class SongListView : FrameView
                         _lastClickRow = clickedRow;
                         _lastClickCol = clickX;
 
-                        int artistStart = 4 + _titleColWidth + 2;
+                        int idxArea = GetIndexWidth() + 2;
+                        int artistStart = idxArea + _titleColWidth + 2;
                         int artistEnd = artistStart + _artistColWidth;
                         int albumStart = artistEnd + 2;
                         if (clickX >= artistStart && clickX < artistEnd)
@@ -408,18 +430,14 @@ public sealed partial class SongListView : FrameView
                 {
                     var clickedSong = _songs[clickedRow];
 
-                    int totalWidth = _listView.Viewport.Width > 0 ? _listView.Viewport.Width : (Viewport.Width > 0 ? Viewport.Width - 2 : 80);
-                    int remain = Math.Max(30, totalWidth - 13);
-                    int titleColWidth = Math.Max(16, (int)Math.Round(remain * 0.46));
-                    int artistColWidth = Math.Max(10, (int)Math.Round(remain * 0.24));
-
-                    int artistStart = 4 + titleColWidth + 2;
-                    int artistEnd = artistStart + artistColWidth;
+                    int idxArea = GetIndexWidth() + 2;
+                    int artistStart = idxArea + _titleColWidth + 2;
+                    int artistEnd = artistStart + _artistColWidth;
                     int albumStart = artistEnd + 2;
 
                     if (clickX >= artistStart && clickX < artistEnd)
                     {
-                        if (!clickedSong.IsLocal)
+                        if (!string.IsNullOrWhiteSpace(clickedSong.Artist))
                         {
                             ArtistClicked?.Invoke(clickedSong);
                             m.Handled = true;
@@ -428,7 +446,7 @@ public sealed partial class SongListView : FrameView
                     }
                     else if (clickX >= albumStart)
                     {
-                        if (!clickedSong.IsLocal && !string.IsNullOrWhiteSpace(clickedSong.AlbumMid))
+                        if (!string.IsNullOrWhiteSpace(clickedSong.AlbumMid) || !string.IsNullOrWhiteSpace(clickedSong.Album))
                         {
                             AlbumClicked?.Invoke(clickedSong);
                             m.Handled = true;

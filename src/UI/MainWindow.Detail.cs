@@ -48,12 +48,6 @@ public sealed partial class MainWindow
 
     private void OnArtistClicked(Song song)
     {
-        if (song.IsLocal || song.IsWebDav)
-        {
-            _controlBar.UpdateStatus("本地/WebDAV 曲目暂不支持查看在线歌手主页");
-            return;
-        }
-
         var singers = ExtractArtistsFromSong(song);
 
         if (singers.Count > 1)
@@ -76,17 +70,14 @@ public sealed partial class MainWindow
             return;
         }
 
-        _ = DrilldownToArtistAsync(new ArtistInfo(song.Artist, "", 0));
+        if (!string.IsNullOrWhiteSpace(song.Artist))
+        {
+            _ = DrilldownToArtistAsync(new ArtistInfo(song.Artist, "", 0));
+        }
     }
 
     private void HandleNowPlayingArtistClicked(Song song)
     {
-        if (song.IsLocal || song.IsWebDav)
-        {
-            _controlBar.UpdateStatus("本地/WebDAV 曲目暂不支持查看在线歌手主页");
-            return;
-        }
-
         var singers = ExtractArtistsFromSong(song);
         if (singers.Count > 1)
         {
@@ -125,12 +116,6 @@ public sealed partial class MainWindow
 
     private void OnAlbumClicked(Song song)
     {
-        if (song.IsLocal || song.IsWebDav)
-        {
-            _controlBar.UpdateStatus("本地/WebDAV 曲目暂不支持查看在线专辑主页");
-            return;
-        }
-
         if (string.IsNullOrWhiteSpace(song.AlbumMid))
         {
             _controlBar.UpdateStatus($"[专辑提示] 《{song.Title}》无可用在线专辑信息");
