@@ -21,7 +21,7 @@ public static class AcousticFingerprintExtractor
 
     private static readonly float[] s_hammingWindow = InitHammingWindow();
     private static readonly (int i, int j)[] s_bitRevSwaps = InitBitRevSwaps();
-    private static readonly (double Re, double Im)[][] s_twiddles = InitTwiddles();
+    private static readonly (float Re, float Im)[][] s_twiddles = InitTwiddles();
 
     private static readonly int[] s_modeBitWidths = [1, 2, 3, 4, 5, 6, 7, 9];
     private static readonly int[] s_modeItemCounts = [36, 18, 12, 9, 7, 6, 5, 4];
@@ -59,13 +59,13 @@ public static class AcousticFingerprintExtractor
         return swaps.ToArray();
     }
 
-    private static (double Re, double Im)[][] InitTwiddles()
+    private static (float Re, float Im)[][] InitTwiddles()
     {
-        var tw = new (double Re, double Im)[10][];
+        var tw = new (float Re, float Im)[10][];
         int stage = 0;
         for (int l = 1; l < FftSize; l <<= 1)
         {
-            tw[stage] = new (double, double)[l];
+            tw[stage] = new (float, float)[l];
             double angle = -Math.PI / l;
             double wRe = Math.Cos(angle);
             double wIm = Math.Sin(angle);
@@ -73,7 +73,7 @@ public static class AcousticFingerprintExtractor
             double curIm = 0.0;
             for (int k = 0; k < l; k++)
             {
-                tw[stage][k] = (curRe, curIm);
+                tw[stage][k] = ((float)curRe, (float)curIm);
                 double nextRe = curRe * wRe - curIm * wIm;
                 double nextIm = curRe * wIm + curIm * wRe;
                 curRe = nextRe;
@@ -134,8 +134,11 @@ public static class AcousticFingerprintExtractor
         }
 
         var spectrogram = new float[numFrames][];
-        var fftRe = new double[FftSize];
-        var fftIm = new double[FftSize];
+        var fftRe = new float[FftSize];
+        var fftIm = new float[FftSize];
+        int vCount = System.Numerics.Vector<float>.Count;
+        int halfFft = FftSize / 2;
+        int simdBranches = halfFft - (halfFft % vCount);
 
         for (int i = 0; i < numFrames; i++)
         {
@@ -143,15 +146,32 @@ public static class AcousticFingerprintExtractor
             for (int n = 0; n < WindowSize; n++)
             {
                 fftRe[n] = samples[stStart + n] * s_hammingWindow[n];
-                fftIm[n] = 0.0;
+                fftIm[n] = 0.0f;
             }
 
             ComputeFft(fftRe, fftIm);
 
-            var mag = new float[FftSize / 2 + 1];
-            for (int f = 0; f <= FftSize / 2; f++)
+            var mag = new float[halfFft + 1];
+            if (System.Numerics.Vector.IsHardwareAccelerated && simdBranches > 0)
             {
-                mag[f] = (float)Math.Sqrt(fftRe[f] * fftRe[f] + fftIm[f] * fftIm[f]);
+                for (int f = 0; f < simdBranches; f += vCount)
+                {
+                    var reV = new System.Numerics.Vector<float>(fftRe, f);
+                    var imV = new System.Numerics.Vector<float>(fftIm, f);
+                    var magV = System.Numerics.Vector.SquareRoot(reV * reV + imV * imV);
+                    magV.CopyTo(mag, f);
+                }
+                for (int f = simdBranches; f <= halfFft; f++)
+                {
+                    mag[f] = MathF.Sqrt(fftRe[f] * fftRe[f] + fftIm[f] * fftIm[f]);
+                }
+            }
+            else
+            {
+                for (int f = 0; f <= halfFft; f++)
+                {
+                    mag[f] = MathF.Sqrt(fftRe[f] * fftRe[f] + fftIm[f] * fftIm[f]);
+                }
             }
             spectrogram[i] = mag;
         }
@@ -170,7 +190,8 @@ public static class AcousticFingerprintExtractor
 
         var result = new List<Landmark>[ChannelCount];
 
-        // 各通道执行 2D NMS
+        // 各通道执行 2D NMS（复用 cands 临时列表，消除逐帧微小对象分配）
+        var cands = new List<(int f, float val)>(64);
         for (int ch = 0; ch < ChannelCount; ch++)
         {
             var spec = channelSpecs[ch];
@@ -180,7 +201,7 @@ public static class AcousticFingerprintExtractor
             int targetEnd = Math.Max(0, numT - TimeWindow);
             for (int t = 0; t < targetEnd; t++)
             {
-                var cands = new List<(int f, float val)>();
+                cands.Clear();
                 for (int f = 3; f <= 510; f++)
                 {
                     float val = spec[t][f];
@@ -336,7 +357,7 @@ public static class AcousticFingerprintExtractor
         return ms.ToArray();
     }
 
-    private static void ComputeFft(double[] re, double[] im)
+    private static void ComputeFft(float[] re, float[] im)
     {
         for (int idx = 0; idx < s_bitRevSwaps.Length; idx++)
         {
@@ -358,8 +379,8 @@ public static class AcousticFingerprintExtractor
                     int q = p + l;
 
                     var (curRe, curIm) = stageTwiddles[k];
-                    double tRe = curRe * re[q] - curIm * im[q];
-                    double tIm = curRe * im[q] + curIm * re[q];
+                    float tRe = curRe * re[q] - curIm * im[q];
+                    float tIm = curRe * im[q] + curIm * re[q];
 
                     re[q] = re[p] - tRe;
                     im[q] = im[p] - tIm;
