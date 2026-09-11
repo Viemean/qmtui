@@ -24,3 +24,4 @@ node_modules/
 # 本地发布与 AUR 独立打包配置
 AUR/
 release-aur.sh
+bump-version.sh
