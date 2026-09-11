@@ -205,14 +205,26 @@ public sealed partial class MusicApi
         {
             foreach (var singer in singerArray.EnumerateArray())
             {
-                var sName = singer.TryGetProperty("name", out var sNameProp) ? sNameProp.GetString() ?? "" : "";
-                var sMid = singer.TryGetProperty("mid", out var sMidProp) ? sMidProp.GetString() ?? "" : "";
+                var sName = "";
+                if (singer.TryGetProperty("name", out var sNameProp)) sName = sNameProp.GetString() ?? "";
+                else if (singer.TryGetProperty("singer_name", out var snp)) sName = snp.GetString() ?? "";
+                else if (singer.TryGetProperty("singerName", out var snp2)) sName = snp2.GetString() ?? "";
+
+                var sMid = "";
+                if (singer.TryGetProperty("mid", out var sMidProp)) sMid = sMidProp.GetString() ?? "";
+                else if (singer.TryGetProperty("singer_mid", out var smp)) sMid = smp.GetString() ?? "";
+                else if (singer.TryGetProperty("singerMID", out var smp2)) sMid = smp2.GetString() ?? "";
+                else if (singer.TryGetProperty("pmid", out var pmp)) sMid = pmp.GetString() ?? "";
+
                 long sId = 0;
-                if (singer.TryGetProperty("id", out var sIdProp))
+                if (singer.TryGetProperty("id", out var sIdProp) ||
+                    singer.TryGetProperty("singer_id", out sIdProp) ||
+                    singer.TryGetProperty("singerID", out sIdProp))
                 {
                     if (sIdProp.ValueKind == JsonValueKind.Number) sId = sIdProp.GetInt64();
                     else if (sIdProp.ValueKind == JsonValueKind.String && long.TryParse(sIdProp.GetString(), out var pId)) sId = pId;
                 }
+
                 if (!string.IsNullOrWhiteSpace(sName))
                 {
                     artists.Add(sName);

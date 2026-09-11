@@ -430,5 +430,20 @@ public class PlatformApiTests
         _output.WriteLine($"删除歌单成功: dissId={dissId}");
     }
 
+    [Fact]
+    public async Task GetSingerDetailAsync_WhenMidEmpty_ResolvesArtistByNameAndReturnsDetail()
+    {
+        if (!IsOnlineTestEnabled()) return;
+
+        var (mid, id) = await MusicApi.ResolveArtistAsync("Void");
+        Assert.False(string.IsNullOrWhiteSpace(mid));
+        Assert.True(id > 0);
+
+        var detail = await MusicApi.GetSingerDetailAsync("", 0, "Void");
+        Assert.NotNull(detail);
+        Assert.Equal(mid, detail.Mid);
+        Assert.True(detail.Songs.Count > 0);
+    }
+
     #endregion
 }

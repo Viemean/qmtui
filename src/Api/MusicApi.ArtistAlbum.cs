@@ -252,7 +252,7 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 当缺少歌手 mid/id 时，通过歌曲检索精确补全歌手唯一标识
+    /// 当缺少歌手 mid/id 时，通过现代搜索网关精确检索补全歌手唯一标识
     /// </summary>
     public static async Task<(string Mid, long Id)> ResolveArtistAsync(string singerName, CancellationToken ct = default)
     {
@@ -260,40 +260,96 @@ public sealed partial class MusicApi
 
         try
         {
-            var encoded = Uri.EscapeDataString(singerName);
-            var url = $"https://c.y.qq.com/soso/fcgi-bin/client_search_cp?w={encoded}&n=5&p=1&format=json";
-            var json = await s_httpClient.GetStringAsync(url, ct).ConfigureAwait(false);
+            var escapedQuery = JsonEncodedText.Encode(singerName).ToString();
+            var payload = $$"""
+            {
+              "music.search.SearchCgiService": {
+                "module": "music.search.SearchCgiService",
+                "method": "DoSearchForQQMusicDesktop",
+                "param": {
+                  "query": "{{escapedQuery}}",
+                  "page_num": 1,
+                  "num_per_page": 10,
+                  "search_type": 1
+                }
+              }
+            }
+            """;
+
+            var json = await PostAg1Async(payload, ct).ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            if (root.TryGetProperty("data", out var data) &&
-                data.TryGetProperty("song", out var songObj) &&
-                songObj.TryGetProperty("list", out var songList) &&
-                songList.ValueKind == JsonValueKind.Array)
+            if (root.TryGetProperty("music.search.SearchCgiService", out var svc) &&
+                svc.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("body", out var body) &&
+                body.TryGetProperty("singer", out var singerObj) &&
+                singerObj.TryGetProperty("list", out var singerList) &&
+                singerList.ValueKind == JsonValueKind.Array)
             {
-                foreach (var song in songList.EnumerateArray())
-                {
-                    if (song.TryGetProperty("singer", out var singerArr) && singerArr.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var singer in singerArr.EnumerateArray())
-                        {
-                            var name = singer.TryGetProperty("name", out var np) ? np.GetString() ?? "" : "";
-                            var mid = singer.TryGetProperty("mid", out var mp) ? mp.GetString() ?? "" : "";
-                            long id = 0;
-                            if (singer.TryGetProperty("id", out var ip) && ip.ValueKind == JsonValueKind.Number) id = ip.GetInt64();
+                string bestMid = "";
+                long bestId = 0;
+                int maxSongNum = -1;
 
-                            if (name.Equals(singerName, StringComparison.OrdinalIgnoreCase) ||
-                                name.Contains(singerName, StringComparison.OrdinalIgnoreCase) ||
-                                singerName.Contains(name, StringComparison.OrdinalIgnoreCase))
-                            {
-                                return (mid, id);
-                            }
+                foreach (var item in singerList.EnumerateArray())
+                {
+                    string name = "";
+                    if (item.TryGetProperty("singerName", out var snp)) name = snp.GetString() ?? "";
+                    else if (item.TryGetProperty("singer_name", out var snp2)) name = snp2.GetString() ?? "";
+                    else if (item.TryGetProperty("name", out var snp3)) name = snp3.GetString() ?? "";
+
+                    string mid = "";
+                    if (item.TryGetProperty("singerMID", out var smp)) mid = smp.GetString() ?? "";
+                    else if (item.TryGetProperty("singer_mid", out var smp2)) mid = smp2.GetString() ?? "";
+                    else if (item.TryGetProperty("mid", out var smp3)) mid = smp3.GetString() ?? "";
+
+                    long id = 0;
+                    if (item.TryGetProperty("singerID", out var sip) ||
+                        item.TryGetProperty("singer_id", out sip) ||
+                        item.TryGetProperty("id", out sip))
+                    {
+                        if (sip.ValueKind == JsonValueKind.Number) id = sip.GetInt64();
+                        else if (sip.ValueKind == JsonValueKind.String && long.TryParse(sip.GetString(), out var pid)) id = pid;
+                    }
+
+                    int songNum = 0;
+                    if (item.TryGetProperty("songNum", out var snProp) && snProp.ValueKind == JsonValueKind.Number)
+                    {
+                        songNum = snProp.GetInt32();
+                    }
+
+                    if (string.IsNullOrEmpty(mid) && id <= 0) continue;
+
+                    // 精确全名匹配：优先选取曲目数量更多的主歌手
+                    if (name.Equals(singerName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (songNum > maxSongNum)
+                        {
+                            maxSongNum = songNum;
+                            bestMid = mid;
+                            bestId = id;
                         }
                     }
+                    // 若尚未找到精确匹配项，记录首个包含匹配项作为备选
+                    else if (string.IsNullOrEmpty(bestMid) &&
+                             (name.Contains(singerName, StringComparison.OrdinalIgnoreCase) ||
+                              singerName.Contains(name, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        bestMid = mid;
+                        bestId = id;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(bestMid) || bestId > 0)
+                {
+                    return (bestMid, bestId);
                 }
             }
         }
-        catch {}
+        catch (Exception ex)
+        {
+            AppLogger.Error("MusicApi", $"ResolveArtistAsync failed for singer '{singerName}'", ex);
+        }
 
         return ("", 0);
     }
