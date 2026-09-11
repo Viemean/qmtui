@@ -104,6 +104,8 @@ public sealed partial class SongListView : FrameView
     public event Action? Clicked;
     public event Action<bool>? TabNavigationRequested;
 
+    private readonly ObservableCollection<string> _displayRows = [];
+
     public SongListView()
     {
         Title = "";
@@ -145,7 +147,7 @@ public sealed partial class SongListView : FrameView
             }
         };
 
-        _listView.SetSource(new ObservableCollection<string>());
+        _listView.SetSource(_displayRows);
 
         _listView.Accepted += async (s, e) =>
         {
@@ -593,14 +595,19 @@ public sealed partial class SongListView : FrameView
 
     public void SelectRow(int index)
     {
-        if (_songs.Count == 0 && _customItems.Count == 0) return;
-        int count = _songs.Count > 0 ? _songs.Count : _customItems.Count;
+        int count = _displayRows.Count;
+        if (count == 0)
+        {
+            _listView.SelectedItem = null;
+            return;
+        }
         int clamped = Math.Clamp(index, 0, count - 1);
         _listView.SelectedItem = clamped;
         int viewH = _listView.Viewport.Height > 0 ? _listView.Viewport.Height : 20;
         int targetTop = Math.Max(0, clamped - (viewH / 2));
         _listView.Viewport = new Rectangle(_listView.Viewport.X, targetTop, _listView.Viewport.Width, _listView.Viewport.Height);
         UpdateFocusedRowDisplay();
+        UpdateSubColumnTitle(clamped);
         _scrollBar.UpdateMetrics(count, _listView.Viewport.Height, _listView.Viewport.Y);
     }
 
@@ -663,8 +670,9 @@ public sealed partial class SongListView : FrameView
         _customItemAccepted = onAccepted;
         _customItemSelectionChanged = onSelectionChanged;
         _listView.Viewport = new Rectangle(_listView.Viewport.X, 0, _listView.Viewport.Width, _listView.Viewport.Height);
-        _listView.SetSource(new ObservableCollection<string>(_customItems));
-        _listView.SelectedItem = _customItems.Count > 0 ? 0 : null;
+        _displayRows.Clear();
+        foreach (var it in _customItems) _displayRows.Add(it);
+        _listView.SelectedItem = _displayRows.Count > 0 ? 0 : null;
         _scrollBar.UpdateMetrics(_customItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
         SetMarqueeTitle(title);
 
@@ -686,13 +694,14 @@ public sealed partial class SongListView : FrameView
         int prevViewportY = _listView.Viewport.Y;
 
         _customItems.AddRange(newItems);
-        _listView.SetSource(new ObservableCollection<string>(_customItems));
+        _displayRows.Clear();
+        foreach (var it in _customItems) _displayRows.Add(it);
 
-        if (prevSelected >= 0 && prevSelected < _customItems.Count)
+        if (prevSelected >= 0 && prevSelected < _displayRows.Count)
         {
             _listView.SelectedItem = prevSelected;
         }
-        else if (_customItems.Count > 0)
+        else if (_displayRows.Count > 0)
         {
             _listView.SelectedItem = 0;
         }
@@ -753,7 +762,9 @@ public sealed partial class SongListView : FrameView
         _customItemAccepted = null;
         _songs.Clear();
         _customItems.Clear();
-        _listView.SetSource(new ObservableCollection<string> { message });
+        _displayRows.Clear();
+        _displayRows.Add(message);
+        _listView.SelectedItem = null;
         SetMarqueeTitle(title);
     }
 

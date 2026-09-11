@@ -122,21 +122,20 @@ public sealed partial class SongListView
     public void UpdateFocusedRowDisplay()
     {
         if (_isRadioMode || _songs.Count == 0) return;
-        if (_listView.Source is not ObservableCollection<string> obs) return;
 
         int currentRow = _listView.SelectedItem ?? 0;
         if (currentRow < 0 || currentRow >= _songs.Count) return;
 
-        if (_lastHighlightRow >= 0 && _lastHighlightRow < _songs.Count && _lastHighlightRow != currentRow && _lastHighlightRow < obs.Count)
+        if (_lastHighlightRow >= 0 && _lastHighlightRow < _songs.Count && _lastHighlightRow != currentRow && _lastHighlightRow < _displayRows.Count)
         {
-            obs[_lastHighlightRow] = _lastHighlightRow < _cachedNormalRows.Count
+            _displayRows[_lastHighlightRow] = _lastHighlightRow < _cachedNormalRows.Count
                 ? _cachedNormalRows[_lastHighlightRow]
                 : FormatSongRow(_lastHighlightRow, isSelected: false);
         }
 
-        if (currentRow < obs.Count)
+        if (currentRow < _displayRows.Count)
         {
-            obs[currentRow] = FormatSongRow(currentRow, isSelected: true);
+            _displayRows[currentRow] = FormatSongRow(currentRow, isSelected: true);
             _lastHighlightRow = currentRow;
         }
 

@@ -146,7 +146,8 @@ public sealed partial class SongListView
 
         _radioDisplayLines.Clear();
         _radioDisplayLines.AddRange(lines);
-        _listView.SetSource(new ObservableCollection<string>(_radioDisplayLines));
+        _displayRows.Clear();
+        foreach (var l in _radioDisplayLines) _displayRows.Add(l);
     }
 
     private void RefreshDisplayList()
@@ -155,7 +156,7 @@ public sealed partial class SongListView
 
         if (_songs.Count == 0)
         {
-            _listView.SetSource(new ObservableCollection<string>());
+            _displayRows.Clear();
             _listView.SelectedItem = null;
             _scrollBar.UpdateMetrics(0, _listView.Viewport.Height, 0);
             return;
@@ -210,7 +211,11 @@ public sealed partial class SongListView
             _lastHighlightRow = selectedIdx;
 
             var prevViewportY = _listView.Viewport.Y;
-            _listView.SetSource(new ObservableCollection<string>(displayList));
+            _displayRows.Clear();
+            foreach (var item in displayList)
+            {
+                _displayRows.Add(item);
+            }
             if (prevSelected.HasValue && prevSelected.Value >= 0 && prevSelected.Value < _songs.Count)
             {
                 _listView.SelectedItem = prevSelected.Value;
