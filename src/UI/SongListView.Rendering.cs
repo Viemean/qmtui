@@ -172,16 +172,19 @@ public sealed partial class SongListView
                 totalWidth = curW > 0 ? curW - 2 : 80;
             }
 
-            int remain = Math.Max(30, totalWidth - 13);
+            int idxWidth = GetIndexWidth();
+            int indexArea = idxWidth + 2;
+            int remain = Math.Max(30, totalWidth - indexArea - 9);
             int newTitleW = Math.Max(16, (int)Math.Round(remain * 0.46));
             int newArtistW = Math.Max(10, (int)Math.Round(remain * 0.24));
             int newAlbumW = Math.Max(12, remain - newTitleW - newArtistW);
 
-            if (newTitleW != _titleColWidth || newArtistW != _artistColWidth || newAlbumW != _albumColWidth)
+            if (newTitleW != _titleColWidth || newArtistW != _artistColWidth || newAlbumW != _albumColWidth || _indexColWidth != idxWidth)
             {
                 _titleColWidth = newTitleW;
                 _artistColWidth = newArtistW;
                 _albumColWidth = newAlbumW;
+                _indexColWidth = idxWidth;
                 _cachedNormalRows.Clear();
             }
 
@@ -238,30 +241,73 @@ public sealed partial class SongListView
         var s = _songs[index];
         var albumStr = string.IsNullOrWhiteSpace(s.Album) ? "单曲" : s.Album;
 
-        string titleText = s.Title;
-        string artistText = s.Artist;
-        string albumText = albumStr;
+        bool isTitleFocused = isSelected && _focusedSubColumn == SongSubColumn.Title;
+        bool isArtistFocused = isSelected && _focusedSubColumn == SongSubColumn.Artist;
+        bool isAlbumFocused = isSelected && _focusedSubColumn == SongSubColumn.Album;
 
-        if (isSelected)
+        var titleCol = FormatCell(s.Title, _titleColWidth, isTitleFocused);
+        var artistCol = FormatCell(s.Artist, _artistColWidth, isArtistFocused);
+        var albumCol = FormatCell(albumStr, _albumColWidth, isAlbumFocused);
+
+        int idxWidth = _indexColWidth > 0 ? _indexColWidth : GetIndexWidth();
+        string idxStr = (index + 1).ToString().PadLeft(idxWidth, '0');
+        return $"{idxStr}  {titleCol}  {artistCol}  {albumCol}";
+    }
+
+    private static string FormatCell(string text, int targetWidth, bool isFocused)
+    {
+        if (targetWidth <= 0) return "";
+        if (string.IsNullOrEmpty(text))
         {
-            switch (_focusedSubColumn)
-            {
-                case SongSubColumn.Title:
-                    titleText = $"[ {s.Title} ]";
-                    break;
-                case SongSubColumn.Artist:
-                    artistText = $"[▶ {s.Artist} ◀]";
-                    break;
-                case SongSubColumn.Album:
-                    albumText = $"[▶ {albumStr} ◀]";
-                    break;
-            }
+            return GetPadding(targetWidth);
         }
 
-        var titleCol = TruncateAndPadWide(titleText, _titleColWidth);
-        var artistCol = TruncateAndPadWide(artistText, _artistColWidth);
-        var albumCol = TruncateAndPadWide(albumText, _albumColWidth);
-        return $"{(index + 1):D2}  {titleCol}  {artistCol}  {albumCol}";
+        if (!isFocused)
+        {
+            return TruncateAndPadWide(text, targetWidth);
+        }
+
+        int textW = GetDisplayWidth(text);
+        int bracketOverhead = 4; // "[ " + " ]"
+        if (targetWidth <= bracketOverhead)
+        {
+            return TruncateAndPadWide($"[{text}]", targetWidth);
+        }
+
+        int innerLimit = targetWidth - bracketOverhead;
+        if (textW <= innerLimit)
+        {
+            string content = $"[ {text} ]";
+            return content + GetPadding(targetWidth - (textW + bracketOverhead));
+        }
+
+        // 超长文本截断：保证两侧完整方括号，格式为 [ xxx.. ]
+        int maxTruncateWidth = Math.Max(1, targetWidth - 6);
+        var sb = new StringBuilder(targetWidth);
+        sb.Append("[ ");
+        int curW = 0;
+        foreach (var rune in text.EnumerateRunes())
+        {
+            int rw = rune.GetColumns();
+            if (curW + rw > maxTruncateWidth)
+            {
+                break;
+            }
+            sb.Append(rune);
+            curW += rw;
+        }
+        sb.Append(".. ]");
+        int totalUsed = 2 + curW + 4;
+        if (totalUsed < targetWidth)
+        {
+            sb.Append(GetPadding(targetWidth - totalUsed));
+        }
+        return sb.ToString();
+    }
+
+    private int GetIndexWidth()
+    {
+        return _songs.Count >= 1000 ? 4 : (_songs.Count >= 100 ? 3 : 2);
     }
 
     public static int GetDisplayWidth(string text)

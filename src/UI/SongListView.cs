@@ -50,6 +50,7 @@ public sealed partial class SongListView : FrameView
     private int _titleColWidth = 20;
     private int _artistColWidth = 12;
     private int _albumColWidth = 14;
+    private int _indexColWidth = 2;
     private int _lastHighlightRow = -1;
     private readonly ThinScrollBarView _scrollBar = new();
 

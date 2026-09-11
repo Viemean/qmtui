@@ -152,14 +152,13 @@ public sealed partial class SongListView
         {
             var selSong = _songs[current];
             var albumText = string.IsNullOrWhiteSpace(selSong.Album) ? "单曲" : selSong.Album;
-            string subHint = _focusedSubColumn switch
+            string titleText = _focusedSubColumn switch
             {
-                SongSubColumn.Title => "[歌名 (回车播放)]",
-                SongSubColumn.Artist => $"[已选歌手: {selSong.Artist} (回车进入)]",
-                SongSubColumn.Album => $"[已选专辑: {albumText} (回车进入)]",
-                _ => "[歌名 (回车播放)]"
+                SongSubColumn.Artist => $"《{selSong.Title}》 · [已选歌手: {selSong.Artist} (回车进入)]  [←/→]切换",
+                SongSubColumn.Album => $"《{selSong.Title}》 · [已选专辑: {albumText} (回车进入)]  [←/→]切换",
+                _ => $"《{selSong.Title}》  歌手: {selSong.Artist}  专辑: {albumText}  [←/→]歌手/专辑"
             };
-            SetMarqueeTitle($"《{selSong.Title}》 · {subHint}");
+            SetMarqueeTitle(titleText);
         }
     }
 
