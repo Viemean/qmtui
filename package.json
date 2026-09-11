@@ -1,0 +1,17 @@
+{
+  "name": "qmtui-web",
+  "version": "0.2.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "biome check www",
+    "check:write": "biome check --write www",
+    "check:all": "biome check www && dotnet format --verify-no-changes && dotnet test",
+    "lint": "biome lint www",
+    "format": "biome format --write www",
+    "format:all": "biome format --write www && dotnet format"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4"
+  }
+}

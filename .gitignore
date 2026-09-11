@@ -1,0 +1,26 @@
+bin/
+obj/
+*.dbg
+*.tmp
+*.media
+.cache/
+.agents/
+.tags
+
+# 构建输出与打包产物
+*.pkg.tar.*
+*.deb
+pkg/
+qmtui
+src/Services/AudioRecognition/Native/qafp_runner
+src/Services/AudioRecognition/Runtime/
+.docker/
+mod/
+
+# 前端开发依赖
+node_modules/
+歌单类.md
+
+# 本地发布与 AUR 独立打包配置
+AUR/
+release-aur.sh

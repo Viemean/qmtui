@@ -1,0 +1,114 @@
+name: Build and Release TUI (Multi-Arch)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }} package
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            deb_arch: amd64
+            os: ubuntu-latest
+            rid: linux-x64
+          - arch: aarch64
+            deb_arch: arm64
+            os: ubuntu-24.04-arm
+            rid: linux-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Native Build Dependencies
+        run: |
+          sudo apt-get update || true
+          sudo apt-get install -y --no-install-recommends libgstreamer1.0-dev clang zstd dpkg
+
+      - name: Build and Package Arch Linux ZST (${{ matrix.arch }})
+        run: |
+          chmod +x ./build-pkg.sh
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION="0.1.4"
+          fi
+          ./build-pkg.sh "$VERSION" 1 "${{ matrix.arch }}" "${{ matrix.rid }}"
+
+      - name: Build and Package Debian DEB (${{ matrix.deb_arch }})
+        run: |
+          chmod +x ./build-deb.sh
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION="0.1.4"
+          fi
+          ./build-deb.sh "$VERSION" 1 "${{ matrix.deb_arch }}" "${{ matrix.rid }}"
+
+      - name: Package Standalone Archive (${{ matrix.arch }})
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION="0.1.4"
+          fi
+          BIN_PATH="bin/Release/net10.0/${{ matrix.rid }}/publish/qmtui"
+          if [ ! -f "$BIN_PATH" ]; then
+            BIN_PATH="bin/Release/net10.0/${{ matrix.rid }}/publish/QQMusic.Tui"
+          fi
+
+          # 独立通用 tar.gz 压缩包 (包含可执行文件 qmtui 与 qafp 识曲运行时)
+          STAGE_DIR=$(mktemp -d /tmp/qmtui_standalone.XXXXXX)
+          cp "$BIN_PATH" "$STAGE_DIR/qmtui"
+          chmod 755 "$STAGE_DIR/qmtui"
+          ln -sf qmtui "$STAGE_DIR/qqmusic-tui"
+          if [ -d "Services/AudioRecognition/Runtime/qafp" ]; then
+            cp -r "Services/AudioRecognition/Runtime/qafp" "$STAGE_DIR/qafp"
+            chmod 755 "$STAGE_DIR/qafp/qafp_runner" || true
+            chmod 755 "$STAGE_DIR/qafp/sysroot/system/bin/linker64" || true
+          fi
+          tar -czvf "qmtui-${VERSION}-linux-${{ matrix.arch }}.tar.gz" -C "$STAGE_DIR" .
+          rm -rf "$STAGE_DIR"
+
+      - name: Upload Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qmtui-pkg-${{ matrix.arch }}
+          path: |
+            qmtui-bin-*.pkg.tar.zst
+            qmtui_*.deb
+            qmtui-*-linux-*.tar.gz
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.pkg.tar.zst
+            dist/*.deb
+            dist/*.tar.gz
+          generate_release_notes: true
+

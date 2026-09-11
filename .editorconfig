@@ -1,0 +1,110 @@
+# top-most EditorConfig file
+root = true
+
+# 全局默认规则
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# JSON 与 Web 前端
+[*.{json,js,css,html}]
+indent_size = 2
+
+# C# 源码规则
+[*.cs]
+indent_size = 4
+
+#### .NET 编码约定 ####
+
+# this. 和 Me. 偏好
+dotnet_style_qualification_for_field = false:silent
+dotnet_style_qualification_for_property = false:silent
+dotnet_style_qualification_for_method = false:silent
+dotnet_style_qualification_for_event = false:silent
+
+# 语言关键字与类型名称
+dotnet_style_predefined_type_for_locals_parameters_members = true:suggestion
+dotnet_style_predefined_type_for_member_access = true:suggestion
+
+# 括号偏好
+dotnet_style_parentheses_in_arithmetic_binary_operators = always_for_clarity:silent
+dotnet_style_parentheses_in_relational_binary_operators = always_for_clarity:silent
+dotnet_style_parentheses_in_other_binary_operators = always_for_clarity:silent
+dotnet_style_parentheses_in_other_operators = never_if_unnecessary:silent
+
+# 修饰符偏好
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:silent
+csharp_preferred_modifier_order = public,private,protected,internal,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,volatile,async:silent
+
+#### C# 语言偏好 ####
+
+# var 偏好
+csharp_style_var_for_built_in_types = true:silent
+csharp_style_var_when_type_is_apparent = true:silent
+csharp_style_var_elsewhere = true:silent
+
+# 模式匹配
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+csharp_style_inlined_variable_declarations = true:suggestion
+
+# 空条件与合并操作符
+csharp_style_conditional_delegate_call = true:suggestion
+dotnet_style_coalesce_expression = true:suggestion
+dotnet_style_null_propagation = true:suggestion
+
+#### 命名规则规范 ####
+
+# 私有/内部实例字段使用下划线前缀 (_camelCase)
+dotnet_naming_rule.private_fields_with_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_with_underscore.style = prefix_underscore
+dotnet_naming_rule.private_fields_with_underscore.severity = suggestion
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private, internal
+dotnet_naming_symbols.private_fields.required_modifiers = 
+
+dotnet_naming_style.prefix_underscore.required_prefix = _
+dotnet_naming_style.prefix_underscore.capitalization = camel_case
+
+# 静态字段使用 s_ 前缀
+dotnet_naming_rule.static_fields_with_s.symbols = static_fields
+dotnet_naming_rule.static_fields_with_s.style = prefix_s
+dotnet_naming_rule.static_fields_with_s.severity = suggestion
+
+dotnet_naming_symbols.static_fields.applicable_kinds = field
+dotnet_naming_symbols.static_fields.applicable_accessibilities = private, internal
+dotnet_naming_symbols.static_fields.required_modifiers = static
+
+dotnet_naming_style.prefix_s.required_prefix = s_
+dotnet_naming_style.prefix_s.capitalization = camel_case
+
+# 类型名称使用 PascalCase
+dotnet_naming_rule.types_should_be_pascal_case.symbols = types
+dotnet_naming_rule.types_should_be_pascal_case.style = pascal_case
+dotnet_naming_rule.types_should_be_pascal_case.severity = suggestion
+
+dotnet_naming_symbols.types.applicable_kinds = class, struct, interface, enum
+dotnet_naming_symbols.types.applicable_accessibilities = *
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+#### 代码质量规则定制 ####
+
+# 针对外部服务强制协议（ACRCloud/优图强制使用 MD5/SHA1 哈希签名）
+dotnet_diagnostic.CA5350.severity = none
+dotnet_diagnostic.CA5351.severity = none
+
+# 原生 C 库互操作（GStreamer/PulseAudio/glibc 部分 C 接口返回值按需忽略）
+dotnet_diagnostic.CA1806.severity = suggestion
+
+# 外部协议参数名（如 QQ 登录 cookie 参数 p_skey 带下划线）
+dotnet_diagnostic.CA1707.severity = suggestion
+
+# WebDAV 支持自签名证书选项
+dotnet_diagnostic.CA5359.severity = suggestion
+
