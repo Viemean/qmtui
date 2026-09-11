@@ -8,6 +8,7 @@ using Terminal.Gui.Views;
 using QmTui.Api;
 using QmTui.Models;
 using QmTui.Services;
+using QmTui.Utils;
 
 namespace QmTui.UI;
 
@@ -17,6 +18,7 @@ public sealed class LoginDialog : Dialog
     private readonly CancellationTokenSource _cts = new();
     private LoginHttpServer? _httpServer;
     private LoginService.QrLoginType _loginType = LoginService.QrLoginType.Qq;
+    private object? _uiTimerToken;
 
     private static Scheme TransparentDialogScheme { get; } = new Scheme
     {
@@ -362,6 +364,14 @@ public sealed class LoginDialog : Dialog
         _refreshRequested = true;
     }
 
+    private static void PostToMainThread(Action action)
+    {
+        _ = Task.Run(() =>
+        {
+            try { Application.Invoke(action); } catch { }
+        });
+    }
+
     private void StartQrLoginFlow()
     {
         _httpServer ??= new LoginHttpServer();
@@ -372,130 +382,151 @@ public sealed class LoginDialog : Dialog
         };
         _httpServer.Start(null);
 
-        Application.Invoke(() =>
+        // 主线程同步更新地址文本，避免依赖主事件循环排队延迟
+        _webLanUrlLabel.Text = $"局域网地址: {_httpServer.LanUrl}";
+        _webLocalUrlLabel.Text = $"本机地址: {_httpServer.LocalUrl}";
+
+        // 注册轻量定时器驱动模态循环唤醒，保证后台状态和二维码平滑重绘
+        _uiTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(250), () =>
         {
-            _webLanUrlLabel.Text = $"局域网: {_httpServer.LanUrl}";
-            _webLocalUrlLabel.Text = $"本机: {_httpServer.LocalUrl}";
+            if (_cts.IsCancellationRequested) return false;
+            SetNeedsDraw();
+            return true;
         });
 
         Task.Run(async () =>
         {
-            while (!_cts.Token.IsCancellationRequested)
+            try
             {
-                _refreshRequested = false;
-
-                Application.Invoke(() =>
+                while (!_cts.Token.IsCancellationRequested)
                 {
-                    _webStatusLabel.Text = "状态: 正在拉取二维码...";
-                    _qrStatusLabel.Text = "状态: 正在拉取二维码...";
-                });
-                _httpServer?.UpdateStatus("正在获取二维码...");
+                    _refreshRequested = false;
 
-                var selectedType = _loginType;
-                _httpServer?.UpdateLoginType(LoginService.GetLoginTypeName(selectedType));
-                var qr = await LoginService.FetchQrCodeAsync(selectedType, _cts.Token);
-                if (qr == null)
-                {
-                    Application.Invoke(() =>
+                    var selectedType = _loginType;
+                    var typeName = LoginService.GetLoginTypeName(selectedType);
+
+                    _httpServer?.UpdateLoginType(typeName);
+                    _httpServer?.UpdateStatus("正在获取二维码...");
+
+                    PostToMainThread(() =>
                     {
-                        _webStatusLabel.Text = "状态: 二维码生成失败，按 R 重试";
-                        _qrStatusLabel.Text = "状态: 二维码生成失败，按 R 重试";
+                        _webStatusLabel.Text = "状态: 正在拉取二维码...";
+                        _qrStatusLabel.Text = "状态: 正在拉取二维码...";
                     });
-                    _httpServer?.UpdateStatus("二维码生成失败，请点击刷新重试");
 
-                    for (int i = 0; i < 15 && !_refreshRequested && !_cts.Token.IsCancellationRequested; i++)
+                    var qr = await LoginService.FetchQrCodeAsync(selectedType, _cts.Token).ConfigureAwait(false);
+                    if (qr == null)
                     {
-                        try { await Task.Delay(200, _cts.Token); } catch { break; }
-                    }
-                    continue;
-                }
-
-                _httpServer?.UpdateQrCode(qr.ImageBytes, qr.MimeType);
-                _httpServer?.UpdateStatus($"等待使用{LoginService.GetLoginTypeName(selectedType)}扫码...");
-
-                Application.Invoke(() =>
-                {
-                    _webStatusLabel.Text = $"状态: 等待使用{LoginService.GetLoginTypeName(selectedType)}扫码...";
-                    _qrStatusLabel.Text = $"状态: 等待使用{LoginService.GetLoginTypeName(selectedType)}扫码...";
-                    if (qr.AsciiLines.Count > 0)
-                    {
-                        _qrView.Width = qr.AsciiLines[0].Length;
-                        _qrView.Height = qr.AsciiLines.Count;
-                    }
-                    _qrView.SetSource(new ObservableCollection<string>(qr.AsciiLines));
-                    _qrTipLabel.Text = $"使用{LoginService.GetLoginTypeName(selectedType)}扫码，或浏览器打开: {_httpServer?.LanUrl} (按 R 刷新)";
-                });
-
-                if (selectedType == LoginService.QrLoginType.OfficialApp)
-                {
-                    var status = await LoginService.WaitForOfficialAppQrLoginAsync(qr, next =>
-                    {
-                        _httpServer?.UpdateStatus(next.Message);
-                        Application.Invoke(() =>
+                        _httpServer?.UpdateStatus("二维码生成失败，请点击刷新重试");
+                        PostToMainThread(() =>
                         {
-                            _webStatusLabel.Text = $"状态: {next.Message}";
-                            _qrStatusLabel.Text = $"状态: {next.Message}";
+                            _webStatusLabel.Text = "状态: 二维码生成失败，按 R 重试";
+                            _qrStatusLabel.Text = "状态: 二维码生成失败，按 R 重试";
                         });
-                    }, _cts.Token);
 
-                    if (status.Event == LoginService.QrLoginEvent.Done)
-                    {
-                        _httpServer?.UpdateStatus($"登录成功 [{UserSession.Current.Nick}]", isSuccess: true, nick: UserSession.Current.Nick);
-                        Application.Invoke(() =>
+                        for (int i = 0; i < 15 && !_refreshRequested && !_cts.Token.IsCancellationRequested; i++)
                         {
-                            _onLoginSuccess?.Invoke();
-                            CloseSelf();
-                        });
-                        return;
+                            try { await Task.Delay(200, _cts.Token).ConfigureAwait(false); } catch { break; }
+                        }
+                        continue;
                     }
-                    if (status.Event == LoginService.QrLoginEvent.Expired) continue;
+
+                    _httpServer?.UpdateQrCode(qr.ImageBytes, qr.MimeType);
+                    _httpServer?.UpdateStatus($"等待使用{typeName}扫码...");
+
+                    PostToMainThread(() =>
+                    {
+                        if (_httpServer != null)
+                        {
+                            _webLanUrlLabel.Text = $"局域网地址: {_httpServer.LanUrl}";
+                            _webLocalUrlLabel.Text = $"本机地址: {_httpServer.LocalUrl}";
+                        }
+                        _webStatusLabel.Text = $"状态: 等待使用{typeName}扫码...";
+                        _qrStatusLabel.Text = $"状态: 等待使用{typeName}扫码...";
+                        if (qr.AsciiLines.Count > 0)
+                        {
+                            _qrView.Width = qr.AsciiLines[0].Length;
+                            _qrView.Height = qr.AsciiLines.Count;
+                        }
+                        _qrView.SetSource(new ObservableCollection<string>(qr.AsciiLines));
+                        _qrTipLabel.Text = $"使用{typeName}扫码，或浏览器打开: {_httpServer?.LanUrl} (按 R 刷新)";
+                    });
+
+                    if (selectedType == LoginService.QrLoginType.OfficialApp)
+                    {
+                        var status = await LoginService.WaitForOfficialAppQrLoginAsync(qr, next =>
+                        {
+                            _httpServer?.UpdateStatus(next.Message);
+                            PostToMainThread(() =>
+                            {
+                                _webStatusLabel.Text = $"状态: {next.Message}";
+                                _qrStatusLabel.Text = $"状态: {next.Message}";
+                            });
+                        }, _cts.Token).ConfigureAwait(false);
+
+                        if (status.Event == LoginService.QrLoginEvent.Done)
+                        {
+                            _httpServer?.UpdateStatus($"登录成功 [{UserSession.Current.Nick}]", isSuccess: true, nick: UserSession.Current.Nick);
+                            PostToMainThread(() =>
+                            {
+                                _onLoginSuccess?.Invoke();
+                                CloseSelf();
+                            });
+                            return;
+                        }
+                        if (status.Event == LoginService.QrLoginEvent.Expired) continue;
+                        while (!_cts.Token.IsCancellationRequested && !_refreshRequested && selectedType == _loginType)
+                        {
+                            try { await Task.Delay(500, _cts.Token).ConfigureAwait(false); } catch { break; }
+                        }
+                        continue;
+                    }
+
                     while (!_cts.Token.IsCancellationRequested && !_refreshRequested && selectedType == _loginType)
                     {
-                        try { await Task.Delay(500, _cts.Token); } catch { break; }
-                    }
-                    continue;
-                }
+                        try { await Task.Delay(1500, _cts.Token).ConfigureAwait(false); } catch { break; }
+                        if (_refreshRequested || selectedType != _loginType) break;
 
-                while (!_cts.Token.IsCancellationRequested && !_refreshRequested && selectedType == _loginType)
-                {
-                    try { await Task.Delay(1500, _cts.Token); } catch { break; }
-                    if (_refreshRequested || selectedType != _loginType) break;
-
-                    var status = await LoginService.PollQrStatusAsync(qr, _cts.Token);
-                    if (status.Event == LoginService.QrLoginEvent.Done)
-                    {
-                        _httpServer?.UpdateStatus($"登录成功 [{UserSession.Current.Nick}]", isSuccess: true, nick: UserSession.Current.Nick);
-                        Application.Invoke(() =>
+                        var status = await LoginService.PollQrStatusAsync(qr, _cts.Token).ConfigureAwait(false);
+                        if (status.Event == LoginService.QrLoginEvent.Done)
                         {
-                            _webStatusLabel.Text = $"状态: 登录成功 [{UserSession.Current.Nick}]";
-                            _qrStatusLabel.Text = $"状态: 登录成功 [{UserSession.Current.Nick}]";
-                            _onLoginSuccess?.Invoke();
-                        });
-                        try { await Task.Delay(1500, _cts.Token); } catch { }
-                        _httpServer?.Stop();
-                        Application.Invoke(CloseSelf);
-                        return;
-                    }
+                            _httpServer?.UpdateStatus($"登录成功 [{UserSession.Current.Nick}]", isSuccess: true, nick: UserSession.Current.Nick);
+                            PostToMainThread(() =>
+                            {
+                                _webStatusLabel.Text = $"状态: 登录成功 [{UserSession.Current.Nick}]";
+                                _qrStatusLabel.Text = $"状态: 登录成功 [{UserSession.Current.Nick}]";
+                                _onLoginSuccess?.Invoke();
+                            });
+                            try { await Task.Delay(1500, _cts.Token).ConfigureAwait(false); } catch { }
+                            _httpServer?.Stop();
+                            PostToMainThread(CloseSelf);
+                            return;
+                        }
 
-                    if (status.Event == LoginService.QrLoginEvent.Expired)
-                    {
-                        _httpServer?.UpdateStatus("二维码已失效，正在自动换新...");
-                        Application.Invoke(() =>
+                        if (status.Event == LoginService.QrLoginEvent.Expired)
                         {
-                            _webStatusLabel.Text = "状态: 二维码已失效，正在自动换新...";
-                            _qrStatusLabel.Text = "状态: 二维码已失效，正在自动换新...";
-                        });
-                        try { await Task.Delay(1000, _cts.Token); } catch { }
-                        break;
-                    }
+                            _httpServer?.UpdateStatus("二维码已失效，正在自动换新...");
+                            PostToMainThread(() =>
+                            {
+                                _webStatusLabel.Text = "状态: 二维码已失效，正在自动换新...";
+                                _qrStatusLabel.Text = "状态: 二维码已失效，正在自动换新...";
+                            });
+                            try { await Task.Delay(1000, _cts.Token).ConfigureAwait(false); } catch { }
+                            break;
+                        }
 
-                    _httpServer?.UpdateStatus(status.Message);
-                    Application.Invoke(() =>
-                    {
-                        _webStatusLabel.Text = $"状态: {status.Message}";
-                        _qrStatusLabel.Text = $"状态: {status.Message}";
-                    });
+                        _httpServer?.UpdateStatus(status.Message);
+                        PostToMainThread(() =>
+                        {
+                            _webStatusLabel.Text = $"状态: {status.Message}";
+                            _qrStatusLabel.Text = $"状态: {status.Message}";
+                        });
+                    }
                 }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                AppLogger.Error("LoginDialog", "Background login task error", ex);
             }
         }, _cts.Token);
     }
@@ -549,6 +580,12 @@ public sealed class LoginDialog : Dialog
         {
         }
 
+        if (_uiTimerToken != null)
+        {
+            try { Application.RemoveTimeout(_uiTimerToken); } catch { }
+            _uiTimerToken = null;
+        }
+
         Application.RequestStop(this);
     }
 
@@ -563,6 +600,12 @@ public sealed class LoginDialog : Dialog
     {
         if (disposing)
         {
+            if (_uiTimerToken != null)
+            {
+                try { Application.RemoveTimeout(_uiTimerToken); } catch { }
+                _uiTimerToken = null;
+            }
+
             try
             {
                 _httpServer?.Dispose();
