@@ -434,6 +434,7 @@ public sealed partial class MainWindow : Window
         _quickSearchBar.RowSelected += rowIdx => _songListView.ScrollToAndSelectItem(rowIdx);
         _quickSearchBar.DismissRequested += () =>
         {
+            _songListView.ClearSearchHighlights();
             _songListView.SetFocusToList();
         };
         _songListView.Add(_quickSearchBar);

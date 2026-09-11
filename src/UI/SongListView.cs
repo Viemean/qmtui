@@ -69,6 +69,17 @@ public sealed partial class SongListView : FrameView
         _isMarqueePaused = paused;
     }
 
+    private readonly HashSet<int> _searchMatchedRows = [];
+
+    public void ClearSearchHighlights()
+    {
+        if (_searchMatchedRows.Count > 0)
+        {
+            _searchMatchedRows.Clear();
+            _listView.SetNeedsDraw();
+        }
+    }
+
     private Func<int, Task>? _customItemAccepted;
     private Action<int>? _customItemSelectionChanged;
     private string? _playingSongMid;
@@ -203,19 +214,40 @@ public sealed partial class SongListView : FrameView
 
             if (_songs.Count > 0 && e.Row >= 0 && e.Row < _songs.Count)
             {
-                if (!string.IsNullOrEmpty(_playingSongMid) && _songs[e.Row].Mid == _playingSongMid)
+                bool isPlaying = !string.IsNullOrEmpty(_playingSongMid) && _songs[e.Row].Mid == _playingSongMid;
+                bool isSelected = _listView.SelectedItem == e.Row;
+                bool isSearchMatched = _searchMatchedRows.Contains(e.Row);
+
+                if (isSelected)
                 {
-                    if (_listView.SelectedItem == e.Row)
+                    if (isPlaying)
                     {
                         // 正在播放且被光标选中：发光浅薄荷绿字 + 清晰海青高光底色
                         e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark);
                     }
-                    else
-                    {
-                        // 正在播放但未被光标选中：纯正翡翠绿高亮字（与歌词高亮完全对齐）
-                        e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenPrimary, Color.None);
-                    }
                     return;
+                }
+
+                if (isSearchMatched)
+                {
+                    // 列表查找命中的非当前行：高亮底色 (QqGreenActive) + 浅薄荷绿字，醒目展现所有匹配项
+                    e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenActive);
+                    return;
+                }
+
+                if (isPlaying)
+                {
+                    // 正在播放但未被光标选中：纯正翡翠绿高亮字（与歌词高亮完全对齐）
+                    e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenPrimary, Color.None);
+                    return;
+                }
+            }
+            else if (_customItems.Count > 0 && e.Row >= 0 && e.Row < _customItems.Count)
+            {
+                bool isSelected = _listView.SelectedItem == e.Row;
+                if (!isSelected && _searchMatchedRows.Contains(e.Row))
+                {
+                    e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenActive);
                 }
             }
         };

@@ -189,8 +189,13 @@ public sealed partial class SongListView
     /// </summary>
     public List<int> PerformInListSearch(string keyword)
     {
+        _searchMatchedRows.Clear();
         var matched = new List<int>();
-        if (string.IsNullOrWhiteSpace(keyword)) return matched;
+        if (string.IsNullOrWhiteSpace(keyword))
+        {
+            _listView.SetNeedsDraw();
+            return matched;
+        }
 
         var kw = keyword.Trim();
         if (_songs.Count > 0)
@@ -204,6 +209,7 @@ public sealed partial class SongListView
                     (s.Album?.Contains(kw, StringComparison.OrdinalIgnoreCase) == true))
                 {
                     matched.Add(i);
+                    _searchMatchedRows.Add(i);
                 }
             }
         }
@@ -214,10 +220,12 @@ public sealed partial class SongListView
                 if (_customItems[i].Contains(kw, StringComparison.OrdinalIgnoreCase))
                 {
                     matched.Add(i);
+                    _searchMatchedRows.Add(i);
                 }
             }
         }
 
+        _listView.SetNeedsDraw();
         return matched;
     }
 }
