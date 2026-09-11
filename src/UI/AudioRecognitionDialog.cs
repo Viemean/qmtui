@@ -28,12 +28,14 @@ public sealed class AudioRecognitionDialog : Dialog
     private readonly Label _sourceLabel;
     private readonly Button _actionBtn;
     private readonly Button _sourceBtn;
+    private readonly Button _preRollBtn;
     private readonly Button _cancelBtn;
 
     // 记忆用户选择的录音源，避免每次打开弹窗时重置
     private static AudioRecordSource s_currentSource = AudioRecordSource.SystemInternal;
     private AudioRecordSource _currentSource = s_currentSource;
     private long _lastToggleTick;
+    private long _lastPreRollToggleTick;
     private Song? _recognizedSong;
     private bool _isRecognized;
     private bool _isWorking;
@@ -58,6 +60,11 @@ public sealed class AudioRecognitionDialog : Dialog
         return _currentSource == AudioRecordSource.SystemInternal ? "内录 (T)" : "麦克风 (T)";
     }
 
+    private static string GetPreRollButtonText()
+    {
+        return AudioPreRollManager.IsEnabled ? "预录:开 (K)" : "预录:关 (K)";
+    }
+
     public AudioRecognitionDialog(Action<Song>? onSongSelected, bool inLyricArea = false)
     {
         _onSongSelected = onSongSelected;
@@ -67,7 +74,7 @@ public sealed class AudioRecognitionDialog : Dialog
         AudioRecognitionService.PreWarm();
 
         Title = "听歌识曲";
-        int dlgW = 58;
+        int dlgW = 62;
         int dlgH = 12;
         Width = dlgW;
         Height = dlgH;
@@ -158,10 +165,23 @@ public sealed class AudioRecognitionDialog : Dialog
         _sourceBtn.KeyBindings.Clear(); // 移除按钮内置热键，统一由窗体 KeyDown 分发
         _sourceBtn.Accepting += (s, e) => { e.Handled = true; ToggleAudioSource(); };
 
+        _preRollBtn = new Button
+        {
+            Text = GetPreRollButtonText(),
+            X = Pos.Right(_sourceBtn) + 2,
+            Y = Pos.AnchorEnd(1),
+            NoDecorations = true,
+            ShadowStyle = ShadowStyles.None,
+            CanFocus = false
+        };
+        _preRollBtn.SetScheme(TransparentDialogScheme);
+        _preRollBtn.KeyBindings.Clear();
+        _preRollBtn.Accepting += (s, e) => { e.Handled = true; TogglePreRoll(); };
+
         _cancelBtn = new Button
         {
             Text = "取消 (Esc)",
-            X = Pos.Right(_sourceBtn) + 2,
+            X = Pos.Right(_preRollBtn) + 2,
             Y = Pos.AnchorEnd(1),
             NoDecorations = true,
             ShadowStyle = ShadowStyles.None
@@ -169,7 +189,7 @@ public sealed class AudioRecognitionDialog : Dialog
         _cancelBtn.SetScheme(TransparentDialogScheme);
         _cancelBtn.Accepting += (s, e) => { e.Handled = true; HandleCancel(); };
 
-        Add(_statusLabel, _detailLabel1, _detailLabel2, _detailLabel3, _sourceLabel, _actionBtn, _sourceBtn, _cancelBtn);
+        Add(_statusLabel, _detailLabel1, _detailLabel2, _detailLabel3, _sourceLabel, _actionBtn, _sourceBtn, _preRollBtn, _cancelBtn);
 
         KeyDown += (s, k) =>
         {
@@ -209,6 +229,16 @@ public sealed class AudioRecognitionDialog : Dialog
                 }
                 return;
             }
+
+            if (k == Key.K || k == Key.K.WithShift)
+            {
+                k.Handled = true;
+                if (!_isRecognized)
+                {
+                    TogglePreRoll();
+                }
+                return;
+            }
         };
 
         _cancelBtn.KeyBindings.Remove(Key.Space);
@@ -244,6 +274,34 @@ public sealed class AudioRecognitionDialog : Dialog
         AppLogger.Force("AudioRecognitionDialog", $"User toggled audio source: {oldSource} -> {_currentSource}");
 
         StartRecognitionProcess();
+    }
+
+    private void TogglePreRoll()
+    {
+        if (_isDismissed) return;
+        var now = Environment.TickCount64;
+        if (now - _lastPreRollToggleTick < 500)
+        {
+            return;
+        }
+        _lastPreRollToggleTick = now;
+
+        bool newState = !AudioPreRollManager.IsEnabled;
+        AudioPreRollManager.IsEnabled = newState;
+        UserConfig.Current.EnableAudioRecognitionPreRoll = newState;
+        UserConfig.Current.Save();
+
+        _preRollBtn.Text = GetPreRollButtonText();
+        AppLogger.Force("AudioRecognitionDialog", $"User toggled pre-roll state: {newState}");
+
+        if (_currentSource == AudioRecordSource.SystemInternal && !_isRecognized)
+        {
+            StartRecognitionProcess();
+        }
+        else
+        {
+            SetNeedsDraw();
+        }
     }
 
     private void HandleCancel()
@@ -306,8 +364,12 @@ public sealed class AudioRecognitionDialog : Dialog
         _sourceBtn.X = Pos.Right(_actionBtn) + 2;
         _sourceBtn.Visible = true;
 
+        _preRollBtn.Text = GetPreRollButtonText();
+        _preRollBtn.X = Pos.Right(_sourceBtn) + 2;
+        _preRollBtn.Visible = true;
+
         _cancelBtn.Text = "取消 (Esc)";
-        _cancelBtn.X = Pos.Right(_sourceBtn) + 2;
+        _cancelBtn.X = Pos.Right(_preRollBtn) + 2;
         _cancelBtn.Visible = true;
         _cancelBtn.SetFocus();
         SetNeedsDraw();
@@ -324,7 +386,13 @@ public sealed class AudioRecognitionDialog : Dialog
         // 纯 C# 原生算法，无需拉起外部 Worker 进程，预热网络连接
         AudioRecognitionService.PreWarm();
 
-        _recordingSession = AudioRecordingService.StartRecordingSession(_currentSource);
+        byte[]? preRollBytes = null;
+        if (_currentSource == AudioRecordSource.SystemInternal)
+        {
+            preRollBytes = AudioPreRollManager.TakePreRollBytes(16000 * 2 * 3);
+        }
+
+        _recordingSession = AudioRecordingService.StartRecordingSession(_currentSource, preRollBytes);
         if (!_recordingSession.IsRunning)
         {
             ShowFailed("无法启动录音服务 (PulseAudio/PipeWire 连接失败)");
@@ -341,13 +409,46 @@ public sealed class AudioRecognitionDialog : Dialog
             double totalSeconds = isMic ? 20.0 : 15.0;
             const int intervalMs = 100;
 
-            // 首个检查点提速至 1.8s (内录) / 2.0s (麦克风)，充分发挥原生低延迟优势
+            int inflightRequests = 0;
+
+            // 内录若拥有预录切片，可在首个时刻（0ms）即刻发起试探，实现秒级命中
+            bool hasPreRoll = preRollBytes != null && preRollBytes.Length >= (int)(16000 * 2 * 2.6);
+            if (hasPreRoll)
+            {
+                var preSamples = _recordingSession?.GetSnapshotSamples();
+                if (preSamples != null && preSamples.Length >= (int)(16000 * 2.6))
+                {
+                    Interlocked.Increment(ref inflightRequests);
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var result = await AudioRecognitionService.RecognizeAndMatchPcmAsync(preSamples, token);
+                            if (result.Success && !_isRecognized && !_isDismissed)
+                            {
+                                _isRecognized = true;
+                                double elapsedSec = sw.Elapsed.TotalSeconds;
+                                Application.Invoke(() =>
+                                {
+                                    if (_isDismissed) return;
+                                    ShowSuccess(result, elapsedSec);
+                                });
+                            }
+                        }
+                        finally
+                        {
+                            Interlocked.Decrement(ref inflightRequests);
+                        }
+                    }, token);
+                }
+            }
+
+            // 若存在预录切片，后续切片检查点更密集；若无预录则保持标准检查点
             double[] sliceCheckpoints = isMic
                 ? [2.0, 2.8, 3.8, 5.0, 6.5, 8.5, 12.0, 16.0]
-                : [1.8, 2.6, 3.6, 5.0, 7.0, 10.0, 15.0];
+                : (hasPreRoll ? [1.0, 2.2, 3.5, 5.0, 7.5, 10.0, 15.0] : [2.0, 3.0, 4.0, 5.5, 7.5, 10.0, 15.0]);
 
             bool[] checkedSlices = new bool[sliceCheckpoints.Length];
-            int inflightRequests = 0;
 
             try
             {
@@ -495,6 +596,7 @@ public sealed class AudioRecognitionDialog : Dialog
         _sourceLabel.Visible = true;
 
         _sourceBtn.Visible = false;
+        _preRollBtn.Visible = false;
 
         if (_recognizedSong != null)
         {
@@ -550,8 +652,12 @@ public sealed class AudioRecognitionDialog : Dialog
         _sourceBtn.X = Pos.Right(_actionBtn) + 2;
         _sourceBtn.Visible = true;
 
+        _preRollBtn.Text = GetPreRollButtonText();
+        _preRollBtn.X = Pos.Right(_sourceBtn) + 2;
+        _preRollBtn.Visible = true;
+
         _cancelBtn.Text = "关闭 (Esc)";
-        _cancelBtn.X = Pos.Right(_sourceBtn) + 2;
+        _cancelBtn.X = Pos.Right(_preRollBtn) + 2;
         _cancelBtn.Visible = true;
 
         _actionBtn.SetFocus();
@@ -584,8 +690,12 @@ public sealed class AudioRecognitionDialog : Dialog
         _sourceBtn.X = Pos.Right(_actionBtn) + 2;
         _sourceBtn.Visible = true;
 
+        _preRollBtn.Text = GetPreRollButtonText();
+        _preRollBtn.X = Pos.Right(_sourceBtn) + 2;
+        _preRollBtn.Visible = true;
+
         _cancelBtn.Text = "关闭 (Esc)";
-        _cancelBtn.X = Pos.Right(_sourceBtn) + 2;
+        _cancelBtn.X = Pos.Right(_preRollBtn) + 2;
         _cancelBtn.Visible = true;
 
         _sourceBtn.SetFocus();

@@ -23,6 +23,12 @@ public sealed class UserConfig
     public bool EnableSongSwitchNotification { get; set; } = true;
 
     /// <summary>
+    /// 是否开启听歌识曲系统内录预录加速 (Rolling Pre-roll Buffer)
+    /// </summary>
+    [JsonPropertyName("enable_audio_recognition_preroll")]
+    public bool EnableAudioRecognitionPreRoll { get; set; } = true;
+
+    /// <summary>
     /// 从 ~/.config/qmtui/config.json 加载偏好配置
     /// </summary>
     public static void Load()

@@ -10,6 +10,7 @@ using QmTui.Api;
 using QmTui.Models;
 using QmTui.Player;
 using QmTui.Services;
+using QmTui.Services.AudioRecognition;
 using QmTui.Utils;
 
 namespace QmTui.UI;
@@ -1093,6 +1094,7 @@ public sealed partial class MainWindow : Window
             return false;
         });
         SetFocusToWindow(0);
+        AudioPreRollManager.EnsureStarted();
 
         // 后台预热收藏曲目 ID 缓存，用于更新收藏状态
         if (UserSession.Current.IsLoggedIn)
