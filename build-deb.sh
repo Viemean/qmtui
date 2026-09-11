@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # 入参：版本号、包构建号、目标架构 (amd64 / arm64)、.NET Runtime ID (RID)
-VERSION="${1:-0.3.2}"
+VERSION="${1:-0.3.3}"
 PKGREL="${2:-1}"
 ARCH="${3:-amd64}"
 
@@ -96,7 +96,7 @@ Maintainer: Yuzuki <lxf74663@gmail.com>
 Installed-Size: ${INSTALLED_SIZE}
 Depends: ${DEBIAN_DEPS}
 Recommends: gstreamer1.0-libav
-Suggests: wl-clipboard, xclip, qemu-user-static
+Suggests: wl-clipboard, xclip
 Provides: qqmusic-tui
 Replaces: qqmusic-tui, qqmusic-tui-bin
 Conflicts: qqmusic-tui, qqmusic-tui-bin

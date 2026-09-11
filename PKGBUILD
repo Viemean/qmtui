@@ -2,7 +2,7 @@
 
 pkgname=qmtui-bin
 _pkgname=qmtui
-pkgver=0.3.2
+pkgver=0.3.3
 pkgrel=1
 pkgdesc="Linux terminal qqmusic player (.NET 10 Native AOT pre-built binary package)"
 arch=('x86_64' 'aarch64')
@@ -21,7 +21,6 @@ optdepends=(
     'gst-libav: additional audio codecs (AAC/M4A) support'
     'wl-clipboard: Wayland clipboard support for copying song links'
     'xclip: X11 clipboard support for copying song links'
-    'qemu-user: ARM64 sidecar/plugin emulation on x86_64'
 )
 
 provides=('qmtui' 'qqmusic-tui' 'qmtui-bin')
