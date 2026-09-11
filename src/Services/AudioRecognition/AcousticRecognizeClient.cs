@@ -7,9 +7,9 @@ using QmTui.Utils;
 namespace QmTui.Services.AudioRecognition;
 
 /// <summary>
-/// 官方优图听歌识曲响应实体
+/// 云端声学识别响应实体
 /// </summary>
-public record YoutuRecognizeResult(
+public record AcousticRecognizeResult(
     bool Success,
     string Title,
     string Artist,
@@ -20,9 +20,9 @@ public record YoutuRecognizeResult(
 );
 
 /// <summary>
-/// QAFP 指纹特征实体
+/// 声学特征实体
 /// </summary>
-public record QafpFeature(
+public record AcousticFeature(
     byte[] Data,
     float Duration,
     int FeatureType = 0,
@@ -30,11 +30,11 @@ public record QafpFeature(
 );
 
 /// <summary>
-/// 官方优图听歌识曲 HTTP REST 客户端
+/// 云端声学识别客户端
 /// </summary>
-public static class YoutuRecognizeClient
+public static class AcousticRecognizeClient
 {
-    private const int QafpVersion = 201506;
+    private const int ProtocolVersion = 201506;
     private const string Endpoint = "http://c.y.qq.com/youtu/humming/search";
 
     private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
@@ -45,6 +45,22 @@ public static class YoutuRecognizeClient
     {
         Timeout = TimeSpan.FromSeconds(8)
     };
+
+    /// <summary>
+    /// 预热 HTTP 连接池，提前完成 DNS 解析与 TCP 握手
+    /// </summary>
+    public static async Task PreWarmAsync()
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Head, Endpoint);
+            using var resp = await HttpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+        }
+        catch
+        {
+            // 预热静默处理
+        }
+    }
 
     private static (string Source, string Salt, byte[] AesKey)? s_cachedChannelConfig;
     private static readonly Lock s_configLock = new();
@@ -66,20 +82,26 @@ public static class YoutuRecognizeClient
         {
             if (s_cachedChannelConfig != null) return s_cachedChannelConfig.Value;
 
-            var defKey = Deobfuscate(s_obfAesKey);
-            s_cachedChannelConfig = (Deobfuscate(s_obfSource), Deobfuscate(s_obfSalt), Encoding.UTF8.GetBytes(defKey));
+            byte[] aesKey = new byte[s_obfAesKey.Length];
+            for (int i = 0; i < s_obfAesKey.Length; i++) aesKey[i] = (byte)(s_obfAesKey[i] ^ 0x5A);
+
+            s_cachedChannelConfig = (
+                Source: Deobfuscate(s_obfSource),
+                Salt: Deobfuscate(s_obfSalt),
+                AesKey: aesKey
+            );
             return s_cachedChannelConfig.Value;
         }
     }
 
     /// <summary>
-    /// 使用 QAFP 特征直接向官方优图服务器发起识别请求
+    /// 上传声学特征数据至云端接口进行检索
     /// </summary>
-    public static async Task<YoutuRecognizeResult> SearchAsync(QafpFeature feature, CancellationToken cancellationToken = default)
+    public static async Task<AcousticRecognizeResult> SearchAsync(AcousticFeature feature, CancellationToken cancellationToken = default)
     {
         if (feature.Data == null || feature.Data.Length == 0)
         {
-            return new YoutuRecognizeResult(false, "", "", "", null, 0, "指纹特征数据为空");
+            return new AcousticRecognizeResult(false, "", "", "", null, 0, "特征数据为空");
         }
 
         var channel = GetChannelConfig();
@@ -95,7 +117,7 @@ public static class YoutuRecognizeClient
             string veriStr = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(signStr)));
 
             // 2. 构造明文控制头 (以 \0 结尾)
-            string header = $"v={QafpVersion}&source={channel.Source}&time={timestamp}&veri_str={veriStr}&cmd=1&info={feature.Duration:F1},{feature.Data.Length},10306&type=0&session_id={sessionId}&feature_type={fpType}&confidence={feature.Confidence:F1}\0";
+            string header = $"v={ProtocolVersion}&source={channel.Source}&time={timestamp}&veri_str={veriStr}&cmd=1&info={feature.Duration:F1},{feature.Data.Length},10306&type=0&session_id={sessionId}&feature_type={fpType}&confidence={feature.Confidence:F1}\0";
             byte[] headerBytes = Encoding.UTF8.GetBytes(header);
 
             // 3. 拼接 Payload: Header + FeatureBytes
@@ -126,7 +148,7 @@ public static class YoutuRecognizeClient
             using var response = await HttpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                return new YoutuRecognizeResult(false, "", "", "", null, 0, $"HTTP 请求失败: {response.StatusCode}");
+                return new AcousticRecognizeResult(false, "", "", "", null, 0, $"HTTP 请求失败: {response.StatusCode}");
             }
 
             byte[] responseBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
@@ -134,28 +156,28 @@ public static class YoutuRecognizeClient
         }
         catch (OperationCanceledException)
         {
-            return new YoutuRecognizeResult(false, "", "", "", null, 0, "识别请求已取消");
+            return new AcousticRecognizeResult(false, "", "", "", null, 0, "识别请求已取消");
         }
         catch (Exception ex)
         {
-            AppLogger.Force("YoutuRecognizeClient", $"识别请求异常: {ex}");
-            return new YoutuRecognizeResult(false, "", "", "", null, 0, $"网络异常: {ex.Message}");
+            AppLogger.Force("AcousticRecognizeClient", $"识别请求异常: {ex}");
+            return new AcousticRecognizeResult(false, "", "", "", null, 0, $"网络异常: {ex.Message}");
         }
     }
 
     /// <summary>
     /// 解析服务器返回的 JSON 报文
     /// </summary>
-    private static YoutuRecognizeResult ParseResponse(byte[] jsonBytes)
+    private static AcousticRecognizeResult ParseResponse(byte[] responseBytes)
     {
         try
         {
-            using var doc = JsonDocument.Parse(jsonBytes);
+            using var doc = JsonDocument.Parse(responseBytes);
             var root = doc.RootElement;
 
             if (!root.TryGetProperty("ret", out var retProp) || retProp.GetInt32() != 0)
             {
-                return new YoutuRecognizeResult(false, "", "", "", null, 0, "服务器未命中歌曲特征");
+                return new AcousticRecognizeResult(false, "", "", "", null, 0, "服务器未命中歌曲特征");
             }
 
             // 提取时间偏移量 offset
@@ -176,10 +198,10 @@ public static class YoutuRecognizeClient
                 }
             }
 
-            // 提取歌曲元数据
+            // 提取歌曲元数据 (songlist)
             if (!root.TryGetProperty("songlist", out var songlistProp) || songlistProp.GetArrayLength() == 0)
             {
-                return new YoutuRecognizeResult(false, "", "", "", null, offset, "返回数据中未包含歌曲信息");
+                return new AcousticRecognizeResult(false, "", "", "", null, offset, "返回数据中未包含歌曲信息");
             }
 
             var songItem = songlistProp[0];
@@ -247,12 +269,12 @@ public static class YoutuRecognizeClient
                 Singers = singers
             };
 
-            return new YoutuRecognizeResult(true, title, artist, album, song, offset, "");
+            return new AcousticRecognizeResult(true, title, artist, album, song, offset, "");
         }
         catch (Exception ex)
         {
-            AppLogger.Force("YoutuRecognizeClient", $"解析识别结果失败: {ex}");
-            return new YoutuRecognizeResult(false, "", "", "", null, 0, $"解析响应失败: {ex.Message}");
+            AppLogger.Force("AcousticRecognizeClient", $"解析识别结果失败: {ex}");
+            return new AcousticRecognizeResult(false, "", "", "", null, 0, $"解析响应失败: {ex.Message}");
         }
     }
 }

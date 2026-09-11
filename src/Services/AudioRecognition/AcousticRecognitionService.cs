@@ -4,24 +4,23 @@ using QmTui.Utils;
 namespace QmTui.Services.AudioRecognition;
 
 /// <summary>
-/// 官方优图听歌识曲服务门面
+/// 原生声学识别服务门面
 /// </summary>
-public static class YoutuRecognitionService
+public static class AcousticRecognitionService
 {
     /// <summary>
-    /// 当前环境中是否有可用的 QAFP 特征提取通道（检测官方微型 Runner）
+    /// 当前环境中是否有可用的声学特征提取通道
     /// </summary>
-    public static bool IsAvailable => QafpNativeRunner.IsAvailable;
+    public static bool IsAvailable => true;
 
     /// <summary>
-    /// 识别 16000Hz PCM 采样切片并直通官方曲库
+    /// 识别 16000Hz PCM 采样切片并检索曲库
     /// </summary>
     public static async Task<RecognitionResult?> RecognizePcmSamplesAsync(
         short[] pcm16k, 
-        QafpWorkerSession? workerSession = null, 
         CancellationToken cancellationToken = default)
     {
-        if (pcm16k == null || pcm16k.Length < (int)(16000 * 2.0))
+        if (pcm16k == null || pcm16k.Length < (int)(16000 * 1.5))
         {
             return null;
         }
@@ -31,30 +30,20 @@ public static class YoutuRecognitionService
             // 1. 16000Hz 降采样到 8000Hz (单声道 2 点低通移动平均)
             short[] pcm8k = Downsample16kTo8k(pcm16k);
 
-            // 2. 提取 QAFP 特征（优先通过长连接 Worker 管道零开销提取，回退到一次性独立进程）
-            QafpFeature? feature = null;
-            if (workerSession != null && workerSession.IsReady)
-            {
-                feature = workerSession.Extract(pcm8k);
-            }
-
-            if (feature == null)
-            {
-                AppLogger.Force("YoutuRecognitionService", $"Extracting QAFP feature via standalone runner, samples: {pcm8k.Length}, native runner available: {QafpNativeRunner.IsAvailable}");
-                feature = QafpNativeRunner.Extract(pcm8k);
-            }
+            // 2. 纯 C# 原生算法提取声学特征
+            var feature = AcousticFingerprintExtractor.Extract(pcm8k);
 
             if (feature == null || feature.Data.Length == 0)
             {
-                AppLogger.Force("YoutuRecognitionService", "QAFP 特征提取失败或为空");
+                AppLogger.Force("AcousticRecognitionService", "声学特征提取失败或样本过短");
                 return null;
             }
 
-            // 3. 发起官方优图网络识别请求
-            var response = await YoutuRecognizeClient.SearchAsync(feature, cancellationToken);
+            // 3. 发起云端声学识别检索请求
+            var response = await AcousticRecognizeClient.SearchAsync(feature, cancellationToken);
             if (response.Success && response.Song != null)
             {
-                AppLogger.Force("YoutuRecognitionService", $"成功命中官方曲库: {response.Song.Title} - {response.Song.Artist} (Offset: {response.OffsetSeconds:F3}s)");
+                AppLogger.Force("AcousticRecognitionService", $"成功匹配曲库: {response.Song.Title} - {response.Song.Artist} (Offset: {response.OffsetSeconds:F3}s)");
                 return new RecognitionResult(
                     Success: true,
                     Title: response.Song.Title,
@@ -67,7 +56,7 @@ public static class YoutuRecognitionService
 
             if (!string.IsNullOrEmpty(response.ErrorMessage))
             {
-                AppLogger.Force("YoutuRecognitionService", $"云端识别失败: {response.ErrorMessage}");
+                AppLogger.Force("AcousticRecognitionService", $"云端检索未匹配: {response.ErrorMessage}");
             }
 
             return null;
@@ -78,7 +67,7 @@ public static class YoutuRecognitionService
         }
         catch (Exception ex)
         {
-            AppLogger.Force("YoutuRecognitionService", $"识别链路异常: {ex}");
+            AppLogger.Force("AcousticRecognitionService", $"识别链路异常: {ex}");
             return null;
         }
     }
@@ -92,7 +81,6 @@ public static class YoutuRecognitionService
         short[] pcm8k = new short[targetLength];
         for (int i = 0; i < targetLength; i++)
         {
-            // 2 点均值平滑，有效滤除奈奎斯特混叠
             int sum = pcm16k[i * 2] + pcm16k[i * 2 + 1];
             pcm8k[i] = (short)(sum / 2);
         }

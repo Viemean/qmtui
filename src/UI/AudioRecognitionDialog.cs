@@ -41,7 +41,6 @@ public sealed class AudioRecognitionDialog : Dialog
     private bool _isWorking;
     private bool _isDismissed;
     private AudioRecordingSession? _recordingSession;
-    private QafpWorkerSession? _workerSession;
 
     private static Scheme TransparentDialogScheme { get; } = new Scheme
     {
@@ -349,18 +348,8 @@ public sealed class AudioRecognitionDialog : Dialog
             return;
         }
 
-        // 按需拉起长连接 QAFP 特征提取 Worker）
-        if (YoutuRecognitionService.IsAvailable)
-        {
-            try
-            {
-                _workerSession = QafpNativeRunner.StartWorkerSession();
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Force("AudioRecognitionDialog", $"拉起 QAFP Worker 失败: {ex.Message}");
-            }
-        }
+        // 纯 C# 原生算法，无需拉起外部 Worker 进程，预热网络连接
+        AudioRecognitionService.PreWarm();
 
         _recordingSession = AudioRecordingService.StartRecordingSession(_currentSource);
         if (!_recordingSession.IsRunning)
@@ -379,10 +368,10 @@ public sealed class AudioRecognitionDialog : Dialog
             double totalSeconds = isMic ? 20.0 : 15.0;
             const int intervalMs = 100;
 
-            // 首个检查点设为 3.0s（满足官方 QAFP 最佳特征窗，避免过短切片造成无效云端请求）
+            // 首个检查点提速至 1.8s (内录) / 2.0s (麦克风)，充分发挥原生低延迟优势
             double[] sliceCheckpoints = isMic
-                ? [3.0, 3.8, 4.8, 6.0, 7.5, 9.5, 12.0, 16.0]
-                : [3.0, 4.0, 5.5, 7.5, 10.0, 15.0];
+                ? [2.0, 2.8, 3.8, 5.0, 6.5, 8.5, 12.0, 16.0]
+                : [1.8, 2.6, 3.6, 5.0, 7.0, 10.0, 15.0];
 
             bool[] checkedSlices = new bool[sliceCheckpoints.Length];
             int inflightRequests = 0;
@@ -425,14 +414,14 @@ public sealed class AudioRecognitionDialog : Dialog
                             }
 
                             var samples = _recordingSession?.GetSnapshotSamples();
-                            if (samples != null && samples.Length >= (int)(16000 * 1.8))
+                            if (samples != null && samples.Length >= (int)(16000 * 1.5))
                             {
                                 Interlocked.Increment(ref inflightRequests);
                                 _ = Task.Run(async () =>
                                 {
                                     try
                                     {
-                                        var result = await AudioRecognitionService.RecognizeAndMatchPcmAsync(samples, _workerSession, token);
+                                        var result = await AudioRecognitionService.RecognizeAndMatchPcmAsync(samples, token);
                                         if (result.Success && !_isRecognized && !_isDismissed)
                                         {
                                             _isRecognized = true;
@@ -523,8 +512,8 @@ public sealed class AudioRecognitionDialog : Dialog
         _detailLabel3.Y = 4;
         _detailLabel3.Visible = !string.IsNullOrWhiteSpace(result.Album);
 
-        string sourceName = (result.Source == "Official" || result.Source == "QQMusic") 
-            ? "官方优图引擎" 
+        string sourceName = (result.Source == "Official" || result.Source == "QQMusic" || result.Source == "Native" || result.Source == "原生") 
+            ? "原生声学引擎" 
             : result.Source;
 
         string timeInfo = elapsedSeconds > 0 ? $"  耗时: {elapsedSeconds:F1}s" : "";
@@ -716,8 +705,6 @@ public sealed class AudioRecognitionDialog : Dialog
         try { _cts.Cancel(); } catch { }
         _recordingSession?.Dispose();
         _recordingSession = null;
-        _workerSession?.Dispose();
-        _workerSession = null;
     }
 
     protected override void Dispose(bool disposing)

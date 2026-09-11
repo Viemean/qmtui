@@ -1,8 +1,7 @@
 /*
- * qafp_runner.c - 官方 QAFP 核心特征提取器
- * 支持两种模式：
- * 1. 经典模式: qafp_runner <model_path> <pcm_path|-> <out_feat_path|->
- * 2. 常驻长连接协议模式: qafp_runner --server <model_path>
+ * native_runner.c - 声学特征提取器
+ * 1. 经典模式: native_runner <model_path> <pcm_path|-> <out_feat_path|->
+ * 2. 常驻长连接协议模式: native_runner --server <model_path>
  */
 
 typedef unsigned char uint8_t;
@@ -83,14 +82,14 @@ static int str_ends_with(const char* s, const char* sub) {
 
 int real_main(int argc, char** argv) {
     // 自适应 Bionic linker64 显式引导模式：若通过 linker64 启动，剥离 linker64 占用的首个参数
-    if (argc > 1 && str_ends_with(argv[1], "qafp_runner")) {
+    if (argc > 1 && str_ends_with(argv[1], "native_runner")) {
         argc--;
         argv++;
     }
 
     if (argc < 2) {
-        const char* usage = "Usage:\n  qafp_runner <model_path> <pcm_path|-> <out_feat_path|->\n  qafp_runner --server <model_path>\n  qafp_runner --probe\n";
-        write(2, usage, 107);
+        const char* usage = "Usage:\n  native_runner <model_path> <pcm_path|-> <out_feat_path|->\n  native_runner --server <model_path>\n  native_runner --probe\n";
+        write(2, usage, 117);
         exit(1);
     }
 
@@ -101,13 +100,13 @@ int real_main(int argc, char** argv) {
             write(2, "dlopen failed\n", 14);
             exit(2);
         }
-        write(1, "QAFP_OK\n", 8);
+        write(1, "RUNNER_OK\n", 10);
         exit(0);
     }
 
     if (argc < 3) {
-        const char* usage = "Usage:\n  qafp_runner <model_path> <pcm_path|-> <out_feat_path|->\n  qafp_runner --server <model_path>\n  qafp_runner --probe\n";
-        write(2, usage, 107);
+        const char* usage = "Usage:\n  native_runner <model_path> <pcm_path|-> <out_feat_path|->\n  native_runner --server <model_path>\n  native_runner --probe\n";
+        write(2, usage, 117);
         exit(1);
     }
 
@@ -142,7 +141,7 @@ int real_main(int argc, char** argv) {
     // 模式 A: 常驻长连接协议 (Server Mode)
     // ==========================================
     if (is_server) {
-        // 1. 发送就绪魔数 "QAFP" (0x51414650, 大端序)
+        // 1. 发送就绪魔数
         uint8_t ready_magic[4] = { 0x51, 0x41, 0x46, 0x50 };
         write_exact(1, ready_magic, 4);
 

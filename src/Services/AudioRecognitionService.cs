@@ -1,9 +1,7 @@
 using System.Diagnostics;
 using QmTui.Api;
 using QmTui.Models;
-using QmTui.Services.AcrCloud;
 using QmTui.Services.AudioRecognition;
-using QmTui.Services.Shazam;
 using QmTui.Utils;
 
 namespace QmTui.Services;
@@ -18,18 +16,17 @@ public record RecognitionResult(
     string Album,
     Song? MatchedSong = null,
     string ErrorMessage = "",
-    string Source = "Official",
+    string Source = "Native",
     double OffsetSeconds = 0.0
 );
 
 /// <summary>
 /// 音频识别与曲库联动服务
-/// (优先官方优图源精准匹配；未命中时降级走 Shazam / ACRCloud 多源并发)
 /// </summary>
 public static class AudioRecognitionService
 {
     /// <summary>
-    /// 识别本地音频文件，并联动检索官方曲库
+    /// 识别本地音频文件，并联动检索曲库
     /// </summary>
     public static async Task<RecognitionResult> RecognizeAndMatchAsync(string audioFilePath, CancellationToken cancellationToken = default)
     {
@@ -40,7 +37,7 @@ public static class AudioRecognitionService
 
         try
         {
-            // 优先级 1: 优先尝试官方优图源 (若为 PCM 样本或可通过 Native Runner 提取)
+            // 纯原生声学算法引擎直接识别 PCM 样本
             if (audioFilePath.EndsWith(".pcm", StringComparison.OrdinalIgnoreCase))
             {
                 byte[] rawBytes = await File.ReadAllBytesAsync(audioFilePath, cancellationToken);
@@ -49,28 +46,20 @@ public static class AudioRecognitionService
 
                 if (pcm8k.Length >= 8000 * 2)
                 {
-                    var feature = QafpNativeRunner.Extract(pcm8k);
+                    var feature = AcousticFingerprintExtractor.Extract(pcm8k);
                     if (feature != null)
                     {
-                        var res = await YoutuRecognizeClient.SearchAsync(feature, cancellationToken);
+                        var res = await AcousticRecognizeClient.SearchAsync(feature, cancellationToken);
                         if (res.Success && res.Song != null)
                         {
-                            AppLogger.Force("AudioRecognitionService", $"[优图命中] 文件精准匹配: {res.Song.Title} - {res.Song.Artist}");
-                            return new RecognitionResult(true, res.Song.Title, res.Song.Artist, res.Song.Album, res.Song, "", "Official", res.OffsetSeconds);
+                            AppLogger.Force("AudioRecognitionService", $"[原生命中] 文件匹配: {res.Song.Title} - {res.Song.Artist}");
+                            return new RecognitionResult(true, res.Song.Title, res.Song.Artist, res.Song.Album, res.Song, "", "原生", res.OffsetSeconds);
                         }
                     }
                 }
             }
 
-            // 优先级 2: 降级回退到 Shazam 文件识别并联动匹配
-            var (recOk, title, artist, album, err) = await NativeShazamService.RecognizeWavAsync(audioFilePath, cancellationToken);
-            if (!recOk || string.IsNullOrWhiteSpace(title))
-            {
-                return new RecognitionResult(false, "", "", "", null, string.IsNullOrEmpty(err) ? "未识别到匹配的歌曲信息" : err);
-            }
-
-            var match = await MatchWithCatalogAsync(title, artist, album);
-            return match with { Source = "Shazam" };
+            return new RecognitionResult(false, "", "", "", null, "原生引擎未匹配到歌曲");
         }
         catch (OperationCanceledException)
         {
@@ -87,76 +76,33 @@ public static class AudioRecognitionService
     /// </summary>
     public static void PreWarm()
     {
-        _ = YoutuRecognitionService.IsAvailable;
-        _ = NativeShazamService.PreWarmConnectionAsync();
+        _ = AcousticRecognitionService.IsAvailable;
+        _ = AcousticRecognizeClient.PreWarmAsync();
     }
 
     /// <summary>
-    /// 识别 16000Hz PCM 采样切片并联动官方曲库
-    /// (优先优图源精准匹配，未命中降级走 Shazam 与 ACRCloud 并发)
+    /// 识别 16000Hz PCM 采样切片并联动曲库 (仅使用原生声学算法引擎)
     /// </summary>
     public static async Task<RecognitionResult> RecognizeAndMatchPcmAsync(
         short[] pcmSamples, 
-        QafpWorkerSession? workerSession = null, 
         CancellationToken cancellationToken = default)
     {
-        if (pcmSamples == null || pcmSamples.Length < (int)(16000 * 1.8))
+        if (pcmSamples == null || pcmSamples.Length < (int)(16000 * 1.5))
         {
             return new RecognitionResult(false, "", "", "", null, "音频样本过短，请等待累积更多音频");
         }
 
         try
         {
-            // 优先级 1: 优先走官方优图源（高精度，直接返回官方曲库精确实体，无需重新搜索）
-            if (YoutuRecognitionService.IsAvailable)
+            // 纯原生声学算法引擎直接识别
+            var officialRes = await AcousticRecognitionService.RecognizePcmSamplesAsync(pcmSamples, cancellationToken);
+            if (officialRes != null && officialRes.Success && officialRes.MatchedSong != null)
             {
-                var officialRes = await YoutuRecognitionService.RecognizePcmSamplesAsync(pcmSamples, workerSession, cancellationToken);
-                if (officialRes != null && officialRes.Success && officialRes.MatchedSong != null)
-                {
-                    AppLogger.Force("AudioRecognitionService", $"[优图命中] 精准匹配: {officialRes.MatchedSong.Title} - {officialRes.MatchedSong.Artist} (Mid: {officialRes.MatchedSong.Mid})");
-                    return officialRes with { Source = "Official" };
-                }
+                AppLogger.Force("AudioRecognitionService", $"[原生命中] 匹配成功: {officialRes.MatchedSong.Title} - {officialRes.MatchedSong.Artist} (Mid: {officialRes.MatchedSong.Mid})");
+                return officialRes with { Source = "原生" };
             }
 
-            // 优先级 2: 降级保护
-            // 若音频样本不足 3.0 秒且官方源可用，不急于走第三方截胡，等待录音继续累积至官方最佳特征窗（3.0s+）
-            double durationSec = (double)pcmSamples.Length / 16000.0;
-            if (durationSec < 3.0 && YoutuRecognitionService.IsAvailable)
-            {
-                return new RecognitionResult(false, "", "", "", null, "样本正在累积以供官方源精准识别");
-            }
-
-            // 优先级 3: 音频累积充足（>= 3.0s）且优图仍未命中时，才降级走通用第三方引擎 (Shazam 与 ACRCloud 独立并发竞态)
-            var shazamTask = NativeShazamService.RecognizePcmSamplesAsync(pcmSamples, cancellationToken);
-            var isAcrConfigured = AcrCloudConfig.Current.IsConfigured;
-            var acrTask = isAcrConfigured
-                ? AcrCloudService.RecognizePcmSamplesAsync(pcmSamples, cancellationToken)
-                : null;
-
-            var pendingTasks = acrTask != null
-                ? new List<Task<(bool Success, string Title, string Artist, string Album, string Error)>> { shazamTask, acrTask }
-                : new List<Task<(bool Success, string Title, string Artist, string Album, string Error)>> { shazamTask };
-
-            (bool Success, string Title, string Artist, string Album, string Error) lastErrorRes = default;
-
-            while (pendingTasks.Count > 0)
-            {
-                var completedTask = await Task.WhenAny(pendingTasks);
-                pendingTasks.Remove(completedTask);
-
-                var res = await completedTask;
-                if (res.Success && !string.IsNullOrWhiteSpace(res.Title))
-                {
-                    string sourceName = completedTask == shazamTask ? "Shazam" : "ACRCloud";
-                    AppLogger.Force("AudioRecognitionService", $"[{sourceName}命中] 正在检索匹配曲库: {res.Title} - {res.Artist}");
-                    var matchRes = await MatchWithCatalogAsync(res.Title, res.Artist, res.Album);
-                    return matchRes with { Source = sourceName };
-                }
-
-                lastErrorRes = res;
-            }
-
-            return new RecognitionResult(false, "", "", "", null, string.IsNullOrEmpty(lastErrorRes.Error) ? "未识别到匹配的歌曲信息" : lastErrorRes.Error);
+            return new RecognitionResult(false, "", "", "", null, "原生声学引擎正在分析或未匹配");
         }
         catch (OperationCanceledException)
         {
