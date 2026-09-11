@@ -3,6 +3,7 @@ obj/
 *.dbg
 *.tmp
 *.media
+TestResults/
 .cache/
 .agents/
 .tags
