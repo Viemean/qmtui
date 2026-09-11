@@ -2,7 +2,7 @@
 
 pkgname=qmtui-bin
 _pkgname=qmtui
-pkgver=0.3.1
+pkgver=0.3.2
 pkgrel=1
 pkgdesc="Linux terminal music player (.NET 10 Native AOT pre-built binary package)"
 arch=('x86_64' 'aarch64')
