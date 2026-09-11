@@ -1,6 +1,6 @@
 {
-  "name": "qmtui-web",
-  "version": "0.2.1",
+  "name": "qmtui",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "scripts": {
