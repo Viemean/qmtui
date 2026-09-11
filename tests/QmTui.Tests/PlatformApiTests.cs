@@ -14,13 +14,13 @@ using Xunit.Abstractions;
 namespace QmTui.Tests;
 
 /// <summary>
-/// 官方 OpenAPI 联调与维护排查测试用例集
+/// 平台 OpenAPI 联调与维护排查测试用例集
 /// 专用于维护期排查协议变动、网关状态、登录鉴权、推荐算法及听歌识曲服务可用性
 /// 默认离线模式自动跳过，排查时可通过环境变量 QMTUI_ONLINE_TEST=1 激活：
-/// env QMTUI_ONLINE_TEST=1 dotnet test tests/QmTui.Tests/QmTui.Tests.csproj --filter "Category=OfficialApi"
+/// env QMTUI_ONLINE_TEST=1 dotnet test tests/QmTui.Tests/QmTui.Tests.csproj --filter "Category=PlatformApi"
 /// </summary>
-[Trait("Category", "OfficialApi")]
-public class OfficialApiTests
+[Trait("Category", "PlatformApi")]
+public class PlatformApiTests
 {
     private readonly ITestOutputHelper _output;
 
@@ -31,7 +31,7 @@ public class OfficialApiTests
     private static bool s_sessionInitialized = false;
     private static readonly object s_lock = new();
 
-    public OfficialApiTests(ITestOutputHelper output)
+    public PlatformApiTests(ITestOutputHelper output)
     {
         _output = output;
         EnsureSessionAndConfigInitialized();
@@ -324,7 +324,7 @@ public class OfficialApiTests
     {
         if (!IsOnlineTestEnabled()) return;
 
-        _output.WriteLine("[模块: 听歌识曲-Shazam] 正在测试苹果 Shazam 官方指纹编码与网络识别通道...");
+        _output.WriteLine("[模块: 听歌识曲-Shazam] 正在测试苹果 Shazam 指纹编码与网络识别通道...");
 
         // 构造标准的 16kHz 16-bit 单声道 PCM 测试样本 (3 秒正弦波)
         int sampleRate = 16000;
@@ -336,11 +336,11 @@ public class OfficialApiTests
             testPcm[i] = (short)(Math.Sin(2 * Math.PI * freq * i / sampleRate) * 16000);
         }
 
-        _output.WriteLine($"[模块: 听歌识曲-Shazam] 发送 {testPcm.Length} 个 PCM 采样点进行官方网关通信测试...");
+        _output.WriteLine($"[模块: 听歌识曲-Shazam] 发送 {testPcm.Length} 个 PCM 采样点进行服务通信测试...");
         var (success, title, artist, album, error) = await NativeShazamService.RecognizePcmSamplesAsync(testPcm);
 
         _output.WriteLine($"[模块: 听歌识曲-Shazam] 网关响应结果: Success={success}, Title='{title}', Artist='{artist}', 消息='{error}'");
-        // 对于纯正弦波，官方服务将正常响应但无法匹配曲目，返回 Success=false 且 Error="未识别到歌曲"，或识别出同频率音乐
+        // 对于纯正弦波，服务将正常响应但无法匹配曲目，返回 Success=false 且 Error="未识别到歌曲"，或识别出同频率音乐
         // 关键断言是网络与接口契约未抛出异常，error 包含有效的业务响应而非崩溃
         Assert.False(string.IsNullOrEmpty(error) && !success);
     }
@@ -368,7 +368,7 @@ public class OfficialApiTests
             testPcm[i] = (short)(Math.Sin(2 * Math.PI * 523.25 * i / sampleRate) * 15000);
         }
 
-        _output.WriteLine($"[模块: 听歌识曲-ACRCloud] 发送 HMAC 签名请求至官方网关...");
+        _output.WriteLine($"[模块: 听歌识曲-ACRCloud] 发送 HMAC 签名请求至平台网关...");
         var (success, title, artist, album, error) = await AcrCloudService.RecognizePcmSamplesAsync(testPcm);
 
         _output.WriteLine($"[模块: 听歌识曲-ACRCloud] 识别响应结果: Success={success}, Title='{title}', 消息='{error}'");

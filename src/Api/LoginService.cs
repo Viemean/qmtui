@@ -52,7 +52,7 @@ public sealed partial class LoginService
     {
         QrLoginType.Qq => "QQ",
         QrLoginType.WeChat => "微信",
-        QrLoginType.OfficialApp => "官方 APP",
+        QrLoginType.OfficialApp => "移动端 APP",
         _ => "QQ"
     };
 
@@ -90,7 +90,7 @@ public sealed partial class LoginService
             return qr.Type switch
             {
                 QrLoginType.WeChat => await PollWeChatQrStatusAsync(qr.Identifier, ct).ConfigureAwait(false),
-                QrLoginType.OfficialApp => new PollStatus(QrLoginEvent.Error, -1, "官方 APP 扫码状态由实时连接处理"),
+                QrLoginType.OfficialApp => new PollStatus(QrLoginEvent.Error, -1, "移动端 APP 扫码状态由实时连接处理"),
                 _ => await PollQqQrStatusAsync(qr.Identifier, ct).ConfigureAwait(false)
             };
         }
@@ -367,7 +367,7 @@ public sealed partial class LoginService
         UserSession.Current.IsVip = false;
         UserSession.Current.Save();
 
-        // 自动触发第二阶段：向平台申请 OAuth2 Code 并换取官方 musickey 完整凭据
+        // 自动触发第二阶段：向平台申请 OAuth2 Code 并换取专属 musickey 完整凭据
         AppLogger.Info("LoginService", "Starting Phase 2: Automatically exchanging OAuth2 Code for full VIP musickey...");
         await ExchangeMusicKeyByOAuthAsync(cookieDict, ct).ConfigureAwait(false);
     }
@@ -456,7 +456,7 @@ public sealed partial class LoginService
     }
 
     /// <summary>
-    /// 确保当前登录会话拥有官方专属 musickey (qm_keyst)，若缺失则自动通过 p_skey 换票
+    /// 确保当前登录会话拥有专属 musickey (qm_keyst)，若缺失则自动通过 p_skey 换票
     /// </summary>
     public static async Task<bool> EnsureMusicKeyAsync(CancellationToken ct = default)
     {
@@ -475,7 +475,7 @@ public sealed partial class LoginService
     }
 
     /// <summary>
-    /// 第二阶段：自动通过 OAuth2 换取官方专属 musickey 完整 VIP Cookie
+    /// 第二阶段：自动通过 OAuth2 换取专属 musickey 完整 VIP Cookie
     /// </summary>
     public static async Task<bool> ExchangeMusicKeyByOAuthAsync(Dictionary<string, string> cookieDict, CancellationToken ct = default)
     {
@@ -547,7 +547,7 @@ public sealed partial class LoginService
 
             AppLogger.Info("LoginService", $"Successfully captured OAuth code: {code}");
 
-            // 2. 调用 u.y.qq.com 官方接口换取专属 musickey
+            // 2. 调用 u.y.qq.com 接口换取专属 musickey
             var musicLoginUrl = "https://u.y.qq.com/cgi-bin/musicu.fcg";
             var payload = $"{{\"comm\":{{\"ct\":19,\"cv\":1,\"tmeLoginType\":\"1\"}},\"login\":{{\"module\":\"QQConnectLogin.LoginServer\",\"method\":\"QQLogin\",\"param\":{{\"onlyNeedAccessToken\":0,\"forceRefreshToken\":0,\"appid\":100497308,\"code\":\"{code}\"}}}}}}";
 

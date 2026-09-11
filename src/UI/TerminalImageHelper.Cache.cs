@@ -323,10 +323,10 @@ public static partial class TerminalImageHelper
         {
             string[] resolutionUrls =
             [
-                $"https://y.qq.com/music/photo_new/T062M000{vsMid}.jpg?max_age=2592000",          // 官方原画档案档（无二次有损下采样，极度细腻）
+                $"https://y.qq.com/music/photo_new/T062M000{vsMid}.jpg?max_age=2592000",          // 原画档案档
                 $"https://y.qq.com/music/photo_new/T062R1200x1200M000{vsMid}.jpg?max_age=2592000",    // 1200x1200 超高清大图
                 $"https://y.qq.com/music/photo_new/T062R800x800M000{vsMid}.jpg?max_age=2592000",      // 800x800 高清档
-                $"https://y.gtimg.cn/music/photo_new/T062R1200x1200M000{vsMid}.jpg?max_age=2592000",  // 腾讯云 CDN 备用
+                $"https://y.gtimg.cn/music/photo_new/T062R1200x1200M000{vsMid}.jpg?max_age=2592000",  // 备用 CDN
                 $"https://y.qq.com/music/photo_new/T062R500x500M000{vsMid}.jpg?max_age=2592000"
             ];
 

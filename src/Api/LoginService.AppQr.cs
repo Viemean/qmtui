@@ -15,7 +15,7 @@ public sealed partial class LoginService
         {
             using var socket = await ConnectMqttAsync(qr.Identifier, ct).ConfigureAwait(false);
             await SubscribeMqttAsync(socket, qr.Identifier, ct).ConfigureAwait(false);
-            changed?.Invoke(new(QrLoginEvent.Waiting, 408, "等待使用官方音乐 APP 扫码..."));
+            changed?.Invoke(new(QrLoginEvent.Waiting, 408, "等待使用移动端 APP 扫码..."));
             Task<byte[]?> receiving = ReceiveMqttAsync(socket, ct);
             while (!ct.IsCancellationRequested)
             {
@@ -32,7 +32,7 @@ public sealed partial class LoginService
 
                 var status = type switch
                 {
-                    "scanned" => new PollStatus(QrLoginEvent.Confirming, 404, "已扫码，请在官方音乐 APP 中确认授权..."),
+                    "scanned" => new PollStatus(QrLoginEvent.Confirming, 404, "已扫码，请在移动端 APP 中确认授权..."),
                     "canceled" => new PollStatus(QrLoginEvent.Refused, 403, "已取消登录"),
                     "timeout" => new PollStatus(QrLoginEvent.Expired, 402, "二维码已失效"),
                     "loginFailed" => new PollStatus(QrLoginEvent.Error, -1, "扫码登录失败"),

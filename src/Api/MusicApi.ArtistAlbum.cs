@@ -467,7 +467,7 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 分页获取歌手专辑列表（通过官方稳定接口 fcg_v8_singer_album.fcg）
+    /// 分页获取歌手专辑列表
     /// </summary>
     public static async Task<List<Album>> GetSingerAlbumListAsync(
         string singerMid,

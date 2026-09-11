@@ -154,7 +154,7 @@ public sealed partial class MainWindow : Window
             AttachWebServerEvents(_standaloneWebServer);
         }
 
-        // 载入持久化登录凭证并在后台自动补齐官方 musickey
+        // 载入持久化登录凭证并在后台自动补齐专属 musickey
         UserSession.Load();
         _preferredQualityTier = AudioQualityHelper.Parse(UserSession.Current.PreferredQuality);
         _actualQualityTier = _preferredQualityTier;
@@ -864,7 +864,7 @@ public sealed partial class MainWindow : Window
         });
         Add(_hotkeyHintLabel);
 
-        // 顶部三大窗格置顶常驻高亮标题（即使未获焦暗化边框线条，标题文本始终保持官方翡翠薄荷绿高亮）
+        // 顶部三大窗格置顶常驻高亮标题（即使未获焦暗化边框线条，标题文本始终保持翡翠薄荷绿高亮）
         _sidebarTitleLabel = new Label
         {
             Text = "┤导航├",

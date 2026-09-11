@@ -105,7 +105,7 @@ public sealed class LoginDialog : Dialog
 
         var appLoginBtn = new Button
         {
-            Text = "官方 APP (3)",
+            Text = "移动端 (3)",
             X = Pos.Right(weChatBtn) + 2,
             Y = 2
         };

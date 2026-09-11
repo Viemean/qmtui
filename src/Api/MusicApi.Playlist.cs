@@ -529,7 +529,7 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 创建自建歌单（基于官方 client music.musicasset.PlaylistBaseWrite/AddPlaylist）
+    /// 创建自建歌单
     /// </summary>
     public static async Task<(bool Success, long DissId, string Message)> CreatePlaylistAsync(string name, CancellationToken ct = default)
     {

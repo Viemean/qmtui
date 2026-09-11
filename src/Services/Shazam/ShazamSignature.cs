@@ -4,7 +4,7 @@ namespace QmTui.Services.Shazam;
 
 /// <summary>
 /// Shazam 二进制音频签名编码器
-/// 负责将提取出的频域星座图峰值打包为官方 48 字节 Header + TLV 数据块，并计算 CRC32 输出 Base64
+/// 负责将提取出的频域星座图峰值打包为标准 48 字节 Header + TLV 数据块，并计算 CRC32 输出 Base64
 /// </summary>
 public sealed class ShazamSignature
 {
@@ -23,7 +23,7 @@ public sealed class ShazamSignature
     }
 
     /// <summary>
-    /// 将签名编码为官方标准的二进制字节数组
+    /// 将签名编码为标准的二进制字节数组
     /// </summary>
     public byte[] EncodeToBinary()
     {

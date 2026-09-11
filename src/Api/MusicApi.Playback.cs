@@ -311,7 +311,7 @@ public sealed partial class MusicApi
                     vsList.Add(v.GetString() ?? "");
                 }
 
-                // 官方规范：vs[1] 恒定为 Single 主视觉封面 MID
+                // 规范定义：vs[1] 恒定为 Single 主视觉封面 MID
                 string? visualMid = null;
                 if (vsList.Count > 1 && !string.IsNullOrWhiteSpace(vsList[1]))
                 {
@@ -337,7 +337,7 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 获取同步 LRC 歌词与翻译（优先调用官方 PlayLyricInfo 接口，自动解析 Base64 并进行双语时间轴对齐）
+    /// 获取同步 LRC 歌词与翻译（解析 Base64 并进行双语时间轴对齐）
     /// </summary>
     public static async Task<List<LyricLine>> GetLyricsAsync(string songMid, CancellationToken ct = default)
     {
@@ -354,7 +354,7 @@ public sealed partial class MusicApi
 
         try
         {
-            // 1. 优先调用官方 PlayLyricInfo 接口以获取原生原文与翻译歌词
+            // 1. 调用 PlayLyricInfo 接口以获取原生原文与翻译歌词
             var jsonPayload = $"{{\"comm\":{{\"ct\":24,\"cv\":0}},\"playLyricInfo\":{{\"module\":\"music.musichallSong.PlayLyricInfo\",\"method\":\"GetPlayLyricInfo\",\"param\":{{\"songMID\":\"{songMid}\",\"songID\":0,\"qrc\":0,\"trans\":1,\"roma\":1,\"isHQ\":1}}}}}}";
 
             using var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");

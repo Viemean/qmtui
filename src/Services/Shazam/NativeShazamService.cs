@@ -211,7 +211,7 @@ public static class NativeShazamService
     }
 
     /// <summary>
-    /// 轻量查询 iTunes 官方原语种元数据 (超时限制 1.0 秒，避免阻塞)
+    /// 轻量查询 iTunes 原语种元数据 (超时限制 1.0 秒，避免阻塞)
     /// </summary>
     private static async Task<(string Title, string Artist, string Album)> TryFetchAppleLocalizedNameAsync(
         string appleTrackId,
