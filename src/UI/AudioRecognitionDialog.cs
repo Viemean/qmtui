@@ -6,7 +6,6 @@ using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using QmTui.Models;
 using QmTui.Services;
-using QmTui.Services.AcrCloud;
 using QmTui.Services.AudioRecognition;
 using QmTui.Utils;
 using Attribute = Terminal.Gui.Drawing.Attribute;
@@ -29,7 +28,6 @@ public sealed class AudioRecognitionDialog : Dialog
     private readonly Label _sourceLabel;
     private readonly Button _actionBtn;
     private readonly Button _sourceBtn;
-    private readonly Button _keyBtn;
     private readonly Button _cancelBtn;
 
     // 记忆用户选择的录音源，避免每次打开弹窗时重置
@@ -160,21 +158,10 @@ public sealed class AudioRecognitionDialog : Dialog
         _sourceBtn.KeyBindings.Clear(); // 移除按钮内置热键，统一由窗体 KeyDown 分发
         _sourceBtn.Accepting += (s, e) => { e.Handled = true; ToggleAudioSource(); };
 
-        _keyBtn = new Button
-        {
-            Text = "密钥 (K)",
-            X = Pos.Right(_sourceBtn) + 2,
-            Y = Pos.AnchorEnd(1),
-            NoDecorations = true,
-            ShadowStyle = ShadowStyles.None
-        };
-        _keyBtn.SetScheme(TransparentDialogScheme);
-        _keyBtn.Accepting += (s, e) => { e.Handled = true; ShowAcrCloudConfigDialog(); };
-
         _cancelBtn = new Button
         {
             Text = "取消 (Esc)",
-            X = Pos.Right(_keyBtn) + 2,
+            X = Pos.Right(_sourceBtn) + 2,
             Y = Pos.AnchorEnd(1),
             NoDecorations = true,
             ShadowStyle = ShadowStyles.None
@@ -182,7 +169,7 @@ public sealed class AudioRecognitionDialog : Dialog
         _cancelBtn.SetScheme(TransparentDialogScheme);
         _cancelBtn.Accepting += (s, e) => { e.Handled = true; HandleCancel(); };
 
-        Add(_statusLabel, _detailLabel1, _detailLabel2, _detailLabel3, _sourceLabel, _actionBtn, _sourceBtn, _keyBtn, _cancelBtn);
+        Add(_statusLabel, _detailLabel1, _detailLabel2, _detailLabel3, _sourceLabel, _actionBtn, _sourceBtn, _cancelBtn);
 
         KeyDown += (s, k) =>
         {
@@ -219,16 +206,6 @@ public sealed class AudioRecognitionDialog : Dialog
                 if (!_isRecognized)
                 {
                     ToggleAudioSource();
-                }
-                return;
-            }
-
-            if (k == Key.K || k == Key.K.WithShift)
-            {
-                k.Handled = true;
-                if (!_isRecognized)
-                {
-                    ShowAcrCloudConfigDialog();
                 }
                 return;
             }
@@ -329,12 +306,8 @@ public sealed class AudioRecognitionDialog : Dialog
         _sourceBtn.X = Pos.Right(_actionBtn) + 2;
         _sourceBtn.Visible = true;
 
-        _keyBtn.Text = "密钥 (K)";
-        _keyBtn.X = Pos.Right(_sourceBtn) + 2;
-        _keyBtn.Visible = true;
-
         _cancelBtn.Text = "取消 (Esc)";
-        _cancelBtn.X = Pos.Right(_keyBtn) + 2;
+        _cancelBtn.X = Pos.Right(_sourceBtn) + 2;
         _cancelBtn.Visible = true;
         _cancelBtn.SetFocus();
         SetNeedsDraw();
@@ -522,7 +495,6 @@ public sealed class AudioRecognitionDialog : Dialog
         _sourceLabel.Visible = true;
 
         _sourceBtn.Visible = false;
-        _keyBtn.Visible = false;
 
         if (_recognizedSong != null)
         {
@@ -578,12 +550,8 @@ public sealed class AudioRecognitionDialog : Dialog
         _sourceBtn.X = Pos.Right(_actionBtn) + 2;
         _sourceBtn.Visible = true;
 
-        _keyBtn.Text = "密钥 (K)";
-        _keyBtn.X = Pos.Right(_sourceBtn) + 2;
-        _keyBtn.Visible = true;
-
         _cancelBtn.Text = "关闭 (Esc)";
-        _cancelBtn.X = Pos.Right(_keyBtn) + 2;
+        _cancelBtn.X = Pos.Right(_sourceBtn) + 2;
         _cancelBtn.Visible = true;
 
         _actionBtn.SetFocus();
@@ -616,89 +584,15 @@ public sealed class AudioRecognitionDialog : Dialog
         _sourceBtn.X = Pos.Right(_actionBtn) + 2;
         _sourceBtn.Visible = true;
 
-        _keyBtn.Text = "密钥 (K)";
-        _keyBtn.X = Pos.Right(_sourceBtn) + 2;
-        _keyBtn.Visible = true;
-
         _cancelBtn.Text = "关闭 (Esc)";
-        _cancelBtn.X = Pos.Right(_keyBtn) + 2;
+        _cancelBtn.X = Pos.Right(_sourceBtn) + 2;
         _cancelBtn.Visible = true;
 
         _sourceBtn.SetFocus();
         SetNeedsDraw();
     }
 
-    private void ShowAcrCloudConfigDialog()
-    {
-        StopAllProcesses();
 
-        var config = AcrCloudConfig.Current;
-        var dlg = new Dialog
-        {
-            Title = "ACRCloud 密钥配置",
-            Width = 64,
-            Height = 13,
-            X = Pos.Center(),
-            Y = Pos.Center()
-        };
-        dlg.SetScheme(TransparentDialogScheme);
-
-        var hostLbl = new Label { Text = "Host:", X = 2, Y = 1, Width = 15 };
-        var hostField = new TextField { Text = config.Host, X = 17, Y = 1, Width = Dim.Fill(2) };
-
-        var keyLbl = new Label { Text = "Access Key:", X = 2, Y = 3, Width = 15 };
-        var keyField = new TextField { Text = config.AccessKey, X = 17, Y = 3, Width = Dim.Fill(2) };
-
-        var secretLbl = new Label { Text = "Access Secret:", X = 2, Y = 5, Width = 15 };
-        var secretField = new TextField { Text = config.AccessSecret, X = 17, Y = 5, Width = Dim.Fill(2), Secret = true };
-
-        var tipLbl = new Label
-        {
-            Text = "提示: 注册 acrcloud.cn 即可获取每日免费额度",
-            X = 2,
-            Y = 7,
-            Width = Dim.Fill(2)
-        };
-        tipLbl.SetScheme(TransparentDialogScheme);
-
-        var saveBtn = new Button
-        {
-            Text = "保存 (Enter)",
-            X = Pos.Center() - 11,
-            Y = Pos.AnchorEnd(1),
-            ShadowStyle = ShadowStyles.None
-        };
-        saveBtn.SetScheme(TransparentDialogScheme);
-
-        var cancelBtn = new Button
-        {
-            Text = "取消 (Esc)",
-            X = Pos.Center() + 3,
-            Y = Pos.AnchorEnd(1),
-            ShadowStyle = ShadowStyles.None
-        };
-        cancelBtn.SetScheme(TransparentDialogScheme);
-
-        saveBtn.Accepting += (s, e) =>
-        {
-            config.Host = hostField.Text?.Trim() ?? "";
-            config.AccessKey = keyField.Text?.Trim() ?? "";
-            config.AccessSecret = secretField.Text?.Trim() ?? "";
-            config.Save();
-            Application.RequestStop(dlg);
-            StartRecognitionProcess();
-        };
-
-        cancelBtn.Accepting += (s, e) =>
-        {
-            Application.RequestStop(dlg);
-            StartRecognitionProcess();
-        };
-
-        dlg.Add(hostLbl, hostField, keyLbl, keyField, secretLbl, secretField, tipLbl, saveBtn, cancelBtn);
-        MikuTheme.ApplyTo(dlg, TransparentDialogScheme);
-        Application.Run(dlg);
-    }
 
     private void StopAllProcesses()
     {

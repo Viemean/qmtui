@@ -6,8 +6,6 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using QmTui.Api;
 using QmTui.Models;
-using QmTui.Services.AcrCloud;
-using QmTui.Services.Shazam;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -93,26 +91,6 @@ public class PlatformApiTests
             else
             {
                 _output.WriteLine("[鉴权初始化] 未配置凭据与本地授权环境变量，以游客模式运行");
-            }
-
-            // ACRCloud 凭据配置：优先环境变量，未授权时置空
-            var acrKey = Environment.GetEnvironmentVariable("ACRCLOUD_ACCESS_KEY");
-            var acrSecret = Environment.GetEnvironmentVariable("ACRCLOUD_ACCESS_SECRET");
-            var acrHost = Environment.GetEnvironmentVariable("ACRCLOUD_HOST");
-            if (!string.IsNullOrWhiteSpace(acrKey) && !string.IsNullOrWhiteSpace(acrSecret))
-            {
-                AcrCloudConfig.Current.AccessKey = acrKey;
-                AcrCloudConfig.Current.AccessSecret = acrSecret;
-                if (!string.IsNullOrWhiteSpace(acrHost))
-                {
-                    AcrCloudConfig.Current.Host = acrHost;
-                }
-            }
-            else if (!allowLocalSession)
-            {
-                // 未开启本地会话时清空密钥
-                AcrCloudConfig.Current.AccessKey = "";
-                AcrCloudConfig.Current.AccessSecret = "";
             }
         }
     }
@@ -317,65 +295,7 @@ public class PlatformApiTests
 
     #endregion
 
-    #region 6. 听歌识曲模块 - 原生 Shazam 与 ACRCloud 双引擎
 
-    [Fact]
-    public async Task NativeShazamService_OfficialApi_PerformsRecognitionNetworkExchange()
-    {
-        if (!IsOnlineTestEnabled()) return;
-
-        _output.WriteLine("[模块: 听歌识曲-Shazam] 正在测试苹果 Shazam 指纹编码与网络识别通道...");
-
-        // 构造标准的 16kHz 16-bit 单声道 PCM 测试样本 (3 秒正弦波)
-        int sampleRate = 16000;
-        int durationSeconds = 3;
-        short[] testPcm = new short[sampleRate * durationSeconds];
-        double freq = 440.0;
-        for (int i = 0; i < testPcm.Length; i++)
-        {
-            testPcm[i] = (short)(Math.Sin(2 * Math.PI * freq * i / sampleRate) * 16000);
-        }
-
-        _output.WriteLine($"[模块: 听歌识曲-Shazam] 发送 {testPcm.Length} 个 PCM 采样点进行服务通信测试...");
-        var (success, title, artist, album, error) = await NativeShazamService.RecognizePcmSamplesAsync(testPcm);
-
-        _output.WriteLine($"[模块: 听歌识曲-Shazam] 网关响应结果: Success={success}, Title='{title}', Artist='{artist}', 消息='{error}'");
-        // 对于纯正弦波，服务将正常响应但无法匹配曲目，返回 Success=false 且 Error="未识别到歌曲"，或识别出同频率音乐
-        // 关键断言是网络与接口契约未抛出异常，error 包含有效的业务响应而非崩溃
-        Assert.False(string.IsNullOrEmpty(error) && !success);
-    }
-
-    [Fact]
-    public async Task AcrCloudService_OfficialApi_PerformsRecognitionNetworkExchange()
-    {
-        if (!IsOnlineTestEnabled()) return;
-
-        _output.WriteLine("[模块: 听歌识曲-ACRCloud] 正在检查 ACRCloud 密钥与网关配置...");
-        if (!AcrCloudConfig.Current.IsConfigured)
-        {
-            _output.WriteLine("[模块: 听歌识曲-ACRCloud] 未配置 ACRCloud 密钥，安全跳过接口联调");
-            return;
-        }
-
-        _output.WriteLine($"[模块: 听歌识曲-ACRCloud] 当前网关 Host: {AcrCloudConfig.Current.Host}, Key: {AcrCloudConfig.Current.AccessKey[..6]}***");
-
-        // 构造 3 秒 PCM 样本
-        int sampleRate = 16000;
-        int durationSeconds = 3;
-        short[] testPcm = new short[sampleRate * durationSeconds];
-        for (int i = 0; i < testPcm.Length; i++)
-        {
-            testPcm[i] = (short)(Math.Sin(2 * Math.PI * 523.25 * i / sampleRate) * 15000);
-        }
-
-        _output.WriteLine($"[模块: 听歌识曲-ACRCloud] 发送 HMAC 签名请求至平台网关...");
-        var (success, title, artist, album, error) = await AcrCloudService.RecognizePcmSamplesAsync(testPcm);
-
-        _output.WriteLine($"[模块: 听歌识曲-ACRCloud] 识别响应结果: Success={success}, Title='{title}', 消息='{error}'");
-        Assert.NotNull(error);
-    }
-
-    #endregion
 
     #region 7. 元数据与归档模块 - 歌手与专辑详情
 

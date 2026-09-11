@@ -22,7 +22,7 @@
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tui/**;tests/**;experimental/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tui/**;tests/**;experimental/**;old/**</DefaultItemExcludes>
     <InvariantGlobalization>true</InvariantGlobalization>
     <LinkerFlavor Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">lld</LinkerFlavor>
   </PropertyGroup>

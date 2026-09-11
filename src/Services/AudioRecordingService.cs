@@ -271,8 +271,8 @@ public sealed class AudioRecordingSession : IDisposable
 
     /// <summary>
     /// 获取当前缓冲区中已累积的 16000Hz 单声道 16-bit PCM 采样数组。
-    /// 麦克风模式下额外执行 DC 去除与预加重滤波（α=0.97），补偿空气传播导致的高频衰减，
-    /// 将 Shazam 四个目标频带的 SNR 提升 12~32 dB，使早期切片具备有效指纹识别能力。
+    /// 麦克风模式下额外执行 DC 去除与预加重滤波（α=0.87），补偿空气传播导致的高频衰减，
+    /// 提升目标频带的 SNR，使早期切片具备有效指纹识别能力。
     /// AGC 仅基于最后 1.5 秒样本计算 RMS，避免录音初始静音段拉偏增益系数。
     /// </summary>
     public short[] GetSnapshotSamples()
@@ -292,10 +292,9 @@ public sealed class AudioRecordingSession : IDisposable
             }
 
             // 麦克风模式：DC 去除 + 预加重滤波，补偿空气传播高频衰减
-            // 实测数据：原始麦克风 SNR 在 Shazam 四频带均为负值（-10.9~-33.7 dB），
-            // 预加重后提升至 -1.9~+2.6 dB，指纹峰值可以更早浮现。
-            // α=0.87（非语音识别惯用的 0.97）：提升约 3~4 dB/倍频程，在强化中高频的同时
-            // 保留足够的低频（Hz250~520）音乐内容，对不同型号麦克风频响兼容性更好
+            // 预加重后信噪比有效提升，指纹特征可以更早浮现。
+            // α=0.87：提升约 3~4 dB/倍频程，在强化中高频的同时
+            // 保留足够的低频内容，对不同型号麦克风频响兼容性更好
             if (_source == AudioRecordSource.Microphone && sampleCount > 1)
             {
                 // 1. DC 去除：减去全段均值，消除直流偏置对 FFT 功率谱的干扰
