@@ -79,6 +79,10 @@ jobs:
             chmod 755 "$STAGE_DIR/qafp/qafp_runner" || true
             chmod 755 "$STAGE_DIR/qafp/sysroot/system/bin/linker64" || true
           fi
+          if [ -d "www" ]; then
+            mkdir -p "$STAGE_DIR/www"
+            cp -r www/* "$STAGE_DIR/www/"
+          fi
           tar -czvf "qmtui-${VERSION}-linux-${{ matrix.arch }}.tar.gz" -C "$STAGE_DIR" .
           rm -rf "$STAGE_DIR"
 
