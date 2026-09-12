@@ -43,15 +43,18 @@ public static class CacheManager
     private static readonly string s_indexFile = Path.Combine(s_baseDir, "cache_index.json");
 
     /// <summary>
-    /// 全局统一缓存容量上限（根据磁盘可用剩余空间自适应：>200GB 为 4GB，100~200GB 为 2GB，<100GB 为 1GB）
+    /// 全局统一缓存容量上限（根据磁盘可用剩余空间自适应，最大上限封顶 8GB）
     /// </summary>
     public static long MaxTotalSizeBytes { get; set; } = GetAdaptiveMaxSizeBytes();
 
     /// <summary>
-    /// 根据磁盘剩余可用空间动态计算缓存容量上限：
-    /// 剩余空间 200GB 以上：4GB；
-    /// 剩余空间 100GB ~ 200GB 之间：2GB；
-    /// 剩余空间 100GB 以下：1GB。
+    /// 根据磁盘剩余可用空间动态计算缓存容量上限（最大封顶 8GB，带低空间防爆盘门禁）：
+    /// - 剩余空间 300GB 以上：8GB（封顶）
+    /// - 剩余空间 150GB ~ 300GB：4GB
+    /// - 剩余空间 50GB ~ 150GB：2GB
+    /// - 剩余空间 10GB ~ 50GB：1GB
+    /// - 剩余空间 3GB ~ 10GB：512MB
+    /// - 剩余空间 3GB 以下：按可用空间 10% 限制 (最低 128MB)，保留系统安全缓冲
     /// </summary>
     public static long GetAdaptiveMaxSizeBytes(string? targetDir = null)
     {
@@ -79,15 +82,18 @@ public static class CacheManager
     public static long CalculateLimitByFreeBytes(long freeBytes)
     {
         const long gb = 1024L * 1024 * 1024;
-        if (freeBytes >= 200L * gb)
-        {
-            return 4L * gb;
-        }
-        if (freeBytes >= 100L * gb)
-        {
-            return 2L * gb;
-        }
-        return 1L * gb;
+        const long mb = 1024L * 1024;
+
+        if (freeBytes >= 300L * gb) return 8L * gb;
+        if (freeBytes >= 150L * gb) return 4L * gb;
+        if (freeBytes >= 50L * gb) return 2L * gb;
+        if (freeBytes >= 10L * gb) return 1L * gb;
+        if (freeBytes >= 3L * gb) return 512L * mb;
+
+        // 极低空间（<3GB）：严格限制在可用空间的 10%，最小 128MB
+        long safeFree = Math.Max(0, freeBytes - 512L * mb);
+        long proportional = freeBytes / 10;
+        return Math.Clamp(Math.Min(proportional, safeFree), 128L * mb, 512L * mb);
     }
 
     private static readonly ConcurrentDictionary<string, CacheEntry> s_entries = new(StringComparer.OrdinalIgnoreCase);

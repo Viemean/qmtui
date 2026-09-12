@@ -118,6 +118,9 @@ public static class AudioCacheService
                 CacheManager.RecordAccess($"audio/{songMid}_{tier}.media", fi.Length);
                 AppLogger.Info("AudioCacheService", $"Audio cached successfully ({fi.Length / 1024} KB): {targetFile}");
 
+                // 双轨制跨音质收敛：高阶落盘后自动淘汰同曲目低阶冗余缓存
+                DeduplicateLowerQualities(songMid, tier);
+
                 // 执行磁盘配额检查
                 CacheManager.EnforceLimitAsync();
                 return targetFile;
@@ -156,4 +159,82 @@ public static class AudioCacheService
     {
         CacheManager.EnforceLimitAsync();
     }
+
+    /// <summary>
+    /// 双轨制跨音质收敛：当落盘成功时，自动清理同曲目同轨道内的低阶历史旧缓存
+    /// - 立体声轨道：Master > HiRes > SQ > HQ > Standard
+    /// - 全景声轨道：Atmos71 > Atmos51 / Dolby > Premium
+    /// </summary>
+    private static void DeduplicateLowerQualities(string songMid, AudioQualityTier currentTier)
+    {
+        try
+        {
+            var stereoRank = GetStereoRank(currentTier);
+            var spatialRank = GetSpatialRank(currentTier);
+
+            foreach (AudioQualityTier otherTier in Enum.GetValues<AudioQualityTier>())
+            {
+                if (otherTier == currentTier) continue;
+
+                bool shouldPrune = false;
+                if (stereoRank > 0)
+                {
+                    var otherStereoRank = GetStereoRank(otherTier);
+                    if (otherStereoRank > 0 && otherStereoRank < stereoRank)
+                    {
+                        shouldPrune = true;
+                    }
+                }
+                else if (spatialRank > 0)
+                {
+                    var otherSpatialRank = GetSpatialRank(otherTier);
+                    if (otherSpatialRank > 0 && otherSpatialRank < spatialRank)
+                    {
+                        shouldPrune = true;
+                    }
+                }
+
+                if (shouldPrune)
+                {
+                    var redundantFile = Path.Combine(s_cacheDir, $"{songMid}_{otherTier}.media");
+                    if (File.Exists(redundantFile))
+                    {
+                        try
+                        {
+                            File.Delete(redundantFile);
+                            CacheManager.Forget($"audio/{songMid}_{otherTier}.media");
+                            AppLogger.Info("AudioCacheService", $"[跨音质收敛] 淘汰同曲目低阶缓存: {songMid}_{otherTier}.media (已保留更高阶 {currentTier})");
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Debug("AudioCacheService", $"删除冗余旧音质缓存失败: {ex.Message}");
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AudioCacheService", $"跨音质去重异常: {ex.Message}");
+        }
+    }
+
+    private static int GetStereoRank(AudioQualityTier tier) => tier switch
+    {
+        AudioQualityTier.Master => 5,
+        AudioQualityTier.HiRes => 4,
+        AudioQualityTier.SQ => 3,
+        AudioQualityTier.HQ => 2,
+        AudioQualityTier.Standard => 1,
+        _ => 0
+    };
+
+    private static int GetSpatialRank(AudioQualityTier tier) => tier switch
+    {
+        AudioQualityTier.Atmos71 => 3,
+        AudioQualityTier.Atmos51 => 2,
+        AudioQualityTier.Dolby => 2,
+        AudioQualityTier.Premium => 1,
+        _ => 0
+    };
 }
