@@ -20,6 +20,9 @@ public class CacheManagerTests
     [InlineData(10L * OneGb, 1L * OneGb)]
     [InlineData(9L * OneGb, 512L * 1024 * 1024)]
     [InlineData(3L * OneGb, 512L * 1024 * 1024)]
+    [InlineData(1L * OneGb, 128L * 1024 * 1024)]
+    [InlineData(500L * 1024 * 1024, 128L * 1024 * 1024)]
+    [InlineData(0L, 128L * 1024 * 1024)]
     public void CalculateLimitByFreeBytes_ShouldReturnExpectedLimit(long freeBytes, long expectedLimit)
     {
         long actual = CacheManager.CalculateLimitByFreeBytes(freeBytes);

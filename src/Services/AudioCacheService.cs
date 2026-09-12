@@ -165,50 +165,26 @@ public static class AudioCacheService
     /// - 立体声轨道：Master > HiRes > SQ > HQ > Standard
     /// - 全景声轨道：Atmos71 > Atmos51 / Dolby > Premium
     /// </summary>
-    private static void DeduplicateLowerQualities(string songMid, AudioQualityTier currentTier)
+    internal static void DeduplicateLowerQualities(string songMid, AudioQualityTier currentTier)
     {
         try
         {
-            var stereoRank = GetStereoRank(currentTier);
-            var spatialRank = GetSpatialRank(currentTier);
-
             foreach (AudioQualityTier otherTier in Enum.GetValues<AudioQualityTier>())
             {
-                if (otherTier == currentTier) continue;
+                if (!ShouldPrune(currentTier, otherTier)) continue;
 
-                bool shouldPrune = false;
-                if (stereoRank > 0)
+                var redundantFile = Path.Combine(s_cacheDir, $"{songMid}_{otherTier}.media");
+                if (File.Exists(redundantFile))
                 {
-                    var otherStereoRank = GetStereoRank(otherTier);
-                    if (otherStereoRank > 0 && otherStereoRank < stereoRank)
+                    try
                     {
-                        shouldPrune = true;
+                        File.Delete(redundantFile);
+                        CacheManager.Forget($"audio/{songMid}_{otherTier}.media");
+                        AppLogger.Info("AudioCacheService", $"[跨音质收敛] 淘汰同曲目低阶缓存: {songMid}_{otherTier}.media (已保留更高阶 {currentTier})");
                     }
-                }
-                else if (spatialRank > 0)
-                {
-                    var otherSpatialRank = GetSpatialRank(otherTier);
-                    if (otherSpatialRank > 0 && otherSpatialRank < spatialRank)
+                    catch (Exception ex)
                     {
-                        shouldPrune = true;
-                    }
-                }
-
-                if (shouldPrune)
-                {
-                    var redundantFile = Path.Combine(s_cacheDir, $"{songMid}_{otherTier}.media");
-                    if (File.Exists(redundantFile))
-                    {
-                        try
-                        {
-                            File.Delete(redundantFile);
-                            CacheManager.Forget($"audio/{songMid}_{otherTier}.media");
-                            AppLogger.Info("AudioCacheService", $"[跨音质收敛] 淘汰同曲目低阶缓存: {songMid}_{otherTier}.media (已保留更高阶 {currentTier})");
-                        }
-                        catch (Exception ex)
-                        {
-                            AppLogger.Debug("AudioCacheService", $"删除冗余旧音质缓存失败: {ex.Message}");
-                        }
+                        AppLogger.Debug("AudioCacheService", $"删除冗余旧音质缓存失败: {ex.Message}");
                     }
                 }
             }
@@ -219,7 +195,28 @@ public static class AudioCacheService
         }
     }
 
-    private static int GetStereoRank(AudioQualityTier tier) => tier switch
+    internal static bool ShouldPrune(AudioQualityTier currentTier, AudioQualityTier otherTier)
+    {
+        if (otherTier == currentTier) return false;
+
+        var stereoRank = GetStereoRank(currentTier);
+        if (stereoRank > 0)
+        {
+            var otherStereoRank = GetStereoRank(otherTier);
+            return otherStereoRank > 0 && otherStereoRank < stereoRank;
+        }
+
+        var spatialRank = GetSpatialRank(currentTier);
+        if (spatialRank > 0)
+        {
+            var otherSpatialRank = GetSpatialRank(otherTier);
+            return otherSpatialRank > 0 && otherSpatialRank < spatialRank;
+        }
+
+        return false;
+    }
+
+    internal static int GetStereoRank(AudioQualityTier tier) => tier switch
     {
         AudioQualityTier.Master => 5,
         AudioQualityTier.HiRes => 4,
@@ -229,7 +226,7 @@ public static class AudioCacheService
         _ => 0
     };
 
-    private static int GetSpatialRank(AudioQualityTier tier) => tier switch
+    internal static int GetSpatialRank(AudioQualityTier tier) => tier switch
     {
         AudioQualityTier.Atmos71 => 3,
         AudioQualityTier.Atmos51 => 2,
