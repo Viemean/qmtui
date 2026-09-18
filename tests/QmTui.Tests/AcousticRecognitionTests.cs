@@ -1,4 +1,5 @@
 using QmTui.Models;
+using QmTui.Services;
 using QmTui.Services.AudioRecognition;
 using Xunit;
 using Xunit.Abstractions;
@@ -143,5 +144,93 @@ public class AcousticRecognitionTests
 
         var allSnapshot = ring.GetRecentBytes(10);
         Assert.Equal(new byte[] { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 }, allSnapshot);
+    }
+
+    [Theory]
+    [InlineData(120.0, 15)]
+    [InlineData(26.0, 15)]
+    [InlineData(25.0, 5)]
+    [InlineData(15.0, 5)]
+    [InlineData(10.0, 0)]
+    [InlineData(5.0, 0)]
+    public void AudioSliceDecoder_CalculateSkipSeconds_MatchesStrategy(double durationSeconds, int expectedSkip)
+    {
+        int actual = AudioSliceDecoder.CalculateSkipSeconds(durationSeconds);
+        Assert.Equal(expectedSkip, actual);
+    }
+
+    [Fact]
+    public void LocalLyricAutoMatcher_ComputePathAndMetaKeys_Stable()
+    {
+        string pathKey1 = LocalLyricAutoMatcher.ComputePathKey("/music/sample.flac");
+        string pathKey2 = LocalLyricAutoMatcher.ComputePathKey("/music/sample.flac");
+        Assert.Equal(32, pathKey1.Length);
+        Assert.Equal(pathKey1, pathKey2);
+
+        // 验证元数据清洗与时长分桶：01. きみの名前 (你的名字) 与 きみの名前 (你的名字)，时长 238s 与 239s 命中同一档位 (240s)
+        string metaKey1 = LocalLyricAutoMatcher.ComputeMetaKey("01. きみの名前 (你的名字)", "藤川千愛", 238.2);
+        string metaKey2 = LocalLyricAutoMatcher.ComputeMetaKey("きみの名前 (你的名字)", "藤川千愛", 239.5);
+        Assert.Equal(32, metaKey1.Length);
+        Assert.Equal(metaKey1, metaKey2);
+    }
+
+    [Fact]
+    public void LocalLyricAutoMatcher_UnifiedCache_ThreeTierCrossSharing()
+    {
+        const string songMid = "test_mid_002LRrPN";
+        var lines = new List<LyricLine>
+        {
+            new(TimeSpan.Zero, "抜け殻みたいな空に", "凝望着宛如空壳的天空"),
+            new(TimeSpan.FromSeconds(5), "ほら キミの声が僕を救うよ", "看啊 你的声音拯救了我")
+        };
+
+        var localSong = new Song("local_123", "01. きみの名前 (你的名字)", "藤川千愛", "Album", 239)
+        {
+            LocalFilePath = "/mnt/Sun/Music/01.flac"
+        };
+        var webDavSong = new Song("webdav_456", "きみの名前 (你的名字)", "藤川千愛", "Album", 238)
+        {
+            WebDavHref = "http://nas/01.flac"
+        };
+        var onlineSong = new Song(songMid, "きみの名前 (你的名字)", "藤川千愛", "Album", 240);
+
+        // 1. 在线播放写入母本库与元数据索引
+        LocalLyricAutoMatcher.SaveUnifiedCache(songMid, "album_mid_789", "きみの名前 (你的名字)", "藤川千愛", lines, onlineSong);
+
+        // 2. 本地歌曲通过元数据索引跨来源 0ms 命中该母本
+        var localHit = LocalLyricAutoMatcher.TryGetCachedLyrics(localSong);
+        Assert.NotNull(localHit);
+        Assert.Equal(songMid, localHit.SongMid);
+        Assert.Equal(2, localHit.Lines.Count);
+        Assert.Equal("凝望着宛如空壳的天空", localHit.Lines[0].Trans);
+
+        // 3. WebDAV 歌曲通过元数据索引跨来源 0ms 命中该母本
+        var webDavHit = LocalLyricAutoMatcher.TryGetCachedLyrics(webDavSong);
+        Assert.NotNull(webDavHit);
+        Assert.Equal(songMid, webDavHit.SongMid);
+        Assert.Equal("看啊 你的声音拯救了我", webDavHit.Lines[1].Trans);
+
+        // 4. 在线歌曲根据 Mid 直接命中母本
+        var onlineHit = LocalLyricAutoMatcher.TryGetCachedLyrics(onlineSong);
+        Assert.NotNull(onlineHit);
+        Assert.Equal(songMid, onlineHit.SongMid);
+    }
+
+    [Fact]
+    public void LocalLyricAutoMatcher_NeedsMatching_LogicRules()
+    {
+        var song = new Song("001", "Test Song", "Test Artist", "Album", 180);
+
+        // 1. 无歌词需匹配
+        Assert.True(LocalLyricAutoMatcher.NeedsMatching(song, []));
+
+        // 2. 占位歌词需匹配
+        Assert.True(LocalLyricAutoMatcher.NeedsMatching(song, [new LyricLine(TimeSpan.Zero, "暂无歌词")]));
+
+        // 3. 多行且有翻译，不需要匹配
+        Assert.False(LocalLyricAutoMatcher.NeedsMatching(song, [
+            new LyricLine(TimeSpan.Zero, "Hello", "你好"),
+            new LyricLine(TimeSpan.FromSeconds(2), "World", "世界")
+        ]));
     }
 }
