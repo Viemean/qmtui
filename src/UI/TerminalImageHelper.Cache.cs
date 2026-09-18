@@ -76,6 +76,29 @@ public static partial class TerminalImageHelper
     }
 
     /// <summary>
+    /// 校验 WebP 文件头 RIFF 与 WEBP 标识
+    /// </summary>
+    public static bool IsValidWebpFile(string? path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+        try
+        {
+            var info = new FileInfo(path);
+            if (info.Length < 16) return false;
+
+            using var fs = File.OpenRead(path);
+            byte[] header = new byte[12];
+            if (fs.Read(header, 0, 12) < 12) return false;
+            return header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F' &&
+                   header[8] == 'W' && header[9] == 'E' && header[10] == 'B' && header[11] == 'P';
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 流式获取远程图像并原子落盘，避免大尺寸封面分配到大对象堆 (LOH)
     /// </summary>
     private static async Task<bool> DownloadImageStreamToFileAsync(string url, string destinationFile, CancellationToken cancellationToken = default)
@@ -355,11 +378,74 @@ public static partial class TerminalImageHelper
     }
 
     /// <summary>
+    /// 获取 HTTP/HTTPS 直链封面（包含 Connect 协议下 App 提供的代理封面），并持久化到本地缓存与圆角处理
+    /// </summary>
+    public static async Task<string?> EnsureHttpCoverAsync(string url, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(url) || cancellationToken.IsCancellationRequested) return null;
+
+        var urlHash = Convert.ToHexString(System.Security.Cryptography.MD5.HashData(Encoding.UTF8.GetBytes(url))).ToLowerInvariant();
+        var pngFile = Path.Combine(s_cacheDir, $"http_{urlHash}.png");
+        if (File.Exists(pngFile))
+        {
+            var fi = new FileInfo(pngFile);
+            if (fi.Length <= 2500 * 1024 && IsValidPngFile(pngFile))
+            {
+                CacheManager.RecordAccess($"covers/{Path.GetFileName(pngFile)}", fi.Length);
+                return pngFile;
+            }
+            try { File.Delete(pngFile); } catch { }
+        }
+
+        var localFile = Path.Combine(s_cacheDir, $"http_{urlHash}.raw");
+        if (File.Exists(localFile) && (!IsValidJpgFile(localFile) && !IsValidPngFile(localFile) && !IsValidWebpFile(localFile)))
+        {
+            try { File.Delete(localFile); } catch { }
+        }
+
+        if (!File.Exists(localFile) || new FileInfo(localFile).Length == 0)
+        {
+            if (cancellationToken.IsCancellationRequested) return null;
+            await DownloadImageStreamToFileAsync(url, localFile, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!File.Exists(localFile) || new FileInfo(localFile).Length == 0 || cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+
+        if (!IsImageSupported)
+        {
+            return localFile;
+        }
+
+        var processed = await ApplyRoundedCornersAsync(localFile, pngFile, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrEmpty(processed) && File.Exists(processed))
+        {
+            CacheManager.RecordAccess($"covers/{Path.GetFileName(processed)}", new FileInfo(processed).Length);
+            CacheManager.EnforceLimitAsync();
+        }
+        return processed ?? localFile;
+    }
+
+    /// <summary>
     /// 获取歌曲播放时对应的超高清封面（智能自愈：优先专辑1200，单曲智能调用T062原画/1200，本地音频提取嵌入封面）
     /// </summary>
     public static async Task<string?> EnsureSongCoverAsync(Song? song, CancellationToken cancellationToken = default)
     {
         if (song == null || cancellationToken.IsCancellationRequested) return null;
+
+        // 优先检查是否有 HTTP / HTTPS 直链封面（包含 App 提供的 http://<ip>:8766/cover/local?... 代理地址或三方直链）
+        if (!string.IsNullOrEmpty(song.CoverUrl) &&
+            (song.CoverUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+             song.CoverUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+        {
+            var httpCover = await EnsureHttpCoverAsync(song.CoverUrl, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(httpCover))
+            {
+                return httpCover;
+            }
+        }
 
         if (song.IsWebDav)
         {

@@ -16,6 +16,52 @@ public static partial class TerminalImageHelper
 {
     private const int MaxCoverDimension = 1000;
 
+    private static (int width, int height, byte[] pixelData)? DecodeImageRgba(byte[] fileBytes, bool isWebp)
+    {
+        if (isWebp)
+        {
+            try
+            {
+                using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(fileBytes);
+                if (image.Width <= 0 || image.Height <= 0) return null;
+                var pixelData = new byte[image.Width * image.Height * 4];
+                image.CopyPixelDataTo(pixelData);
+                return (image.Width, image.Height, pixelData);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("TerminalImageHelper", $"ImageSharp WebP decode failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        try
+        {
+            var image = StbImageSharp.ImageResult.FromMemory(fileBytes, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
+            if (image != null && image.Width > 0 && image.Height > 0 && image.Data != null)
+            {
+                return (image.Width, image.Height, image.Data);
+            }
+        }
+        catch
+        {
+            // fallback to ImageSharp
+        }
+
+        try
+        {
+            using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(fileBytes);
+            if (image.Width <= 0 || image.Height <= 0) return null;
+            var pixelData = new byte[image.Width * image.Height * 4];
+            image.CopyPixelDataTo(pixelData);
+            return (image.Width, image.Height, pixelData);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static async Task<string?> ApplyRoundedCornersAsync(string sourceFile, string targetPng, CancellationToken cancellationToken = default)
     {
         if (!File.Exists(sourceFile) || new FileInfo(sourceFile).Length == 0 || cancellationToken.IsCancellationRequested) return null;
@@ -26,16 +72,17 @@ public static partial class TerminalImageHelper
             byte[] fileBytes = await File.ReadAllBytesAsync(sourceFile, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
-            var image = StbImageSharp.ImageResult.FromMemory(fileBytes, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
-            if (image == null || image.Width <= 0 || image.Height <= 0 || image.Data == null)
+            bool isWebp = IsValidWebpFile(sourceFile);
+            var decoded = DecodeImageRgba(fileBytes, isWebp);
+            if (decoded == null)
             {
                 return null;
             }
             cancellationToken.ThrowIfCancellationRequested();
 
-            int width = image.Width;
-            int height = image.Height;
-            byte[] pixelData = image.Data;
+            int width = decoded.Value.width;
+            int height = decoded.Value.height;
+            byte[] pixelData = decoded.Value.pixelData;
 
             // 若图像尺寸超过 1000 像素，使用双线性插值算法等比缩放至 1000 像素内，大幅节省大对象堆与 Kitty Base64 传输内存
             if (width > MaxCoverDimension || height > MaxCoverDimension)
