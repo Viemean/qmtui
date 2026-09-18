@@ -50,6 +50,7 @@ public static class MikuTheme
     public static Scheme FrameBorderDim { get; } = CreateFrameBorderDimScheme();
     public static Scheme FrameBorderActive { get; } = CreateFrameBorderActiveScheme();
     public static Scheme TitleHighlight { get; } = CreateTitleHighlightScheme();
+    public static Scheme QrCode { get; } = CreateQrCodeScheme();
 
     private static Scheme CreateBaseScheme()
     {
@@ -199,6 +200,24 @@ public static class MikuTheme
         SchemeManager.AddScheme("FrameBorderDim", FrameBorderDim);
         SchemeManager.AddScheme("FrameBorderActive", FrameBorderActive);
         SchemeManager.AddScheme("TitleHighlight", TitleHighlight);
+        SchemeManager.AddScheme("QrCode", QrCode);
+    }
+
+    private static Scheme CreateQrCodeScheme()
+    {
+        var attr = new Attribute(Color.Black, Color.White);
+        return new Scheme
+        {
+            Normal    = attr,
+            Focus     = attr,
+            HotNormal = attr,
+            HotFocus  = attr,
+            Disabled  = attr,
+            Highlight = attr,
+            Active    = attr,
+            ReadOnly  = attr,
+            Editable  = attr
+        };
     }
 
     public static void ApplyTo(View view, Scheme? scheme = null)

@@ -213,7 +213,6 @@ public sealed partial class WebPlaybackServer
         {
             PlaybackMode.SingleLoop => "single_loop",
             PlaybackMode.Shuffle => "shuffle",
-            PlaybackMode.Sequential => "sequential",
             _ => "list_loop"
         };
         sb.Append($"\"mode\":\"{modeStr}\",");

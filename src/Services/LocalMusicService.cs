@@ -675,7 +675,7 @@ public static class LocalMusicService
         };
     }
 
-    private static string ComputeMd5(string input)
+    internal static string ComputeMd5(string input)
     {
         var bytes = MD5.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(bytes).ToLowerInvariant();

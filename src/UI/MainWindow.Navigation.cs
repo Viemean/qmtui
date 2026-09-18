@@ -462,12 +462,6 @@ public sealed partial class MainWindow
         {
             await PlaySongAsync(nextSong);
         }
-        else if (isAutoPlayback && _currentPlaybackMode == PlaybackMode.Sequential)
-        {
-            // 顺序播放播完最后一首自动停止
-            await _player.StopAsync();
-            UpdatePlayerStatus();
-        }
     }
 
     /// <summary>

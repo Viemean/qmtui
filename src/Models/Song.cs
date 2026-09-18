@@ -15,6 +15,7 @@ public record Song(
 {
     public long Id { get; set; } = Id;
     public int Duration { get; set; } = Duration;
+    public string AlbumMid { get; set; } = AlbumMid;
     public string EffectiveMediaMid => string.IsNullOrEmpty(MediaMid) ? Mid : MediaMid;
     public string FormattedDuration => $"{Duration / 60:D2}:{Duration % 60:D2}";
     public string? PlayUrl { get; set; }
@@ -24,6 +25,7 @@ public record Song(
     public string? WebDavServerId { get; set; }
     public string? WebDavHref { get; set; }
     public bool IsWebDav => !string.IsNullOrEmpty(WebDavHref);
+    public string? CoverUrl { get; set; }
     public List<ArtistInfo> Singers { get; set; } = [];
 }
 

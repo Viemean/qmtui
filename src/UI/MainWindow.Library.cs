@@ -259,6 +259,68 @@ public sealed partial class MainWindow
         }
     }
 
+    private bool IsSongFavorite(Song song)
+    {
+        lock (_favoriteSongMids)
+        {
+            return (!string.IsNullOrEmpty(song.Mid) && _favoriteSongMids.Contains(song.Mid)) ||
+                   (song.Id > 0 && _favoriteSongIds.Contains(song.Id));
+        }
+    }
+
+    private void ApplySongFavoriteState(Song song, bool isFavorite)
+    {
+        lock (_favoriteSongMids)
+        {
+            if (isFavorite)
+            {
+                if (!string.IsNullOrEmpty(song.Mid)) _favoriteSongMids.Add(song.Mid);
+                if (song.Id > 0) _favoriteSongIds.Add(song.Id);
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(song.Mid)) _favoriteSongMids.Remove(song.Mid);
+                if (song.Id > 0) _favoriteSongIds.Remove(song.Id);
+            }
+        }
+
+        if (_activeSong?.Mid == song.Mid)
+        {
+            Application.Invoke(() => _controlBar.SetFavoriteStatus(isFavorite));
+            if (_standaloneWebServer != null && _standaloneWebServer.IsRunning)
+            {
+                _standaloneWebServer.IsCurrentSongFavorite = isFavorite;
+                _standaloneWebServer.BroadcastState("favorite_change");
+            }
+        }
+
+        var uin = UserSession.Current.Uin;
+        var cache = MetadataCacheService.GetFavoriteCache(uin);
+        if (cache != null)
+        {
+            cache.Songs.RemoveAll(s => s.Mid == song.Mid || (song.Id > 0 && s.Id == song.Id));
+            if (isFavorite)
+            {
+                cache.Songs.Insert(0, song);
+            }
+            cache.TotalCount = cache.Songs.Count;
+            cache.FirstSongMid = cache.Songs.Count > 0 ? cache.Songs[0].Mid : "";
+            MetadataCacheService.SaveFavoriteCache(uin, cache.TotalCount, cache.FirstSongMid, cache.Songs);
+        }
+
+        if (_currentViewMode == ViewMode.Favorite)
+        {
+            if (isFavorite)
+            {
+                Application.Invoke(() => _songListView.InsertSong(0, song, $"我的喜欢: 共 {_songListView.Songs.Count + 1} 首 (按 G 查找)"));
+            }
+            else
+            {
+                Application.Invoke(() => _songListView.RemoveSong(song));
+            }
+        }
+    }
+
     private async Task ToggleSongFavoriteAsync(Song song)
     {
         if (song.IsLocal || song.IsWebDav)
@@ -273,9 +335,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        bool isFav = (!string.IsNullOrEmpty(song.Mid) && _favoriteSongMids.Contains(song.Mid)) ||
-                     (song.Id > 0 && _favoriteSongIds.Contains(song.Id)) ||
-                     (_activeSong?.Mid == song.Mid && _controlBar.IsFavorite);
+        bool isFav = IsSongFavorite(song);
 
         if (isFav)
         {
@@ -283,38 +343,8 @@ public sealed partial class MainWindow
             var ok = await MusicApi.RemoveSongFromFavoriteAsync(song);
             if (ok)
             {
-                lock (_favoriteSongMids)
-                {
-                    if (!string.IsNullOrEmpty(song.Mid)) _favoriteSongMids.Remove(song.Mid);
-                    if (song.Id > 0) _favoriteSongIds.Remove(song.Id);
-                }
-
-                if (_activeSong?.Mid == song.Mid)
-                {
-                    Application.Invoke(() => _controlBar.SetFavoriteStatus(false));
-                    if (_standaloneWebServer != null && _standaloneWebServer.IsRunning)
-                    {
-                        _standaloneWebServer.IsCurrentSongFavorite = false;
-                        _standaloneWebServer.BroadcastState("favorite_change");
-                    }
-                }
-
+                ApplySongFavoriteState(song, false);
                 _controlBar.UpdateStatus($"[取消收藏成功] 已将《{song.Title}》从我的喜欢中移除");
-
-                var uin = UserSession.Current.Uin;
-                var cache = MetadataCacheService.GetFavoriteCache(uin);
-                if (cache != null)
-                {
-                    cache.Songs.RemoveAll(s => s.Mid == song.Mid || (song.Id > 0 && s.Id == song.Id));
-                    cache.TotalCount = cache.Songs.Count;
-                    cache.FirstSongMid = cache.Songs.Count > 0 ? cache.Songs[0].Mid : "";
-                    MetadataCacheService.SaveFavoriteCache(uin, cache.TotalCount, cache.FirstSongMid, cache.Songs);
-                }
-
-                if (_currentViewMode == ViewMode.Favorite)
-                {
-                    Application.Invoke(() => _songListView.RemoveSong(song));
-                }
             }
             else
             {
@@ -327,43 +357,12 @@ public sealed partial class MainWindow
             var ok = await MusicApi.AddSongToFavoriteAsync(song);
             if (ok)
             {
-                lock (_favoriteSongMids)
-                {
-                    if (!string.IsNullOrEmpty(song.Mid)) _favoriteSongMids.Add(song.Mid);
-                    if (song.Id > 0) _favoriteSongIds.Add(song.Id);
-                }
-
-                if (_activeSong?.Mid == song.Mid)
-                {
-                    Application.Invoke(() => _controlBar.SetFavoriteStatus(true));
-                    if (_standaloneWebServer != null && _standaloneWebServer.IsRunning)
-                    {
-                        _standaloneWebServer.IsCurrentSongFavorite = true;
-                        _standaloneWebServer.BroadcastState("favorite_change");
-                    }
-                }
-
-                var uin = UserSession.Current.Uin;
-                var cache = MetadataCacheService.GetFavoriteCache(uin);
-                if (cache != null)
-                {
-                    cache.Songs.RemoveAll(s => s.Mid == song.Mid || (song.Id > 0 && s.Id == song.Id));
-                    cache.Songs.Insert(0, song);
-                    cache.TotalCount = cache.Songs.Count;
-                    cache.FirstSongMid = song.Mid;
-                    MetadataCacheService.SaveFavoriteCache(uin, cache.TotalCount, cache.FirstSongMid, cache.Songs);
-                }
-
-                if (_currentViewMode == ViewMode.Favorite)
-                {
-                    Application.Invoke(() => _songListView.InsertSong(0, song, $"我的喜欢: 共 {_songListView.Songs.Count + 1} 首 (按 G 查找)"));
-                }
-
+                ApplySongFavoriteState(song, true);
                 _controlBar.UpdateStatus($"[收藏成功] 已将《{song.Title}》添加至我的喜欢");
             }
             else
             {
-                _controlBar.UpdateStatus($"[收藏失败] 添加《{song.Title}》至我的喜欢失败");
+                _controlBar.UpdateStatus($"[操作失败] 添加《{song.Title}》至我的喜欢失败");
             }
         }
     }

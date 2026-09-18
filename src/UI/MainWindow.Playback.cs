@@ -35,9 +35,9 @@ public sealed partial class MainWindow
     private double _lastProgressSec;
     private string? _currentCoverFilePath;
 
-    private Task PlaySongAsync(Song song) => PlaySongAsync(song, 0);
+    private Task PlaySongAsync(Song song) => PlaySongAsync(song, 0, null);
 
-    private async Task PlaySongAsync(Song song, double startPosition = 0)
+    private async Task PlaySongAsync(Song song, double startPosition = 0, string? overridePlayUrl = null)
     {
         var previousCts = Interlocked.Exchange(ref _playbackCts, new CancellationTokenSource());
         try
@@ -152,7 +152,26 @@ public sealed partial class MainWindow
         string? playUrl;
         List<LyricLine> lyrics;
 
-        if (song.IsWebDav)
+        if (!string.IsNullOrEmpty(overridePlayUrl))
+        {
+            playUrl = overridePlayUrl;
+            _actualQualityTier = AudioQualityHelper.DetermineLocalOrWebDavTier(song.Quality, playUrl);
+            Application.Invoke(() => _controlBar.UpdateQuality(AudioQualityHelper.GetBadge(_actualQualityTier)));
+            if (!string.IsNullOrEmpty(song.Mid) && !song.IsLocal && !song.IsWebDav)
+            {
+                lyrics = await MusicApi.GetLyricsAsync(song.Mid).ConfigureAwait(false);
+            }
+            else if (song.IsLocal && !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath))
+            {
+                lyrics = await QmTui.Services.LocalMusicService.GetLyricsAsync(song).ConfigureAwait(false);
+            }
+            else
+            {
+                lyrics = [];
+            }
+            if (IsStale()) return;
+        }
+        else if (song.IsWebDav)
         {
             var server = WebDavService.GetActiveServer();
             if (server != null && !string.IsNullOrEmpty(song.WebDavHref))
@@ -372,7 +391,10 @@ public sealed partial class MainWindow
                     {
                         _currentCoverFilePath = cover;
                         _mprisService.UpdateCover(cover);
-                        Application.Invoke(() => _nowPlayingView.UpdateCover(cover));
+                        Application.Invoke(() =>
+                        {
+                            _nowPlayingView.UpdateCover(cover);
+                        });
                     }
                 }
                 catch (OperationCanceledException) {}
@@ -387,12 +409,11 @@ public sealed partial class MainWindow
                 }
             }, ct);
 
-            // 若为本地歌曲或 WebDAV 歌曲，且无歌词或缺少翻译歌词（仅在外文歌曲确实需要翻译时），后台自动尝试匹配在线歌词与双语翻译
+            // 若为本地歌曲或 WebDAV 歌曲，且满足智能匹配规则，后台自动尝试匹配在线歌词与双语翻译
             bool isLocalOrWebDav = song.IsLocal || song.IsWebDav;
-            bool isNoLyrics = _currentLyrics.Count == 0 || (_currentLyrics.Count == 1 && _currentLyrics[0].Text == "暂无歌词");
-            bool isMissingTrans = !hasTrans && LyricParser.NeedsTranslation(_currentLyrics);
-            if (isLocalOrWebDav && !IsCurrentSongLyricMatched(song) && (isNoLyrics || isMissingTrans))
+            if (isLocalOrWebDav && !IsCurrentSongLyricMatched(song) && LocalLyricAutoMatcher.NeedsMatching(song, _currentLyrics))
             {
+                bool isNoLyrics = _currentLyrics.Count == 0 || (_currentLyrics.Count == 1 && _currentLyrics[0].Text == "暂无歌词");
                 _ = Task.Run(async () =>
                 {
                     if (IsStale()) return;
