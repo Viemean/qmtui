@@ -36,8 +36,8 @@ public static class AudioQualityHelper
         AudioQualityTier.Master => "AI00",
         AudioQualityTier.Premium => "Q000",
         AudioQualityTier.Atmos51 => "Q001",
-        AudioQualityTier.Atmos71 => "Q003",
-        AudioQualityTier.Dolby => "D004",
+        AudioQualityTier.Atmos71 => "Q001",
+        AudioQualityTier.Dolby => "Q000",
         AudioQualityTier.HiRes => "RS01",
         AudioQualityTier.SQ => "F000",
         AudioQualityTier.HQ => "M800",
@@ -50,14 +50,27 @@ public static class AudioQualityHelper
         AudioQualityTier.Master => ".flac",
         AudioQualityTier.Premium => ".flac",
         AudioQualityTier.Atmos51 => ".flac",
-        AudioQualityTier.Atmos71 => ".ogg",
-        AudioQualityTier.Dolby => ".mp4",
+        AudioQualityTier.Atmos71 => ".flac",
+        AudioQualityTier.Dolby => ".flac",
         AudioQualityTier.HiRes => ".flac",
         AudioQualityTier.SQ => ".flac",
         AudioQualityTier.HQ => ".mp3",
         AudioQualityTier.Standard => ".mp3",
         _ => ".mp3"
     };
+
+    public static (string Key, AudioQualityTier Tier, string Prefix, string Extension)[] ProbeRequests { get; } =
+    [
+        ("req_master", AudioQualityTier.Master, "AI00", ".flac"),
+        ("req_premium", AudioQualityTier.Premium, "Q000", ".flac"),
+        ("req_atmos51", AudioQualityTier.Atmos51, "Q001", ".flac"),
+        ("req_atmos71", AudioQualityTier.Atmos71, "Q001", ".flac"),
+        ("req_dolby", AudioQualityTier.Dolby, "Q000", ".flac"),
+        ("req_hires", AudioQualityTier.HiRes, "RS01", ".flac"),
+        ("req_sq", AudioQualityTier.SQ, "F000", ".flac"),
+        ("req_320", AudioQualityTier.HQ, "M800", ".mp3"),
+        ("req_128", AudioQualityTier.Standard, "M500", ".mp3")
+    ];
 
     public static string GetDefaultSpec(AudioQualityTier tier) => tier switch
     {

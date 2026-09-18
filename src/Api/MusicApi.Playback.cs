@@ -11,9 +11,14 @@ public sealed partial class MusicApi
 {
     public static async Task<List<QualityOption>> ProbeSongQualitiesAsync(string songMid, string mediaMid = "", CancellationToken ct = default)
     {
+        return await ProbeSongQualitiesInternalAsync(songMid, mediaMid, canRetryWithRenew: true, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<List<QualityOption>> ProbeSongQualitiesInternalAsync(string songMid, string mediaMid, bool canRetryWithRenew, CancellationToken ct)
+    {
         if (string.IsNullOrEmpty(mediaMid)) mediaMid = songMid;
 
-        await LoginService.EnsureMusicKeyAsync(ct).ConfigureAwait(false);
+        await LoginService.EnsureMusicKeyAsync(false, ct).ConfigureAwait(false);
 
         var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
         var uin = string.IsNullOrEmpty(UserSession.Current.Uin) ? "0" : UserSession.Current.Uin;
@@ -23,24 +28,14 @@ public sealed partial class MusicApi
                 ? mk
                 : (UserSession.Current.Cookies.TryGetValue("qqmusic_key", out var qmk) ? qmk : ""));
 
-        var requests = new (string Key, AudioQualityTier Tier, string Prefix, string Extension)[]
-        {
-            ("req_master", AudioQualityTier.Master, "AI00", ".flac"),
-            ("req_premium", AudioQualityTier.Premium, "Q000", ".flac"),
-            ("req_atmos51", AudioQualityTier.Atmos51, "Q001", ".flac"),
-            ("req_atmos71", AudioQualityTier.Atmos71, "Q003", ".ogg"),
-            ("req_dolby", AudioQualityTier.Dolby, "D004", ".mp4"),
-            ("req_hires", AudioQualityTier.HiRes, "RS01", ".flac"),
-            ("req_sq", AudioQualityTier.SQ, "F000", ".flac"),
-            ("req_320", AudioQualityTier.HQ, "M800", ".mp3"),
-            ("req_128", AudioQualityTier.Standard, "M500", ".mp3")
-        };
+        var requests = AudioQualityHelper.ProbeRequests;
         var requestJson = new StringBuilder(1536);
         requestJson.Append("{\"comm\":{\"uin\":\"").Append(JsonEncodedText.Encode(uin))
             .Append("\",\"format\":\"json\",\"ct\":19,\"cv\":1,\"authst\":\"")
             .Append(JsonEncodedText.Encode(authst)).Append("\"},")
             .Append("\"songinfo\":{\"module\":\"music.pf_song_detail_svr\",\"method\":\"get_song_detail_yqq\",\"param\":{\"song_mid\":\"")
             .Append(JsonEncodedText.Encode(songMid)).Append("\"}}");
+
         foreach (var request in requests)
         {
             requestJson.Append(",\"").Append(request.Key)
@@ -70,7 +65,24 @@ public sealed partial class MusicApi
             var respStr = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
             using var doc = JsonDocument.Parse(respStr);
-            return ParseProbedQualities(doc.RootElement, requests);
+            var options = ParseProbedQualities(doc.RootElement, requests);
+
+            if (canRetryWithRenew && UserSession.Current.IsLoggedIn)
+            {
+                var hasVipSource = options.Any(o => o.Tier != AudioQualityTier.Standard && !string.IsNullOrEmpty(o.BitrateInfo));
+                var hasVipUrl = options.Any(o => o.Tier != AudioQualityTier.Standard && o.Available);
+                if (hasVipSource && !hasVipUrl)
+                {
+                    AppLogger.Info("MusicApi", "ProbeSongQualities: VIP audio tracks exist but no valid VIP URL obtained, attempting token renewal...");
+                    var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
+                    if (renewed)
+                    {
+                        return await ProbeSongQualitiesInternalAsync(songMid, mediaMid, canRetryWithRenew: false, ct).ConfigureAwait(false);
+                    }
+                }
+            }
+
+            return options;
         }
         catch (Exception ex)
         {
@@ -420,6 +432,14 @@ public sealed partial class MusicApi
             return [new LyricLine(TimeSpan.Zero, "暂无歌词")];
         }
 
+        // 1. 优先读取统一母本缓存 (mid_<songMid>.json)
+        var masterCached = LocalLyricAutoMatcher.ReadMasterCacheByMid(songMid);
+        if (masterCached != null && masterCached.Lines.Count > 0)
+        {
+            return masterCached.Lines.ConvertAll(l => l.ToDomain());
+        }
+
+        // 2. 兼容读取旧版 MetadataCacheService 缓存
         var cached = MetadataCacheService.GetLyrics(songMid);
         if (cached != null && cached.Count > 0)
         {
@@ -428,7 +448,7 @@ public sealed partial class MusicApi
 
         try
         {
-            // 1. 调用 PlayLyricInfo 接口以获取原生原文与翻译歌词
+            // 3. 调用 PlayLyricInfo 接口以获取原生原文与翻译歌词
             var jsonPayload = $"{{\"comm\":{{\"ct\":24,\"cv\":0}},\"playLyricInfo\":{{\"module\":\"music.musichallSong.PlayLyricInfo\",\"method\":\"GetPlayLyricInfo\",\"param\":{{\"songMID\":\"{songMid}\",\"songID\":0,\"qrc\":0,\"trans\":1,\"roma\":1,\"isHQ\":1}}}}}}";
 
             using var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -450,6 +470,7 @@ public sealed partial class MusicApi
                 {
                     var merged = LyricParser.MergeLyrics(rawLyric, rawTrans);
                     MetadataCacheService.SaveLyrics(songMid, merged);
+                    LocalLyricAutoMatcher.SaveUnifiedCache(songMid, "", "", "", merged);
                     return merged;
                 }
             }
@@ -459,7 +480,7 @@ public sealed partial class MusicApi
             AppLogger.Error("MusicApi", "GetLyricsAsync PlayLyricInfo error, falling back", ex);
         }
 
-        // 2. 兜底备用：传统 fcg_query_lyric_new.fcg 接口
+        // 4. 兜底备用：传统 fcg_query_lyric_new.fcg 接口
         try
         {
             var url = $"https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid={songMid}&format=json&nobase64=1";
@@ -474,6 +495,7 @@ public sealed partial class MusicApi
                 {
                     var merged = LyricParser.MergeLyrics(rawLrc, "");
                     MetadataCacheService.SaveLyrics(songMid, merged);
+                    LocalLyricAutoMatcher.SaveUnifiedCache(songMid, "", "", "", merged);
                     return merged;
                 }
             }
