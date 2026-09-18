@@ -504,7 +504,10 @@ public sealed partial class MainWindow
                             });
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("MainWindow.Lyrics", $"Async cover update error: {ex.Message}");
+                    }
                 });
             }
 

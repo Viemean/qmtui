@@ -56,8 +56,9 @@ public static partial class TerminalImageHelper
             image.CopyPixelDataTo(pixelData);
             return (image.Width, image.Height, pixelData);
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("TerminalImage", $"Image decode failed: {ex.Message}");
             return null;
         }
     }
@@ -421,8 +422,9 @@ public static partial class TerminalImageHelper
             stdout.Write(payload, 0, payload.Length);
             stdout.Flush();
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("TerminalImage", $"Write chunk to stdout failed: {ex.Message}");
         }
     }
 
@@ -446,8 +448,9 @@ public static partial class TerminalImageHelper
             stdout.Write(bytes, 0, bytes.Length);
             stdout.Flush();
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("TerminalImage", $"Write raw bytes to stdout failed: {ex.Message}");
         }
     }
 
@@ -462,8 +465,9 @@ public static partial class TerminalImageHelper
             byte[] cmd = Encoding.ASCII.GetBytes("\x1b_Ga=d,d=a,q=2\x1b\\");
             WriteRawBytesToTerminal(cmd);
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("TerminalImage", $"ClearImages failed: {ex.Message}");
         }
     }
 }

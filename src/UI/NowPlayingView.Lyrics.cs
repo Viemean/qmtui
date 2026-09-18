@@ -140,7 +140,10 @@ public sealed partial class NowPlayingView
                     }
                 }
                 catch (OperationCanceledException) {}
-                catch {}
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("NowPlayingView", $"EnsureSongCoverAsync error: {ex.Message}");
+                }
             }, ct);
         }
     }

@@ -477,7 +477,10 @@ public sealed class PlaybackQueueService
                 File.WriteAllText(s_queueFilePath, json);
             }
         }
-        catch {}
+        catch (Exception ex)
+        {
+            AppLogger.Warn("PlaybackQueue", $"Failed to save queue: {ex.Message}");
+        }
     }
 
     public void SaveQueueDebounced(int delayMs = 3000)
@@ -510,7 +513,10 @@ public sealed class PlaybackQueueService
                                 File.WriteAllText(s_queueFilePath, snapshot);
                             }
                         }
-                        catch {}
+                        catch (Exception ex)
+                        {
+                            AppLogger.Warn("PlaybackQueue", $"Failed to save debounced queue: {ex.Message}");
+                        }
                     }
                 }
             });
@@ -556,7 +562,10 @@ public sealed class PlaybackQueueService
             var json = File.ReadAllText(s_queueFilePath);
             LoadQueueFromJson(json);
         }
-        catch {}
+        catch (Exception ex)
+        {
+            AppLogger.Warn("PlaybackQueue", $"Failed to load queue: {ex.Message}");
+        }
     }
 
     internal void LoadQueueFromJson(string json)
@@ -612,7 +621,10 @@ public sealed class PlaybackQueueService
                 QueueChanged?.Invoke();
             }
         }
-        catch {}
+        catch (Exception ex)
+        {
+            AppLogger.Warn("PlaybackQueue", $"Failed to parse queue json: {ex.Message}");
+        }
     }
 
     private static string JsonEscape(string? value)

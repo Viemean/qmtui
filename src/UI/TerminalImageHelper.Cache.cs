@@ -125,9 +125,9 @@ public static partial class TerminalImageHelper
                 return true;
             }
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // 容错重试或取消
+            AppLogger.Debug("TerminalImage", $"DownloadImageStreamToFileAsync failed for {url}: {ex.Message}");
         }
         finally
         {
@@ -247,8 +247,9 @@ public static partial class TerminalImageHelper
                 File.Copy(localRawImagePath, persistentFallback, overwrite: true);
                 return persistentFallback;
             }
-            catch
+            catch (Exception ex)
             {
+                AppLogger.Debug("TerminalImage", $"Copy persistentFallback failed: {ex.Message}");
                 return null;
             }
         }

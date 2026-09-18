@@ -255,7 +255,10 @@ public static partial class WebDavService
                 SaveConfig();
             }
         }
-        catch {}
+        catch (Exception ex)
+        {
+            AppLogger.Debug("WebDavCache", $"UpdateSongCacheItem error: {ex.Message}");
+        }
     }
 
 }

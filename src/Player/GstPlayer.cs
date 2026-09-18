@@ -488,9 +488,9 @@ public sealed partial class GstPlayer : IPlayer
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignored
+                AppLogger.Debug("GstPlayer", $"Position query error: {ex.Message}");
             }
         }
     }

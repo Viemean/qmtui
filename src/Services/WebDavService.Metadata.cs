@@ -318,7 +318,10 @@ public static partial class WebDavService
                 }
             }
         }
-        catch {}
+        catch (Exception ex)
+        {
+            AppLogger.Debug("WebDavMetadata", $"Failed to parse metadata list: {ex.Message}");
+        }
         return false;
     }
 
@@ -569,7 +572,10 @@ public static partial class WebDavService
             {
                 return null;
             }
-            catch {}
+            catch (Exception ex)
+            {
+                AppLogger.Debug("WebDavMetadata", $"Candidate cover probe failed: {ex.Message}");
+            }
         }
         finally
         {
@@ -596,7 +602,10 @@ public static partial class WebDavService
                 }
             }
         }
-        catch {}
+        catch (Exception ex)
+        {
+            AppLogger.Debug("WebDavMetadata", $"Online cover search failed: {ex.Message}");
+        }
 
         return null;
     }
@@ -613,7 +622,10 @@ public static partial class WebDavService
                 return await resp.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
             }
         }
-        catch {}
+        catch (Exception ex)
+        {
+            AppLogger.Debug("WebDavMetadata", $"Fetch range bytes failed: {ex.Message}");
+        }
         return null;
     }
 
@@ -717,7 +729,10 @@ public static partial class WebDavService
                 var parsed = LyricParser.ParseSingleLrc(lrcText);
                 if (parsed.Count > 0) return parsed;
             }
-            catch {}
+            catch (Exception ex)
+            {
+                AppLogger.Debug("WebDavMetadata", $"Read lrc cache failed: {ex.Message}");
+            }
         }
 
         // 3. 内存配置缓存中的 EmbeddedLyrics 命中
@@ -840,7 +855,10 @@ public static partial class WebDavService
                         return meta;
                     }
                 }
-                catch {}
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("WebDavMetadata", $"Local audio metadata extraction failed: {ex.Message}");
+                }
             }
         }
 
