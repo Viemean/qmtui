@@ -1,7 +1,7 @@
 namespace QmTui.Models;
 
 /// <summary>
-/// 播放循环与随机模式
+/// 播放循环与随机模式（对齐移动端3种模式）
 /// </summary>
 public enum PlaybackMode
 {
@@ -18,12 +18,7 @@ public enum PlaybackMode
     /// <summary>
     /// 随机播放 (列表内洗牌抽取)
     /// </summary>
-    Shuffle = 2,
-
-    /// <summary>
-    /// 顺序播放 (末尾停止)
-    /// </summary>
-    Sequential = 3
+    Shuffle = 2
 }
 
 public static class PlaybackModeHelper
@@ -33,7 +28,6 @@ public static class PlaybackModeHelper
         PlaybackMode.ListLoop => "列表",
         PlaybackMode.SingleLoop => "单曲",
         PlaybackMode.Shuffle => "随机",
-        PlaybackMode.Sequential => "顺序",
         _ => "列表"
     };
 
@@ -42,7 +36,6 @@ public static class PlaybackModeHelper
         PlaybackMode.ListLoop => "列表循环",
         PlaybackMode.SingleLoop => "单曲循环",
         PlaybackMode.Shuffle => "随机播放",
-        PlaybackMode.Sequential => "顺序播放",
         _ => "列表循环"
     };
 
@@ -50,8 +43,7 @@ public static class PlaybackModeHelper
     {
         PlaybackMode.ListLoop => PlaybackMode.SingleLoop,
         PlaybackMode.SingleLoop => PlaybackMode.Shuffle,
-        PlaybackMode.Shuffle => PlaybackMode.Sequential,
-        PlaybackMode.Sequential => PlaybackMode.ListLoop,
+        PlaybackMode.Shuffle => PlaybackMode.ListLoop,
         _ => PlaybackMode.ListLoop
     };
 
@@ -60,7 +52,6 @@ public static class PlaybackModeHelper
         PlaybackMode.ListLoop => ("Playlist", false),
         PlaybackMode.SingleLoop => ("Track", false),
         PlaybackMode.Shuffle => ("Playlist", true),
-        PlaybackMode.Sequential => ("None", false),
         _ => ("Playlist", false)
     };
 
@@ -70,8 +61,30 @@ public static class PlaybackModeHelper
         return loopStatus switch
         {
             "Track" => PlaybackMode.SingleLoop,
-            "None" => PlaybackMode.Sequential,
             _ => PlaybackMode.ListLoop
         };
+    }
+
+    public static string ToConnectLoopMode(this PlaybackMode mode) => mode switch
+    {
+        PlaybackMode.ListLoop => "ListRepeat",
+        PlaybackMode.SingleLoop => "SingleRepeat",
+        PlaybackMode.Shuffle => "Shuffle",
+        _ => "ListRepeat"
+    };
+
+    public static PlaybackMode FromConnectLoopMode(string? modeStr)
+    {
+        if (string.IsNullOrWhiteSpace(modeStr)) return PlaybackMode.ListLoop;
+        var s = modeStr.Trim();
+        if (s.Contains("Single", StringComparison.OrdinalIgnoreCase) || s.Contains("One", StringComparison.OrdinalIgnoreCase) || s.Contains("Track", StringComparison.OrdinalIgnoreCase))
+        {
+            return PlaybackMode.SingleLoop;
+        }
+        if (s.Contains("Shuffle", StringComparison.OrdinalIgnoreCase) || s.Contains("Random", StringComparison.OrdinalIgnoreCase))
+        {
+            return PlaybackMode.Shuffle;
+        }
+        return PlaybackMode.ListLoop;
     }
 }

@@ -29,31 +29,6 @@ public class PlaybackQueueTests
         Assert.Equal(0, Q.Count);
     }
 
-    // ── 顺序播放模式 ─────────────────────────────────────────────
-
-    [Fact]
-    public void Sequential_GetNext_ReachesEndReturnsNull()
-    {
-        Q.SetQueue(MakeSongs(3), startIndex: 0);
-        Q.Mode = PlaybackMode.Sequential;
-
-        Assert.NotNull(Q.GetNextSong(isAutoPlayback: true));  // mid_2
-        Assert.NotNull(Q.GetNextSong(isAutoPlayback: true));  // mid_3
-        var end = Q.GetNextSong(isAutoPlayback: true);        // 末尾 → null
-        Assert.Null(end);
-    }
-
-    [Fact]
-    public void Sequential_GetPrev_AtFirstStaysOnFirst()
-    {
-        Q.SetQueue(MakeSongs(3), startIndex: 0);
-        Q.Mode = PlaybackMode.Sequential;
-
-        var prev = Q.GetPrevSong();
-        Assert.NotNull(prev);
-        Assert.Equal("mid_1", prev.Mid);   // 已在第一首，返回第一首
-    }
-
     // ── 列表循环模式 ─────────────────────────────────────────────
 
     [Fact]
@@ -230,5 +205,75 @@ public class PlaybackQueueTests
         var first = Q.ActiveSongs[0];
         Assert.Equal("album_mid_1", first.AlbumMid);
         Assert.Equal("/music/song1.flac", first.LocalFilePath);
+    }
+
+    [Fact]
+    public void PeekPrevSong_ListLoop_ReturnsExpectedWithoutAdvancingIndex()
+    {
+        Q.SetQueue(MakeSongs(3), startIndex: 0);
+        Q.Mode = PlaybackMode.ListLoop;
+
+        var prevInLoop = Q.PeekPrevSong();
+        Assert.NotNull(prevInLoop);
+        Assert.Equal("mid_3", prevInLoop.Mid);
+        Assert.Equal(0, Q.CurrentIndex);
+
+        Q.SetCurrentIndex(1);
+        var prevAtMiddle = Q.PeekPrevSong();
+        Assert.NotNull(prevAtMiddle);
+        Assert.Equal("mid_1", prevAtMiddle.Mid);
+        Assert.Equal(1, Q.CurrentIndex);
+    }
+
+    [Fact]
+    public void SetCurrentIndex_FiresQueueChanged()
+    {
+        Q.SetQueue(MakeSongs(3), startIndex: 0);
+        int eventCount = 0;
+        Q.QueueChanged += OnChanged;
+
+        try
+        {
+            Q.SetCurrentIndex(2);
+            Assert.True(eventCount > 0);
+            Assert.Equal(2, Q.CurrentIndex);
+        }
+        finally
+        {
+            Q.QueueChanged -= OnChanged;
+        }
+
+        void OnChanged() => eventCount++;
+    }
+
+    [Fact]
+    public void SyncCurrentSong_ExistingAndNew_FiresQueueChanged()
+    {
+        Q.SetQueue(MakeSongs(3), startIndex: 0);
+        int eventCount = 0;
+        Q.QueueChanged += OnChanged;
+
+        try
+        {
+            // 对齐已有歌曲
+            var existingSong = new Song("mid_2", "Title 2", "Artist 2", "Album 2", 200, "", 2);
+            Q.SyncCurrentSong(existingSong);
+            Assert.Equal(1, Q.CurrentIndex);
+            Assert.Equal(1, eventCount);
+
+            // 对齐新歌曲（重置单曲队列）
+            var newSong = new Song("mid_new", "Title New", "Artist New", "Album New", 180, "", 999);
+            Q.SyncCurrentSong(newSong);
+            Assert.Equal(0, Q.CurrentIndex);
+            Assert.Equal(1, Q.Count);
+            Assert.Equal("mid_new", Q.CurrentSong?.Mid);
+            Assert.Equal(2, eventCount);
+        }
+        finally
+        {
+            Q.QueueChanged -= OnChanged;
+        }
+
+        void OnChanged() => eventCount++;
     }
 }

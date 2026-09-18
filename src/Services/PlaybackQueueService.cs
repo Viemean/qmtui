@@ -242,27 +242,8 @@ public sealed class PlaybackQueueService
             }
 
             // 列表循环模式 (或单曲循环下主动按切歌键)
-            if (Mode == PlaybackMode.ListLoop || (!isAutoPlayback && Mode == PlaybackMode.SingleLoop))
-            {
-                CurrentIndex = (CurrentIndex + 1) % _activeSongs.Count;
-                return _activeSongs[CurrentIndex];
-            }
-
-            // 顺序播放模式
-            if (CurrentIndex + 1 < _activeSongs.Count)
-            {
-                CurrentIndex++;
-                return _activeSongs[CurrentIndex];
-            }
-
-            if (!isAutoPlayback && CurrentIndex == -1 && _activeSongs.Count > 0)
-            {
-                CurrentIndex = 0;
-                return _activeSongs[0];
-            }
-
-            // 顺序播放到达末尾
-            return null;
+            CurrentIndex = (CurrentIndex + 1) % _activeSongs.Count;
+            return _activeSongs[CurrentIndex];
         }
     }
 
@@ -295,6 +276,42 @@ public sealed class PlaybackQueueService
     }
 
     /// <summary>
+    /// 预先窥视上一首曲目（用于上位机状态同步与前后卡片预渲染，不改变内部游标）
+    /// </summary>
+    public Song? PeekPrevSong()
+    {
+        lock (_lock)
+        {
+            if (_activeSongs.Count <= 1) return null;
+
+            if (Mode == PlaybackMode.Shuffle)
+            {
+                EnsureShuffleQueue();
+                if (_shufflePointer > 0)
+                {
+                    int prevIdx = _shuffleIndices[_shufflePointer - 1];
+                    if (prevIdx >= 0 && prevIdx < _activeSongs.Count)
+                    {
+                        return _activeSongs[prevIdx];
+                    }
+                }
+                else if (_shuffleIndices.Count > 0)
+                {
+                    int prevIdx = _shuffleIndices[_shuffleIndices.Count - 1];
+                    if (prevIdx >= 0 && prevIdx < _activeSongs.Count)
+                    {
+                        return _activeSongs[prevIdx];
+                    }
+                }
+                return null;
+            }
+
+            int prev = (CurrentIndex - 1 + _activeSongs.Count) % _activeSongs.Count;
+            return _activeSongs[prev];
+        }
+    }
+
+    /// <summary>
     /// 推演并切换至上一首播放曲目
     /// </summary>
     public Song? GetPrevSong()
@@ -320,20 +337,8 @@ public sealed class PlaybackQueueService
                 return _activeSongs[CurrentIndex];
             }
 
-            if (Mode == PlaybackMode.ListLoop || Mode == PlaybackMode.SingleLoop)
-            {
-                CurrentIndex = (CurrentIndex - 1 + _activeSongs.Count) % _activeSongs.Count;
-                return _activeSongs[CurrentIndex];
-            }
-
-            // 顺序播放
-            if (CurrentIndex > 0)
-            {
-                CurrentIndex--;
-                return _activeSongs[CurrentIndex];
-            }
-
-            return _activeSongs[0];
+            CurrentIndex = (CurrentIndex - 1 + _activeSongs.Count) % _activeSongs.Count;
+            return _activeSongs[CurrentIndex];
         }
     }
 
@@ -342,6 +347,7 @@ public sealed class PlaybackQueueService
     /// </summary>
     public Song? SetCurrentIndex(int index)
     {
+        Song? selected = null;
         lock (_lock)
         {
             if (index < 0 || index >= _activeSongs.Count) return null;
@@ -357,10 +363,12 @@ public sealed class PlaybackQueueService
                 }
             }
 
-            var selected = _activeSongs[CurrentIndex];
-            SaveQueueDebounced();
-            return selected;
+            selected = _activeSongs[CurrentIndex];
         }
+
+        QueueChanged?.Invoke();
+        SaveQueueDebounced();
+        return selected;
     }
 
     /// <summary>
@@ -401,6 +409,7 @@ public sealed class PlaybackQueueService
                 _shufflePointer = 0;
             }
         }
+        QueueChanged?.Invoke();
         SaveQueueDebounced();
     }
 

@@ -80,9 +80,6 @@ public class ShuffleAlgorithmTests
         Assert.Equal(PlaybackMode.Shuffle, mode);
 
         mode = mode.Next();
-        Assert.Equal(PlaybackMode.Sequential, mode);
-
-        mode = mode.Next();
         Assert.Equal(PlaybackMode.ListLoop, mode);
     }
 }
