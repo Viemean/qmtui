@@ -408,7 +408,17 @@ public sealed partial class NowPlayingView
             Highlight = attr,
             Disabled = attr
         });
-        _matchLyricBtn.SetNeedsDraw();
     }
 
+    public void ScrollToLine(int lineIndex)
+    {
+        if (_lyricListView == null || _currentLyrics.Count == 0) return;
+        _lastUserLyricScrollTick = Environment.TickCount64;
+        if (_lyricLineToFirstItemIndex.TryGetValue(lineIndex, out int itemIdx))
+        {
+            _lyricListView.SelectedItem = itemIdx;
+            _lyricListView.EnsureSelectedItemVisible();
+            _lyricListView.SetNeedsDraw();
+        }
+    }
 }

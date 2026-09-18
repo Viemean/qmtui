@@ -330,9 +330,14 @@ public sealed partial class MusicApi
     /// </summary>
     public static async Task<bool> AddSongToPlaylistAsync(long dirId, long songId, CancellationToken ct = default)
     {
+        return await AddSongToPlaylistInternalAsync(dirId, songId, canRetryWithRenew: true, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<bool> AddSongToPlaylistInternalAsync(long dirId, long songId, bool canRetryWithRenew, CancellationToken ct)
+    {
         if (!UserSession.Current.IsLoggedIn || songId <= 0) return false;
 
-        await LoginService.EnsureMusicKeyAsync(ct).ConfigureAwait(false);
+        await LoginService.EnsureMusicKeyAsync(false, ct).ConfigureAwait(false);
 
         var payload = $"{{\"comm\":{{\"ct\":24,\"cv\":0}}," +
             $"\"addSongsToPlayList\":{{\"module\":\"music.musicasset.PlaylistDetailWrite\",\"method\":\"AddSonglist\"," +
@@ -371,6 +376,17 @@ public sealed partial class MusicApi
                     }
                     return true;
                 }
+
+                if ((code == 1000 || code == 10000) && canRetryWithRenew)
+                {
+                    AppLogger.Info("MusicApi", $"AddSongToPlaylistAsync returned auth error {code}, attempting credential renewal...");
+                    var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
+                    if (renewed)
+                    {
+                        return await AddSongToPlaylistInternalAsync(dirId, songId, canRetryWithRenew: false, ct).ConfigureAwait(false);
+                    }
+                }
+
                 AppLogger.Warn("MusicApi", $"AddSongToPlaylistAsync (AG-1) returned non-zero code: {code}");
             }
             return false;
@@ -387,9 +403,14 @@ public sealed partial class MusicApi
     /// </summary>
     public static async Task<bool> RemoveSongFromPlaylistAsync(long dirId, long songId, CancellationToken ct = default)
     {
+        return await RemoveSongFromPlaylistInternalAsync(dirId, songId, canRetryWithRenew: true, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<bool> RemoveSongFromPlaylistInternalAsync(long dirId, long songId, bool canRetryWithRenew, CancellationToken ct)
+    {
         if (!UserSession.Current.IsLoggedIn || songId <= 0) return false;
 
-        await LoginService.EnsureMusicKeyAsync(ct).ConfigureAwait(false);
+        await LoginService.EnsureMusicKeyAsync(false, ct).ConfigureAwait(false);
 
         var payload = $"{{\"comm\":{{\"ct\":24,\"cv\":0}}," +
             $"\"delSongsFromPlayList\":{{\"module\":\"music.musicasset.PlaylistDetailWrite\",\"method\":\"DelSonglist\"," +
@@ -419,6 +440,17 @@ public sealed partial class MusicApi
                 {
                     return true;
                 }
+
+                if ((code == 1000 || code == 10000) && canRetryWithRenew)
+                {
+                    AppLogger.Info("MusicApi", $"RemoveSongFromPlaylistAsync returned auth error {code}, attempting credential renewal...");
+                    var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
+                    if (renewed)
+                    {
+                        return await RemoveSongFromPlaylistInternalAsync(dirId, songId, canRetryWithRenew: false, ct).ConfigureAwait(false);
+                    }
+                }
+
                 AppLogger.Warn("MusicApi", $"RemoveSongFromPlaylistAsync (AG-1) returned non-zero code: {code}");
             }
             return false;
