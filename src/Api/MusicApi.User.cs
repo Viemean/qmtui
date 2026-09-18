@@ -9,6 +9,11 @@ public sealed partial class MusicApi
 {
     public static async Task<bool> RefreshCurrentUserProfileAsync(CancellationToken ct = default)
     {
+        return await RefreshCurrentUserProfileInternalAsync(canRetryWithRenew: true, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<bool> RefreshCurrentUserProfileInternalAsync(bool canRetryWithRenew, CancellationToken ct)
+    {
         if (!UserSession.Current.IsLoggedIn || string.IsNullOrWhiteSpace(UserSession.Current.MusicKey))
         {
             return false;
@@ -38,19 +43,23 @@ public sealed partial class MusicApi
             var root = doc.RootElement;
 
             var changed = false;
+            var hasProfile = false;
             if (TryGetResponseData(root, "profile", out var profileData) &&
                 profileData.TryGetProperty("Info", out var info) &&
                 info.TryGetProperty("BaseInfo", out var baseInfo))
             {
+                hasProfile = true;
                 changed |= SetString(baseInfo, "Name", value => UserSession.Current.Nick = value);
                 changed |= SetString(baseInfo, "EncryptedUin", value => UserSession.Current.EncryptedUin = value);
                 changed |= SetString(baseInfo, "Avatar", value => UserSession.Current.AvatarUrl = value);
             }
 
+            var hasVipIdentity = false;
             if (TryGetResponseData(root, "vip", out var vipData))
             {
                 if (vipData.TryGetProperty("identity", out var identity))
                 {
+                    hasVipIdentity = true;
                     var isVip = ReadInt(identity, "vip") > 0 || ReadInt(identity, "HugeVip") > 0 || ReadInt(vipData, "svip") > 0;
                     UserSession.Current.IsVip = isVip;
                     UserSession.Current.VipLevel = ReadInt(identity, "level");
@@ -65,6 +74,17 @@ public sealed partial class MusicApi
                 {
                     UserSession.Current.MusicLevel = ReadInt(userInfo, "music_level");
                     changed = true;
+                }
+            }
+
+            // 若未成功获取 VIP 身份且允许重试续期，则尝试自动刷新 Token
+            if (canRetryWithRenew && (!hasProfile || !hasVipIdentity || !UserSession.Current.IsVip))
+            {
+                AppLogger.Info("MusicApi", "Session VIP status invalid or expired, attempting automatic token renewal...");
+                var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
+                if (renewed)
+                {
+                    return await RefreshCurrentUserProfileInternalAsync(canRetryWithRenew: false, ct).ConfigureAwait(false);
                 }
             }
 

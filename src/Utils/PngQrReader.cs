@@ -105,27 +105,8 @@ public static class PngQrReader
                 }
             }
 
-            // 4. 构建半块字符行 (双行垂直合并显示)
-            var lines = new List<string>((outputSize + 1) / 2);
-            for (int y = 0; y < outputSize; y += 2)
-            {
-                var sb = new System.Text.StringBuilder(outputSize);
-                for (int x = 0; x < outputSize; x++)
-                {
-                    bool top = grid[y, x];
-                    bool bottom = y + 1 < outputSize && grid[y + 1, x];
-                    sb.Append((top, bottom) switch
-                    {
-                        (true, true) => '█',
-                        (true, false) => '▀',
-                        (false, true) => '▄',
-                        _ => ' '
-                    });
-                }
-                lines.Add(sb.ToString());
-            }
-
-            return lines;
+            // 4. 构建半块字符行 (复用统一渲染器)
+            return QrCodeRenderer.RenderToBlockText(grid);
         }
         catch (Exception ex)
         {

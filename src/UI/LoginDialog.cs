@@ -33,22 +33,6 @@ public sealed class LoginDialog : Dialog
         Editable  = new Terminal.Gui.Drawing.Attribute(Color.White, Color.None)
     };
 
-    /// <summary>
-    /// 终端二维码标准高对比度白底黑码配色方案（符合二维码国际标准光学极性，防止反色或全黑背景导致摄像头无法识别）
-    /// </summary>
-    private static Scheme QrCodeScheme { get; } = new Scheme
-    {
-        Normal    = new Terminal.Gui.Drawing.Attribute(Color.Black, Color.White),
-        Focus     = new Terminal.Gui.Drawing.Attribute(Color.Black, Color.White),
-        HotNormal = new Terminal.Gui.Drawing.Attribute(Color.Black, Color.White),
-        HotFocus  = new Terminal.Gui.Drawing.Attribute(Color.Black, Color.White),
-        Disabled  = new Terminal.Gui.Drawing.Attribute(Color.Black, Color.White),
-        Highlight = new Terminal.Gui.Drawing.Attribute(Color.Black, Color.White),
-        Active    = new Terminal.Gui.Drawing.Attribute(Color.Black, Color.White),
-        ReadOnly  = new Terminal.Gui.Drawing.Attribute(Color.Black, Color.White),
-        Editable  = new Terminal.Gui.Drawing.Attribute(Color.Black, Color.White)
-    };
-
     // 1. 网页登录容器 (默认首选)
     private readonly View _webContainer;
     private readonly Label _webLanUrlLabel;
@@ -235,7 +219,7 @@ public sealed class LoginDialog : Dialog
             Height = 23,
             CanFocus = false
         };
-        _qrView.SetScheme(QrCodeScheme);
+        _qrView.SetScheme(MikuTheme.QrCode);
         _qrContainer.Add(_qrView);
 
         _qrTipLabel = new Label
