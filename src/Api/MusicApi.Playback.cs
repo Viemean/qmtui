@@ -17,6 +17,11 @@ public sealed partial class MusicApi
 
         var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
         var uin = string.IsNullOrEmpty(UserSession.Current.Uin) ? "0" : UserSession.Current.Uin;
+        var authst = !string.IsNullOrEmpty(UserSession.Current.MusicKey)
+            ? UserSession.Current.MusicKey
+            : (UserSession.Current.Cookies.TryGetValue("qm_keyst", out var mk) && !string.IsNullOrEmpty(mk)
+                ? mk
+                : (UserSession.Current.Cookies.TryGetValue("qqmusic_key", out var qmk) ? qmk : ""));
 
         var requests = new (string Key, AudioQualityTier Tier, string Prefix, string Extension)[]
         {
@@ -31,7 +36,9 @@ public sealed partial class MusicApi
             ("req_128", AudioQualityTier.Standard, "M500", ".mp3")
         };
         var requestJson = new StringBuilder(1536);
-        requestJson.Append("{\"comm\":{\"uin\":\"").Append(JsonEncodedText.Encode(uin)).Append("\",\"format\":\"json\",\"ct\":19,\"cv\":1,\"authst\":\"\"},")
+        requestJson.Append("{\"comm\":{\"uin\":\"").Append(JsonEncodedText.Encode(uin))
+            .Append("\",\"format\":\"json\",\"ct\":19,\"cv\":1,\"authst\":\"")
+            .Append(JsonEncodedText.Encode(authst)).Append("\"},")
             .Append("\"songinfo\":{\"module\":\"music.pf_song_detail_svr\",\"method\":\"get_song_detail_yqq\",\"param\":{\"song_mid\":\"")
             .Append(JsonEncodedText.Encode(songMid)).Append("\"}}");
         foreach (var request in requests)
@@ -46,11 +53,12 @@ public sealed partial class MusicApi
         requestJson.Append('}');
         var jsonPayload = requestJson.ToString();
 
-        var options = new List<QualityOption>(requests.Length);
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Post, url);
             req.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+            req.Headers.TryAddWithoutValidation("Origin", "https://y.qq.com");
+            req.Headers.Referrer = new Uri("https://y.qq.com/");
 
             var cookieHeader = UserSession.Current.GetCookieHeader();
             if (!string.IsNullOrEmpty(cookieHeader))
@@ -62,102 +70,168 @@ public sealed partial class MusicApi
             var respStr = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
             using var doc = JsonDocument.Parse(respStr);
-            var root = doc.RootElement;
-
-            long interval = 0;
-            long[] sizeNew = [];
-            long sizeDolby = 0;
-            long sizeHires = 0;
-            long sizeFlac = 0;
-            long size320 = 0;
-            long size128 = 0;
-
-            if (root.TryGetProperty("songinfo", out var songInfoObj) &&
-                songInfoObj.TryGetProperty("data", out var songData) &&
-                songData.TryGetProperty("track_info", out var trackInfo))
-            {
-                if (trackInfo.TryGetProperty("interval", out var intervalProp)) intervalProp.TryGetInt64(out interval);
-                if (trackInfo.TryGetProperty("file", out var fileObj))
-                {
-                    sizeDolby = ReadJsonInt64(fileObj, "size_dolby");
-                    sizeHires = ReadJsonInt64(fileObj, "size_hires");
-                    if (sizeHires == 0) sizeHires = ReadJsonInt64(fileObj, "size_96flac");
-                    if (sizeHires == 0) sizeHires = ReadJsonInt64(fileObj, "size_24bit");
-                    sizeFlac = ReadJsonInt64(fileObj, "size_flac");
-                    size320 = ReadJsonInt64(fileObj, "size_320mp3");
-                    size128 = ReadJsonInt64(fileObj, "size_128mp3");
-                    if (fileObj.TryGetProperty("size_new", out var values) && values.ValueKind == JsonValueKind.Array)
-                    {
-                        sizeNew = values.EnumerateArray()
-                            .Select(value => value.TryGetInt64(out var size) ? size : 0)
-                            .ToArray();
-                    }
-                }
-            }
-            string? ExtractUrl(string reqKey)
-            {
-                if (root.TryGetProperty(reqKey, out var reqObj) &&
-                    reqObj.TryGetProperty("data", out var data))
-                {
-                    string? sip = null;
-                    if (data.TryGetProperty("sip", out var sips) && sips.ValueKind == JsonValueKind.Array && sips.GetArrayLength() > 0)
-                    {
-                        sip = sips[0].GetString();
-                    }
-
-                    if (data.TryGetProperty("midurlinfo", out var midUrlInfo) &&
-                        midUrlInfo.ValueKind == JsonValueKind.Array &&
-                        midUrlInfo.GetArrayLength() > 0)
-                    {
-                        var purl = midUrlInfo[0].TryGetProperty("purl", out var p) ? p.GetString() : null;
-                        if (!string.IsNullOrEmpty(sip) && !string.IsNullOrEmpty(purl) && purl.Length > 5)
-                        {
-                            return sip + purl;
-                        }
-                    }
-                }
-                return null;
-            }
-
-            var sizeByTier = new Dictionary<AudioQualityTier, long>
-            {
-                [AudioQualityTier.Master] = GetArrayValue(sizeNew, 0),
-                [AudioQualityTier.Premium] = GetArrayValue(sizeNew, 1),
-                [AudioQualityTier.Atmos51] = GetArrayValue(sizeNew, 2),
-                [AudioQualityTier.Atmos71] = GetArrayValue(sizeNew, 3),
-                [AudioQualityTier.Dolby] = sizeDolby,
-                [AudioQualityTier.HiRes] = sizeHires > 0 ? sizeHires : Math.Max(GetArrayValue(sizeNew, 11), GetArrayValue(sizeNew, 13)),
-                [AudioQualityTier.SQ] = sizeFlac > 0 ? sizeFlac : GetArrayValue(sizeNew, 12),
-                [AudioQualityTier.HQ] = size320 > 0 ? size320 : GetArrayValue(sizeNew, 3),
-                [AudioQualityTier.Standard] = size128
-            };
-
-            foreach (var request in requests)
-            {
-                var playUrl = ExtractUrl(request.Key);
-                var size = sizeByTier[request.Tier];
-                var available = !string.IsNullOrEmpty(playUrl) &&
-                    (request.Tier != AudioQualityTier.HiRes || sizeHires > 0);
-                var bitrate = size > 0 && interval > 0
-                    ? $"{(long)Math.Round((size * 8.0) / interval / 1000.0)}kbps"
-                    : "";
-                options.Add(new QualityOption(
-                    request.Tier,
-                    AudioQualityHelper.GetBadge(request.Tier),
-                    AudioQualityHelper.GetQualityName(request.Tier),
-                    AudioQualityHelper.GetDefaultSpec(request.Tier),
-                    bitrate,
-                    available,
-                    available ? playUrl : null));
-            }
+            return ParseProbedQualities(doc.RootElement, requests);
         }
         catch (Exception ex)
         {
             AppLogger.Error("MusicApi", "ProbeSongQualitiesAsync exception", ex);
+            var options = new List<QualityOption>(AudioQualityHelper.SelectionOrder.Count);
             foreach (var tier in AudioQualityHelper.SelectionOrder)
             {
                 options.Add(new QualityOption(tier, AudioQualityHelper.GetBadge(tier), AudioQualityHelper.GetQualityName(tier), AudioQualityHelper.GetDefaultSpec(tier), "", false));
             }
+            return options;
+        }
+    }
+
+    internal static List<QualityOption> ParseProbedQualities(JsonElement root, (string Key, AudioQualityTier Tier, string Prefix, string Extension)[] requests)
+    {
+        long interval = 0;
+        long[] sizeNew = [];
+        long sizeDolby = 0;
+        long hiresRaw = 0;
+        long flacSize = 0;
+        long size320 = 0;
+        long size128 = 0;
+        int hiresSample = 0;
+        int hiresBitdepth = 0;
+        bool hasFileObj = false;
+
+        if (root.TryGetProperty("songinfo", out var songInfoObj) &&
+            songInfoObj.TryGetProperty("data", out var songData) &&
+            songData.TryGetProperty("track_info", out var trackInfo))
+        {
+            if (trackInfo.TryGetProperty("interval", out var intervalProp)) intervalProp.TryGetInt64(out interval);
+            if (trackInfo.TryGetProperty("file", out var fileObj))
+            {
+                hasFileObj = true;
+                if (fileObj.TryGetProperty("size_new", out var values) && values.ValueKind == JsonValueKind.Array)
+                {
+                    sizeNew = values.EnumerateArray()
+                        .Select(value => value.TryGetInt64(out var size) ? size : 0)
+                        .ToArray();
+                }
+
+                sizeDolby = ReadJsonInt64(fileObj, "size_dolby");
+                if (sizeDolby == 0) sizeDolby = GetArrayValue(sizeNew, 3);
+
+                hiresRaw = ReadJsonInt64(fileObj, "size_hires");
+                if (hiresRaw == 0) hiresRaw = ReadJsonInt64(fileObj, "size_96flac");
+                if (hiresRaw == 0) hiresRaw = ReadJsonInt64(fileObj, "size_24bit");
+                if (hiresRaw == 0) hiresRaw = GetArrayValue(sizeNew, 11);
+
+                flacSize = ReadJsonInt64(fileObj, "size_flac");
+                if (flacSize == 0) flacSize = GetArrayValue(sizeNew, 12);
+
+                size320 = ReadJsonInt64(fileObj, "size_320mp3");
+                if (size320 == 0) size320 = GetArrayValue(sizeNew, 3);
+
+                size128 = ReadJsonInt64(fileObj, "size_128mp3");
+
+                hiresSample = (int)ReadJsonInt64(fileObj, "hires_sample");
+                hiresBitdepth = (int)ReadJsonInt64(fileObj, "hires_bitdepth");
+            }
+        }
+
+        var isTrueHiRes = hiresRaw > 0 || hiresSample > 48000 || hiresBitdepth > 16;
+        var hiResSize = isTrueHiRes ? (hiresRaw > 0 ? hiresRaw : flacSize) : 0L;
+
+        var sizeByTier = new Dictionary<AudioQualityTier, long>
+        {
+            [AudioQualityTier.Master] = GetArrayValue(sizeNew, 0),
+            [AudioQualityTier.Premium] = GetArrayValue(sizeNew, 4) > 0 ? GetArrayValue(sizeNew, 4) : GetArrayValue(sizeNew, 1),
+            [AudioQualityTier.Atmos51] = GetArrayValue(sizeNew, 1) > 0 ? GetArrayValue(sizeNew, 1) : GetArrayValue(sizeNew, 2),
+            [AudioQualityTier.Atmos71] = GetArrayValue(sizeNew, 2) > 0 ? GetArrayValue(sizeNew, 2) : GetArrayValue(sizeNew, 3),
+            [AudioQualityTier.Dolby] = sizeDolby,
+            [AudioQualityTier.HiRes] = hiResSize,
+            [AudioQualityTier.SQ] = flacSize,
+            [AudioQualityTier.HQ] = size320,
+            [AudioQualityTier.Standard] = size128
+        };
+
+        (string? Url, bool HasValidUrl) ExtractUrl(string reqKey, string prefix)
+        {
+            if (root.TryGetProperty(reqKey, out var reqObj) &&
+                reqObj.TryGetProperty("data", out var data))
+            {
+                string? sip = null;
+                if (data.TryGetProperty("sip", out var sips) && sips.ValueKind == JsonValueKind.Array && sips.GetArrayLength() > 0)
+                {
+                    sip = sips[0].GetString();
+                }
+
+                if (data.TryGetProperty("midurlinfo", out var midUrlInfo) &&
+                    midUrlInfo.ValueKind == JsonValueKind.Array &&
+                    midUrlInfo.GetArrayLength() > 0)
+                {
+                    var info = midUrlInfo[0];
+                    var purl = info.TryGetProperty("purl", out var p) ? p.GetString() : null;
+                    var result = info.TryGetProperty("result", out var r) && r.TryGetInt32(out var res) ? res : 0;
+
+                    var hasValid = !string.IsNullOrWhiteSpace(purl) &&
+                                   purl.Length > 5 &&
+                                   result == 0 &&
+                                   !string.IsNullOrEmpty(sip) &&
+                                   purl.Contains(prefix, StringComparison.OrdinalIgnoreCase);
+
+                    if (hasValid && purl != null)
+                    {
+                        return (sip + purl, true);
+                    }
+                }
+            }
+            return (null, false);
+        }
+
+        var options = new List<QualityOption>(requests.Length);
+        foreach (var request in requests)
+        {
+            var (playUrl, hasValidUrl) = ExtractUrl(request.Key, request.Prefix);
+            var size = sizeByTier.GetValueOrDefault(request.Tier, 0L);
+
+            bool available;
+            if (hasFileObj)
+            {
+                if (request.Tier == AudioQualityTier.HiRes)
+                {
+                    available = isTrueHiRes && size > 0 && hasValidUrl;
+                }
+                else
+                {
+                    available = size > 0 && hasValidUrl;
+                }
+            }
+            else
+            {
+                available = hasValidUrl;
+            }
+
+            var spec = AudioQualityHelper.GetDefaultSpec(request.Tier);
+            if (request.Tier == AudioQualityTier.HiRes && (hiresSample > 0 || hiresBitdepth > 0))
+            {
+                var depth = hiresBitdepth > 0 ? hiresBitdepth : 24;
+                var rate = hiresSample > 0 ? hiresSample / 1000 : 96;
+                spec = $"{depth}bit / {rate}kHz";
+            }
+            else if (request.Tier == AudioQualityTier.Master && (hiresSample > 0 || hiresBitdepth > 0))
+            {
+                var depth = hiresBitdepth > 0 ? hiresBitdepth : 24;
+                var rate = hiresSample > 0 ? hiresSample / 1000 : 192;
+                spec = $"{depth}bit / {rate}kHz";
+            }
+
+            var bitrate = size > 0 && interval > 0
+                ? $"{(long)Math.Round((size * 8.0) / interval / 1000.0)}kbps"
+                : "";
+
+            options.Add(new QualityOption(
+                request.Tier,
+                AudioQualityHelper.GetBadge(request.Tier),
+                AudioQualityHelper.GetQualityName(request.Tier),
+                spec,
+                bitrate,
+                available,
+                available ? playUrl : null));
         }
 
         return options;

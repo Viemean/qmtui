@@ -66,4 +66,155 @@ public class AudioQualityFallbackTests
         var tier = AudioQualityHelper.DetermineLocalOrWebDavTier("HQ 320k", "/music/song.mp3");
         Assert.Equal(AudioQualityTier.HQ, tier);
     }
+
+    [Fact]
+    public void ParseProbedQualities_HiResWithSampleRate_ResolvesAsAvailableAndFormatsSpec()
+    {
+        var requests = new (string Key, AudioQualityTier Tier, string Prefix, string Extension)[]
+        {
+            ("req_hires", AudioQualityTier.HiRes, "RS01", ".flac"),
+            ("req_sq", AudioQualityTier.SQ, "F000", ".flac")
+        };
+
+        var json = """
+        {
+            "songinfo": {
+                "data": {
+                    "track_info": {
+                        "interval": 240,
+                        "file": {
+                            "size_flac": 30000000,
+                            "hires_sample": 96000,
+                            "hires_bitdepth": 24
+                        }
+                    }
+                }
+            },
+            "req_hires": {
+                "data": {
+                    "sip": ["https://isure.stream.qqmusic.qq.com/"],
+                    "midurlinfo": [
+                        { "purl": "RS010039MnYb0qxYhV.flac?vkey=test", "result": 0 }
+                    ]
+                }
+            },
+            "req_sq": {
+                "data": {
+                    "sip": ["https://isure.stream.qqmusic.qq.com/"],
+                    "midurlinfo": [
+                        { "purl": "F0000039MnYb0qxYhV.flac?vkey=test", "result": 0 }
+                    ]
+                }
+            }
+        }
+        """;
+
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var options = QmTui.Api.MusicApi.ParseProbedQualities(doc.RootElement, requests);
+
+        var hiResOpt = options.FirstOrDefault(o => o.Tier == AudioQualityTier.HiRes);
+        Assert.NotNull(hiResOpt);
+        Assert.True(hiResOpt.Available);
+        Assert.Equal("24bit / 96kHz", hiResOpt.Spec);
+        Assert.Equal("https://isure.stream.qqmusic.qq.com/RS010039MnYb0qxYhV.flac?vkey=test", hiResOpt.PlayUrl);
+    }
+
+    [Fact]
+    public void ParseProbedQualities_HiResWithSizeNew11_ResolvesAsAvailable()
+    {
+        var requests = new (string Key, AudioQualityTier Tier, string Prefix, string Extension)[]
+        {
+            ("req_hires", AudioQualityTier.HiRes, "RS01", ".flac")
+        };
+
+        var json = """
+        {
+            "songinfo": {
+                "data": {
+                    "track_info": {
+                        "interval": 200,
+                        "file": {
+                            "size_new": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48000000]
+                        }
+                    }
+                }
+            },
+            "req_hires": {
+                "data": {
+                    "sip": ["https://isure.stream.qqmusic.qq.com/"],
+                    "midurlinfo": [
+                        { "purl": "RS010039MnYb0qxYhV.flac?vkey=test", "result": 0 }
+                    ]
+                }
+            }
+        }
+        """;
+
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var options = QmTui.Api.MusicApi.ParseProbedQualities(doc.RootElement, requests);
+
+        var hiResOpt = options.FirstOrDefault(o => o.Tier == AudioQualityTier.HiRes);
+        Assert.NotNull(hiResOpt);
+        Assert.True(hiResOpt.Available);
+        Assert.Equal("https://isure.stream.qqmusic.qq.com/RS010039MnYb0qxYhV.flac?vkey=test", hiResOpt.PlayUrl);
+    }
+
+    [Fact]
+    public void ParseProbedQualities_FalseHiRes_RejectsHiResAndKeepsSQAvailable()
+    {
+        var requests = new (string Key, AudioQualityTier Tier, string Prefix, string Extension)[]
+        {
+            ("req_hires", AudioQualityTier.HiRes, "RS01", ".flac"),
+            ("req_sq", AudioQualityTier.SQ, "F000", ".flac")
+        };
+
+        // 场景：只有普通的 SQ (size_flac)，没有 size_hires / 采样率 / size_new[11]，即便网关盲签了 RS01 purl，也应当判定 HiRes 不可用
+        var json = """
+        {
+            "songinfo": {
+                "data": {
+                    "track_info": {
+                        "interval": 200,
+                        "file": {
+                            "size_flac": 28000000,
+                            "size_hires": 0,
+                            "hires_sample": 0,
+                            "hires_bitdepth": 0,
+                            "size_new": [170000000, 27000000, 71000000, 9700000, 0, 20000000, 32000000, 2200000, 27000000, 6700000, 0, 0, 0, 0, 0, 0]
+                        }
+                    }
+                }
+            },
+            "req_hires": {
+                "data": {
+                    "sip": ["https://isure.stream.qqmusic.qq.com/"],
+                    "midurlinfo": [
+                        { "purl": "RS01001ToGjY158HHH.flac?vkey=test", "result": 0 }
+                    ]
+                }
+            },
+            "req_sq": {
+                "data": {
+                    "sip": ["https://isure.stream.qqmusic.qq.com/"],
+                    "midurlinfo": [
+                        { "purl": "F000001ToGjY158HHH.flac?vkey=test", "result": 0 }
+                    ]
+                }
+            }
+        }
+        """;
+
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var options = QmTui.Api.MusicApi.ParseProbedQualities(doc.RootElement, requests);
+
+        var hiResOpt = options.FirstOrDefault(o => o.Tier == AudioQualityTier.HiRes);
+        var sqOpt = options.FirstOrDefault(o => o.Tier == AudioQualityTier.SQ);
+
+        Assert.NotNull(hiResOpt);
+        Assert.False(hiResOpt.Available); // 必须被识别为不可用
+
+        Assert.NotNull(sqOpt);
+        Assert.True(sqOpt.Available); // SQ 正常可用
+        Assert.Equal("https://isure.stream.qqmusic.qq.com/F000001ToGjY158HHH.flac?vkey=test", sqOpt.PlayUrl);
+    }
 }
