@@ -18,6 +18,7 @@ public sealed partial class GstPlayer : IPlayer
     private const int GST_MESSAGE_EOS = 1;
     private const int GST_MESSAGE_ERROR = 2;
     private const int GST_MESSAGE_WARNING = 4;
+    private const int GST_MESSAGE_BUFFERING = 16;
 
     private nint _pipeline;
     private readonly Lock _lock = new();
@@ -403,12 +404,19 @@ public sealed partial class GstPlayer : IPlayer
             {
                 try
                 {
-                    nint msg = gst_bus_pop_filtered(bus, GST_MESSAGE_ERROR);
-                    if (msg != 0)
+                    nint errMsg = gst_bus_pop_filtered(bus, GST_MESSAGE_ERROR);
+                    if (errMsg != 0)
                     {
                         AppLogger.Warn("GstPlayer", "Bus reported GST_MESSAGE_ERROR, triggering watchdog");
-                        gst_object_unref(msg);
+                        gst_object_unref(errMsg);
                         TriggerWatchdogRecovery();
+                    }
+
+                    nint bufMsg = gst_bus_pop_filtered(bus, GST_MESSAGE_BUFFERING);
+                    if (bufMsg != 0)
+                    {
+                        _watchdogStallCount = 0;
+                        gst_object_unref(bufMsg);
                     }
                 }
                 finally
@@ -451,9 +459,9 @@ public sealed partial class GstPlayer : IPlayer
                     }
                     else if (IsPlaying && TotalDurationSeconds > 0 && sec < TotalDurationSeconds - 2.0)
                     {
-                        // 正在播放但进度停滞
+                        // 正在播放但进度停滞（容忍 10 秒缓冲与网络抖动）
                         _watchdogStallCount++;
-                        if (_watchdogStallCount >= 20) // 5 秒无进展
+                        if (_watchdogStallCount >= 40) // 10 秒无进展
                         {
                             TriggerWatchdogRecovery();
                         }

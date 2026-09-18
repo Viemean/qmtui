@@ -14,6 +14,8 @@ namespace QmTui.Services;
 
 public static partial class WebDavService
 {
+    private static readonly SemaphoreSlim s_coverExtractionSemaphore = new(2, 2);
+
     public static List<Song> DeduplicateSongs(IEnumerable<Song> songs)
     {
         var result = new List<Song>();
@@ -416,138 +418,86 @@ public static partial class WebDavService
             return await LocalMusicService.EnsureCoverAsync(song with { LocalFilePath = localAudio }, ct);
         }
 
-        // B. 流式未缓存模式：通过自适应 HTTP Range 请求拉取足够涵盖封面元数据区的头部（初始 4MB，不足自动按真实块大小补齐）
-        var ext = Path.GetExtension(song.WebDavHref);
-        var tmpHeaderFile = Path.Combine(Path.GetTempPath(), $"webdav_cov_hdr_{Guid.NewGuid():N}{ext}");
-        var tempExtractImg = Path.Combine(CacheManager.CoversDir, $"raw_wd_{md5}.tmp");
+        await s_coverExtractionSemaphore.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (ct.IsCancellationRequested) return null;
-            var client = GetHttpClient(server);
-            var uri = BuildFullUri(server, song.WebDavHref);
-
-            // 1. 初始拉取前 4MB 头部（足够覆盖绝大多数高清大图）
-            long rangeEnd = 4 * 1024 * 1024 - 1;
-            byte[]? headerData = await FetchRangeBytesAsync(client, uri, 0, rangeEnd, ct).ConfigureAwait(false);
-            if (headerData != null && headerData.Length > 0)
+            // B. 流式未缓存模式：通过自适应 HTTP Range 请求拉取足够涵盖封面元数据区的头部（初始 4MB，不足自动按真实块大小补齐）
+            var ext = Path.GetExtension(song.WebDavHref);
+            var tmpHeaderFile = Path.Combine(Path.GetTempPath(), $"webdav_cov_hdr_{Guid.NewGuid():N}{ext}");
+            var tempExtractImg = Path.Combine(CacheManager.CoversDir, $"raw_wd_{md5}.tmp");
+            try
             {
-                // 探测 FLAC 或 ID3v2 元数据块真实需求长度
-                long requiredHeaderLen = -1;
-                if (headerData.Length >= 4 && headerData[0] == 0x66 && headerData[1] == 0x4C && headerData[2] == 0x61 && headerData[3] == 0x43) // "fLaC"
-                {
-                    requiredHeaderLen = GetFlacRequiredHeaderLength(headerData);
-                }
-                else if (headerData.Length >= 10 && headerData[0] == 0x49 && headerData[1] == 0x44 && headerData[2] == 0x33) // "ID3"
-                {
-                    requiredHeaderLen = GetId3v2RequiredHeaderLength(headerData);
-                }
+                if (ct.IsCancellationRequested) return null;
+                var client = GetHttpClient(server);
+                var uri = BuildFullUri(server, song.WebDavHref);
 
-                // 若真实所需元数据长度超出 4MB 且在合理上限内（<= 20MB），再次精确拉取完整元数据区
-                if (requiredHeaderLen > headerData.Length && requiredHeaderLen <= 20 * 1024 * 1024)
+                // 1. 初始拉取前 4MB 头部（足够覆盖绝大多数高清大图）
+                long rangeEnd = 4 * 1024 * 1024 - 1;
+                byte[]? headerData = await FetchRangeBytesAsync(client, uri, 0, rangeEnd, ct).ConfigureAwait(false);
+                if (headerData != null && headerData.Length > 0)
                 {
-                    AppLogger.Info("WebDavService", $"Header length {headerData.Length} insufficient for required {requiredHeaderLen} bytes, refetching exact range...");
-                    var fullHeaderData = await FetchRangeBytesAsync(client, uri, 0, requiredHeaderLen - 1, ct).ConfigureAwait(false);
-                    if (fullHeaderData != null && fullHeaderData.Length >= requiredHeaderLen)
+                    // 探测 FLAC 或 ID3v2 元数据块真实需求长度
+                    long requiredHeaderLen = -1;
+                    if (headerData.Length >= 4 && headerData[0] == 0x66 && headerData[1] == 0x4C && headerData[2] == 0x61 && headerData[3] == 0x43) // "fLaC"
                     {
-                        headerData = fullHeaderData;
+                        requiredHeaderLen = GetFlacRequiredHeaderLength(headerData);
                     }
-                }
-
-                ct.ThrowIfCancellationRequested();
-                await File.WriteAllBytesAsync(tmpHeaderFile, headerData, ct).ConfigureAwait(false);
-
-                if (File.Exists(tmpHeaderFile) && new FileInfo(tmpHeaderFile).Length > 0)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    var track = new ATL.Track(tmpHeaderFile);
-
-                    // 在拉取头部时顺便提取并缓存内嵌歌词，无需额外网络往返
-                    var embeddedLyrics = LocalMusicService.ExtractEmbeddedLyrics(track);
-                    if (!string.IsNullOrWhiteSpace(embeddedLyrics))
+                    else if (headerData.Length >= 10 && headerData[0] == 0x49 && headerData[1] == 0x44 && headerData[2] == 0x33) // "ID3"
                     {
-                        try
+                        requiredHeaderLen = GetId3v2RequiredHeaderLength(headerData);
+                    }
+
+                    // 若真实所需元数据长度超出 4MB 且在合理上限内（<= 20MB），再次精确拉取完整元数据区
+                    if (requiredHeaderLen > headerData.Length && requiredHeaderLen <= 20 * 1024 * 1024)
+                    {
+                        AppLogger.Info("WebDavService", $"Header length {headerData.Length} insufficient for required {requiredHeaderLen} bytes, refetching exact range...");
+                        var fullHeaderData = await FetchRangeBytesAsync(client, uri, 0, requiredHeaderLen - 1, ct).ConfigureAwait(false);
+                        if (fullHeaderData != null && fullHeaderData.Length >= requiredHeaderLen)
                         {
-                            var lrcPath = GetLocalLrcCachePath(server, song.WebDavHref);
-                            if (!File.Exists(lrcPath) || new FileInfo(lrcPath).Length == 0)
+                            headerData = fullHeaderData;
+                        }
+                    }
+
+                    ct.ThrowIfCancellationRequested();
+                    await File.WriteAllBytesAsync(tmpHeaderFile, headerData, ct).ConfigureAwait(false);
+
+                    if (File.Exists(tmpHeaderFile) && new FileInfo(tmpHeaderFile).Length > 0)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        var track = new ATL.Track(tmpHeaderFile);
+
+                        // 在拉取头部时顺便提取并缓存内嵌歌词，无需额外网络往返
+                        var embeddedLyrics = LocalMusicService.ExtractEmbeddedLyrics(track);
+                        if (!string.IsNullOrWhiteSpace(embeddedLyrics))
+                        {
+                            try
                             {
-                                await File.WriteAllTextAsync(lrcPath, embeddedLyrics, Encoding.UTF8, ct).ConfigureAwait(false);
-                                CacheManager.RecordAccess($"webdav/{Path.GetFileName(lrcPath)}", new FileInfo(lrcPath).Length);
-                            }
-                            // 同步更新内存缓存
-                            lock (s_lock)
-                            {
-                                var cached = server.CachedSongs?.Find(s => string.Equals(s.Href, song.WebDavHref, StringComparison.OrdinalIgnoreCase));
-                                if (cached != null && string.IsNullOrWhiteSpace(cached.EmbeddedLyrics))
+                                var lrcPath = GetLocalLrcCachePath(server, song.WebDavHref);
+                                if (!File.Exists(lrcPath) || new FileInfo(lrcPath).Length == 0)
                                 {
-                                    cached.EmbeddedLyrics = embeddedLyrics;
+                                    await File.WriteAllTextAsync(lrcPath, embeddedLyrics, Encoding.UTF8, ct).ConfigureAwait(false);
+                                    CacheManager.RecordAccess($"webdav/{Path.GetFileName(lrcPath)}", new FileInfo(lrcPath).Length);
+                                }
+                                // 同步更新内存缓存
+                                lock (s_lock)
+                                {
+                                    var cached = server.CachedSongs?.Find(s => string.Equals(s.Href, song.WebDavHref, StringComparison.OrdinalIgnoreCase));
+                                    if (cached != null && string.IsNullOrWhiteSpace(cached.EmbeddedLyrics))
+                                    {
+                                        cached.EmbeddedLyrics = embeddedLyrics;
+                                    }
                                 }
                             }
+                            catch {}
                         }
-                        catch {}
-                    }
 
-                    if (track.EmbeddedPictures != null && track.EmbeddedPictures.Count > 0)
-                    {
-                        var pic = track.EmbeddedPictures[0];
-                        if (pic.PictureData != null && pic.PictureData.Length > 0 && IsValidPictureData(pic.PictureData))
+                        if (track.EmbeddedPictures != null && track.EmbeddedPictures.Count > 0)
                         {
-                            ct.ThrowIfCancellationRequested();
-                            await File.WriteAllBytesAsync(tempExtractImg, pic.PictureData, ct).ConfigureAwait(false);
-                            var result = await TerminalImageHelper.EnsureLocalImageProcessedAsync(tempExtractImg, cacheKey, ct).ConfigureAwait(false);
-                            try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch {}
-                            if (!string.IsNullOrEmpty(result) && File.Exists(result))
-                            {
-                                return result;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            return null;
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("WebDavService", $"Range cover extraction failed for {song.WebDavHref}: {ex.Message}");
-        }
-        finally
-        {
-            try { if (File.Exists(tmpHeaderFile)) File.Delete(tmpHeaderFile); } catch {}
-            try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch {}
-        }
-
-        if (ct.IsCancellationRequested) return null;
-
-        // C. 回退：查找同目录下的常见封面命名 (cover.jpg, folder.jpg 等)
-        try
-        {
-            var href = song.WebDavHref;
-            var lastSlash = href.LastIndexOf('/');
-            if (lastSlash > 0)
-            {
-                var parentDir = href[..(lastSlash + 1)];
-                string[] candidateNames = ["cover.jpg", "cover.png", "folder.jpg", "front.jpg", "Cover.jpg", "Folder.jpg"];
-                var client = GetHttpClient(server);
-                foreach (var name in candidateNames)
-                {
-                    if (ct.IsCancellationRequested) return null;
-                    var remoteCoverHref = parentDir + name;
-                    var coverUri = BuildFullUri(server, remoteCoverHref);
-                    using var headReq = new HttpRequestMessage(HttpMethod.Head, coverUri);
-                    using var headResp = await client.SendAsync(headReq, ct).ConfigureAwait(false);
-                    if (headResp.IsSuccessStatusCode)
-                    {
-                        using var getReq = new HttpRequestMessage(HttpMethod.Get, coverUri);
-                        using var getResp = await client.SendAsync(getReq, ct).ConfigureAwait(false);
-                        if (getResp.IsSuccessStatusCode)
-                        {
-                            var bytes = await getResp.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
-                            if (bytes.Length > 1024 && IsValidPictureData(bytes))
+                            var pic = track.EmbeddedPictures[0];
+                            if (pic.PictureData != null && pic.PictureData.Length > 0 && IsValidPictureData(pic.PictureData))
                             {
                                 ct.ThrowIfCancellationRequested();
-                                await File.WriteAllBytesAsync(tempExtractImg, bytes, ct).ConfigureAwait(false);
+                                await File.WriteAllBytesAsync(tempExtractImg, pic.PictureData, ct).ConfigureAwait(false);
                                 var result = await TerminalImageHelper.EnsureLocalImageProcessedAsync(tempExtractImg, cacheKey, ct).ConfigureAwait(false);
                                 try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch {}
                                 if (!string.IsNullOrEmpty(result) && File.Exists(result))
@@ -559,12 +509,72 @@ public static partial class WebDavService
                     }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("WebDavService", $"Range cover extraction failed for {song.WebDavHref}: {ex.Message}");
+            }
+            finally
+            {
+                try { if (File.Exists(tmpHeaderFile)) File.Delete(tmpHeaderFile); } catch {}
+                try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch {}
+            }
+
+            if (ct.IsCancellationRequested) return null;
+
+            // C. 回退：查找同目录下的常见封面命名 (cover.jpg, folder.jpg 等)
+            try
+            {
+                var href = song.WebDavHref;
+                var lastSlash = href.LastIndexOf('/');
+                if (lastSlash > 0)
+                {
+                    var parentDir = href[..(lastSlash + 1)];
+                    string[] candidateNames = ["cover.jpg", "cover.png", "folder.jpg", "front.jpg", "Cover.jpg", "Folder.jpg"];
+                    var client = GetHttpClient(server);
+                    foreach (var name in candidateNames)
+                    {
+                        if (ct.IsCancellationRequested) return null;
+                        var remoteCoverHref = parentDir + name;
+                        var coverUri = BuildFullUri(server, remoteCoverHref);
+                        using var headReq = new HttpRequestMessage(HttpMethod.Head, coverUri);
+                        using var headResp = await client.SendAsync(headReq, ct).ConfigureAwait(false);
+                        if (headResp.IsSuccessStatusCode)
+                        {
+                            using var getReq = new HttpRequestMessage(HttpMethod.Get, coverUri);
+                            using var getResp = await client.SendAsync(getReq, ct).ConfigureAwait(false);
+                            if (getResp.IsSuccessStatusCode)
+                            {
+                                var bytes = await getResp.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+                                if (bytes.Length > 1024 && IsValidPictureData(bytes))
+                                {
+                                    ct.ThrowIfCancellationRequested();
+                                    await File.WriteAllBytesAsync(tempExtractImg, bytes, ct).ConfigureAwait(false);
+                                    var result = await TerminalImageHelper.EnsureLocalImageProcessedAsync(tempExtractImg, cacheKey, ct).ConfigureAwait(false);
+                                    try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch {}
+                                    if (!string.IsNullOrEmpty(result) && File.Exists(result))
+                                    {
+                                        return result;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            catch {}
         }
-        catch (OperationCanceledException)
+        finally
         {
-            return null;
+            s_coverExtractionSemaphore.Release();
         }
-        catch {}
 
         if (ct.IsCancellationRequested) return null;
 
