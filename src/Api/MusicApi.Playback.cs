@@ -243,7 +243,8 @@ public sealed partial class MusicApi
                 spec,
                 bitrate,
                 available,
-                available ? playUrl : null));
+                available ? playUrl : null,
+                size));
         }
 
         return options;

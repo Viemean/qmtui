@@ -37,7 +37,7 @@ public sealed class QualityDialog : Dialog
         _onQualitySelected = onQualitySelected;
 
         Title = customTitle;
-        Width = 64;
+        Width = 68;
         Height = 16;
         X = Pos.Center();
         Y = Pos.Center();

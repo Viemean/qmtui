@@ -40,10 +40,26 @@ public class AudioQualityFallbackTests
     [Fact]
     public void QualityOption_DisplayText_AvailableShouldShowNormal()
     {
-        var option = new QualityOption(AudioQualityTier.SQ, "SQ", "SQ 无损", "16bit/44.1kHz", "850kbps", true);
+        var option = new QualityOption(AudioQualityTier.SQ, "SQ", "SQ 无损", "16bit/44.1kHz", "850kbps", true, null, 61839633);
         var text = option.DisplayText(true);
         Assert.DoesNotContain("无音源", text);
+        Assert.Contains("59.0MB", text);
+        Assert.Contains("{850kbps}", text);
         Assert.Contains("✓", text);
+    }
+
+    [Theory]
+    [InlineData(0L, "")]
+    [InlineData(500L, "500B")]
+    [InlineData(2048L, "2.0KB")]
+    [InlineData(10485760L, "10.0MB")]
+    [InlineData(61839633L, "59.0MB")]
+    [InlineData(100164810L, "95.5MB")]
+    [InlineData(1073741824L, "1.0GB")]
+    public void QualityOption_FormatFileSize_FormatsCorrectly(long bytes, string expected)
+    {
+        var formatted = QualityOption.FormatFileSize(bytes);
+        Assert.Equal(expected, formatted);
     }
 
     [Fact]
