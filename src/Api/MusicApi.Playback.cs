@@ -127,7 +127,6 @@ public sealed partial class MusicApi
                 }
 
                 sizeDolby = ReadJsonInt64(fileObj, "size_dolby");
-                if (sizeDolby == 0) sizeDolby = GetArrayValue(sizeNew, 3);
 
                 hiresRaw = ReadJsonInt64(fileObj, "size_hires");
                 if (hiresRaw == 0) hiresRaw = ReadJsonInt64(fileObj, "size_96flac");
@@ -204,7 +203,11 @@ public sealed partial class MusicApi
             var size = sizeByTier.GetValueOrDefault(request.Tier, 0L);
 
             bool available;
-            if (hasFileObj)
+            if (request.Tier == AudioQualityTier.Dolby)
+            {
+                available = sizeDolby > 0 && hasValidUrl;
+            }
+            else if (hasFileObj)
             {
                 if (request.Tier == AudioQualityTier.HiRes)
                 {

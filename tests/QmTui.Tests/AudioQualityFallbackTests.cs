@@ -252,4 +252,45 @@ public class AudioQualityFallbackTests
             Assert.Contains("2968kbps", hiRes.BitrateInfo);
         }
     }
+
+    [Fact]
+    public void ParseProbedQualities_DolbyZeroSize_RejectsDolbyEvenIfPurlExists()
+    {
+        var requests = new (string Key, AudioQualityTier Tier, string Prefix, string Extension)[]
+        {
+            ("req_dolby", AudioQualityTier.Dolby, "Q000", ".flac")
+        };
+
+        // 当 size_dolby 为 0 时，即便 size_new[3] (OGG) 有值且接口返回了 purl，也不应误判为可用杜比
+        var json = """
+        {
+            "songinfo": {
+                "data": {
+                    "track_info": {
+                        "interval": 200,
+                        "file": {
+                            "size_dolby": 0,
+                            "size_new": [0, 0, 0, 13123456]
+                        }
+                    }
+                }
+            },
+            "req_dolby": {
+                "data": {
+                    "sip": ["https://isure.stream.qqmusic.qq.com/"],
+                    "midurlinfo": [
+                        { "purl": "Q0000039MnYb0qxYhV.flac?vkey=test", "result": 0 }
+                    ]
+                }
+            }
+        }
+        """;
+
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var options = QmTui.Api.MusicApi.ParseProbedQualities(doc.RootElement, requests);
+
+        var dolbyOpt = options.FirstOrDefault(o => o.Tier == AudioQualityTier.Dolby);
+        Assert.NotNull(dolbyOpt);
+        Assert.False(dolbyOpt.Available);
+    }
 }
