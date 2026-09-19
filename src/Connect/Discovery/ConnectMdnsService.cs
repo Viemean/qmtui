@@ -147,11 +147,55 @@ public sealed class ConnectMdnsService : IDisposable
         }, _cts.Token);
     }
 
+    private static readonly EventHandler ProcessExitHandler = (_, _) => KillOrphanedAvahiProcesses();
+
+    static ConnectMdnsService()
+    {
+        AppDomain.CurrentDomain.ProcessExit += ProcessExitHandler;
+    }
+
+    private static void KillOrphanedAvahiProcesses()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        try
+        {
+            using var p = Process.Start(new ProcessStartInfo
+            {
+                FileName = "pkill",
+                Arguments = "-f \"avahi-publish-service.*_melodist-connect\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            p?.WaitForExit(500);
+        }
+        catch { }
+    }
+
+    private static bool IsAvahiDaemonRunning()
+    {
+        if (!OperatingSystem.IsLinux()) return false;
+        try
+        {
+            return File.Exists("/run/avahi-daemon/socket") || File.Exists("/var/run/avahi-daemon/socket");
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void TryStartAvahiPublish(string instanceName, string localIp)
     {
         try
         {
             StopAvahiPublish();
+            KillOrphanedAvahiProcesses();
+
+            if (!IsAvahiDaemonRunning())
+            {
+                AppLogger.Debug("ConnectMdns", "avahi-daemon socket not found, skipping avahi-publish-service.");
+                return;
+            }
 
             var psi = new ProcessStartInfo
             {
@@ -164,6 +208,14 @@ public sealed class ConnectMdnsService : IDisposable
             };
 
             _avahiProcess = Process.Start(psi);
+            if (_avahiProcess != null)
+            {
+                _avahiProcess.EnableRaisingEvents = true;
+                _avahiProcess.Exited += (_, _) =>
+                {
+                    AppLogger.Debug("ConnectMdns", "avahi-publish-service exited.");
+                };
+            }
             AppLogger.Info("ConnectMdns", $"Spawned avahi-publish-service for {instanceName}");
         }
         catch (Exception ex)
@@ -176,14 +228,21 @@ public sealed class ConnectMdnsService : IDisposable
     {
         try
         {
-            if (_avahiProcess != null && !_avahiProcess.HasExited)
+            if (_avahiProcess != null)
             {
-                _avahiProcess.Kill(entireProcessTree: true);
+                if (!_avahiProcess.HasExited)
+                {
+                    _avahiProcess.Kill(entireProcessTree: true);
+                    _avahiProcess.WaitForExit(500);
+                }
                 _avahiProcess.Dispose();
             }
         }
-        catch {}
-        _avahiProcess = null;
+        catch { }
+        finally
+        {
+            _avahiProcess = null;
+        }
     }
 
     private void HandleMdnsQuery(byte[] data, IPEndPoint remoteEp, string instanceName, string localIp)
@@ -336,6 +395,7 @@ public sealed class ConnectMdnsService : IDisposable
     public void Stop()
     {
         StopAvahiPublish();
+        KillOrphanedAvahiProcesses();
         _cts?.Cancel();
         _cts = null;
         try

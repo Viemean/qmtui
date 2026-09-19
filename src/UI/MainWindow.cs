@@ -1346,6 +1346,22 @@ public sealed partial class MainWindow : Window
             }
             catch {}
 
+            try
+            {
+                _connectMdns?.Dispose();
+                _connectMdns = null;
+                if (_connectServer != null)
+                {
+                    if (_connectServer.IsRunning)
+                    {
+                        _connectServer.Stop();
+                    }
+                    _connectServer.Dispose();
+                    _connectServer = null;
+                }
+            }
+            catch {}
+
             try { _mprisService.Dispose(); } catch {}
             try { _player.Dispose(); } catch {}
             try { UserSession.Current.Save(); } catch {}

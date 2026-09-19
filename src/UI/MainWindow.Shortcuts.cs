@@ -874,6 +874,21 @@ public sealed partial class MainWindow
                     _standaloneWebServer = null;
                 }
                 catch {}
+                try
+                {
+                    _connectMdns?.Dispose();
+                    _connectMdns = null;
+                    if (_connectServer != null)
+                    {
+                        if (_connectServer.IsRunning)
+                        {
+                            _connectServer.Stop();
+                        }
+                        _connectServer.Dispose();
+                        _connectServer = null;
+                    }
+                }
+                catch {}
                 _player.Dispose();
                 _mprisService.Dispose();
                 Application.RequestStop();
