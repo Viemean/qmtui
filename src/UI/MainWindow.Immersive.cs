@@ -216,6 +216,7 @@ public sealed partial class MainWindow
             _standaloneWebServer.CurrentPlaybackMode = mode;
             _standaloneWebServer.BroadcastState("mode_change");
         }
+        BroadcastConnectPlayerState();
     }
 
     private long _lastToggleNowPlayingTicks;
@@ -380,6 +381,18 @@ public sealed partial class MainWindow
         UpdateFrameBorderHighlights();
         SetNeedsDraw();
         AppLogger.Info("MainWindow", "Exited AOD background display mode");
+    }
+
+    private void ToggleAodMode()
+    {
+        if (_isAodMode)
+        {
+            ExitAodMode();
+        }
+        else
+        {
+            EnterAodMode();
+        }
     }
 
     private async Task HandleRealEscapeKeyAsync()

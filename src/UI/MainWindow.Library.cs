@@ -319,6 +319,8 @@ public sealed partial class MainWindow
                 Application.Invoke(() => _songListView.RemoveSong(song));
             }
         }
+
+        BroadcastConnectPlayerState();
     }
 
     private async Task ToggleSongFavoriteAsync(Song song)

@@ -10,6 +10,7 @@ using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Views;
 using QmTui.Api;
+using QmTui.Connect.Models;
 using QmTui.Models;
 using QmTui.Player;
 using QmTui.Services;
@@ -34,6 +35,7 @@ public sealed partial class MainWindow
     private double _accumulatedPlaySeconds;
     private double _lastProgressSec;
     private string? _currentCoverFilePath;
+    private long _lastConnectBroadcastTick;
 
     private Task PlaySongAsync(Song song) => PlaySongAsync(song, 0, null);
 
@@ -67,6 +69,25 @@ public sealed partial class MainWindow
         _currentCoverFilePath = null;
 
         bool IsStale() => ct.IsCancellationRequested || Interlocked.Read(ref _playbackSessionId) != currentSession;
+
+        // 对齐官方双向反向接力：若为移动端本地曲目且 PC 本地不存在物理文件，向移动端请求 HTTP 串流代理
+        bool isLocalSong = song.IsLocal || song.Mid.StartsWith("local_", StringComparison.OrdinalIgnoreCase);
+        bool directFileExists = !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath);
+        if (isLocalSong && !directFileExists && string.IsNullOrEmpty(overridePlayUrl))
+        {
+            if (_connectServer != null && _connectServer.IsRunning && _connectServer.ConnectedCount > 0)
+            {
+                AppLogger.Info("MainWindow.Playback", $"Local song file not found on PC ({song.LocalFilePath}), requesting mobile stream proxy for {song.Title}");
+                var connectSong = ConnectSong.FromDomainSong(song, _actualQualityTier, _connectServer.ActualPort);
+                _activeSong = song;
+                PlaybackQueueService.Instance.SyncCurrentSong(song);
+                _songListView.SetPlayingSong(song.Mid);
+                _controlBar.SetCurrentSong(song);
+                _controlBar.UpdateStatus($"[等待串流] 正在请求手机端中转: {song.Title} ...");
+                _connectServer.BroadcastPlaySong(connectSong);
+                return;
+            }
+        }
 
         _activeSong = song;
         PlaybackQueueService.Instance.SyncCurrentSong(song);
@@ -131,6 +152,7 @@ public sealed partial class MainWindow
 
         _currentLyrics.Clear();
         _currentActiveLyricIndex = -1;
+        _lastRemoteSyncedSongMid = null;
 
         Application.Invoke(() =>
         {
@@ -165,9 +187,22 @@ public sealed partial class MainWindow
             {
                 lyrics = await QmTui.Services.LocalMusicService.GetLyricsAsync(song).ConfigureAwait(false);
             }
+            else if (song.IsWebDav)
+            {
+                var servers = WebDavService.GetServers();
+                var server = (!string.IsNullOrEmpty(song.WebDavServerId) ? servers.Find(s => s.Id == song.WebDavServerId) : null)
+                             ?? WebDavService.GetActiveServer();
+                lyrics = server != null && !string.IsNullOrEmpty(song.WebDavHref)
+                    ? await WebDavService.EnsureLyricsAsync(server, song).ConfigureAwait(false)
+                    : [];
+            }
             else
             {
-                lyrics = [];
+                // 手机反向接力本地曲目 / 代理串流：优先检索本地多级歌词母本与快表缓存
+                var cached = LocalLyricAutoMatcher.TryGetCachedLyrics(song, playUrl);
+                lyrics = (cached != null && cached.Lines.Count > 0)
+                    ? cached.Lines.ConvertAll(l => l.ToDomain())
+                    : [];
             }
             if (IsStale()) return;
         }
@@ -320,6 +355,10 @@ public sealed partial class MainWindow
             _standaloneWebServer.CurrentLyrics = lyrics;
             _standaloneWebServer.BroadcastState("lyrics_change");
         }
+        if (lyrics.Count > 0)
+        {
+            BroadcastConnectLyrics();
+        }
 
         var hasTrans = LyricParser.HasTranslation(_currentLyrics) && LyricParser.NeedsTranslation(_currentLyrics);
         _showTranslation = hasTrans;
@@ -394,6 +433,7 @@ public sealed partial class MainWindow
                         Application.Invoke(() =>
                         {
                             _nowPlayingView.UpdateCover(cover);
+                            BroadcastConnectPlayerState();
                         });
                     }
                 }
@@ -479,6 +519,7 @@ public sealed partial class MainWindow
         {
             if (IsStale()) return;
             RefreshLyricListView();
+            BroadcastConnectLyrics();
         });
 
         // 启动后台平滑预热下一首曲目的音源与封面
@@ -508,6 +549,8 @@ public sealed partial class MainWindow
         {
             _standaloneWebServer.IsPlaying = isPlaying;
         }
+        BroadcastConnectPlayerState();
+        BroadcastConnectQueueState();
     }
 
     private void AdjustVolume(int delta)
@@ -595,6 +638,15 @@ public sealed partial class MainWindow
                 _lastProgressSaveTick = Environment.TickCount64;
                 UserSession.SaveDebounced();
             }
+
+            if (_connectServer != null && _connectServer.IsRunning && _connectServer.ConnectedCount > 0)
+            {
+                if (Environment.TickCount64 - _lastConnectBroadcastTick > 500)
+                {
+                    _lastConnectBroadcastTick = Environment.TickCount64;
+                    BroadcastConnectPlayerState();
+                }
+            }
             return;
         }
 
@@ -604,6 +656,16 @@ public sealed partial class MainWindow
 
         _controlBar.UpdateProgress(cur, total, progressPercent);
         _mprisService.UpdatePosition(currentSec, _activeSong.Duration);
+
+        // 同步推送高精度播放进度与状态给移动端 App
+        if (_connectServer != null && _connectServer.IsRunning && _connectServer.ConnectedCount > 0)
+        {
+            if (Environment.TickCount64 - _lastConnectBroadcastTick > 400)
+            {
+                _lastConnectBroadcastTick = Environment.TickCount64;
+                BroadcastConnectPlayerState();
+            }
+        }
 
         UserSession.Current.LastPlaybackPositionSeconds = currentSec;
         UserSession.Current.LastPlayedSong = _activeSong;

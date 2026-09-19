@@ -108,11 +108,15 @@ public static class LocalLyricAutoMatcher
             return (dummySong, domainLyrics);
         }
 
-        // 2. 定位有效的本地/已缓存音频文件或 WebDAV 流式 URL
+        // 2. 定位有效的本地/已缓存音频文件或 WebDAV/本地流式 URL
         string? audioPathOrUrl = null;
         if (song.IsLocal && !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath))
         {
             audioPathOrUrl = song.LocalFilePath;
+        }
+        else if (song.IsLocal && !string.IsNullOrEmpty(playUrl) && (playUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || playUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+        {
+            audioPathOrUrl = playUrl;
         }
         else if (song.IsWebDav)
         {

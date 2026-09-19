@@ -339,6 +339,43 @@ public sealed partial class MainWindow
         if (lineIndex >= 0 && lineIndex < _currentLyrics.Count)
         {
             _nowPlayingView.ScrollToLine(lineIndex);
+
+            if (_currentActiveLyricIndex != lineIndex)
+            {
+                _currentActiveLyricIndex = lineIndex;
+                _lyricListView.SetNeedsDraw();
+            }
+
+            if (_lyricLineToFirstItemIndex.TryGetValue(lineIndex, out int targetListItemIdx))
+            {
+                var sourceCount = _lyricListView.Source?.Count ?? 0;
+                if (targetListItemIdx >= 0 && targetListItemIdx < sourceCount)
+                {
+                    try
+                    {
+                        if (_lyricListView.SelectedItem != targetListItemIdx)
+                        {
+                            _lyricListView.SelectedItem = targetListItemIdx;
+                        }
+                        int viewH = _lyricListView.Viewport.Height;
+                        if (viewH > 0)
+                        {
+                            int targetTop = Math.Max(0, targetListItemIdx - (viewH / 2));
+                            if (_lyricListView.Viewport.Y != targetTop)
+                            {
+                                _lyricListView.Viewport = new Rectangle(
+                                    _lyricListView.Viewport.X,
+                                    targetTop,
+                                    _lyricListView.Viewport.Width,
+                                    _lyricListView.Viewport.Height
+                                );
+                            }
+                        }
+                        _lyricScrollBar?.UpdateMetrics(sourceCount, _lyricListView.Viewport.Height, _lyricListView.Viewport.Y);
+                    }
+                    catch { }
+                }
+            }
         }
     }
 
@@ -480,11 +517,13 @@ public sealed partial class MainWindow
                 _controlBar?.UpdateStatus($"[歌词] 已自动匹配在线{reason}: {bestMatch.Title} - {bestMatch.Artist}");
             });
 
-            // 回填匹配曲目的 AlbumMid
+            // 回填匹配曲目的 AlbumMid 并向 Connect 客户端广播状态
             if (!string.IsNullOrWhiteSpace(bestMatch.AlbumMid))
             {
                 song.AlbumMid = bestMatch.AlbumMid;
+                BroadcastConnectPlayerState();
             }
+            BroadcastConnectLyrics();
 
             // 若当前无有效封面且匹配曲目拥有 AlbumMid，自动拉取超清封面并广播
             if (string.IsNullOrEmpty(_currentCoverFilePath) && !string.IsNullOrWhiteSpace(bestMatch.AlbumMid))
@@ -501,6 +540,7 @@ public sealed partial class MainWindow
                             Application.Invoke(() =>
                             {
                                 _nowPlayingView.UpdateCover(cov);
+                                BroadcastConnectPlayerState();
                             });
                         }
                     }
@@ -612,6 +652,7 @@ public sealed partial class MainWindow
                 _controlBar?.UpdateTranslationAvailability(hasTrans);
                 _controlBar?.UpdateStatus($"[歌词] 已撤销在线匹配，恢复内嵌原始歌词 ({restoredLyrics.Count} 行)");
             });
+            BroadcastConnectLyrics();
             return;
         }
 
@@ -637,6 +678,7 @@ public sealed partial class MainWindow
             if (!string.IsNullOrWhiteSpace(bestMatch.AlbumMid))
             {
                 song.AlbumMid = bestMatch.AlbumMid;
+                BroadcastConnectPlayerState();
             }
 
             SaveMatchedLrcToDisk(song, _currentPlayUrl, onlineLyrics);
@@ -661,6 +703,7 @@ public sealed partial class MainWindow
 
                 _controlBar?.UpdateStatus($"[歌词] 匹配成功: {bestMatch.Title} - {bestMatch.Artist}，再次按 Y 可撤销");
             });
+            BroadcastConnectLyrics();
         }
         catch (Exception ex)
         {

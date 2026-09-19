@@ -167,6 +167,7 @@ public sealed partial class MainWindow : Window
 
         _mprisService = new SystemMediaSessionService();
         SetupMprisService();
+        SetupConnectService();
 
         Task.Run(async () =>
         {
@@ -353,7 +354,8 @@ public sealed partial class MainWindow : Window
             "收藏专辑",
             "最近播放",
             "本地音乐",
-            "WebDAV"
+            "WebDAV",
+            "远程控制"
         });
         _sidebarFrame.Add(_sidebarList);
         _sidebarFrame.MouseEvent += (s, m) =>
@@ -516,6 +518,10 @@ public sealed partial class MainWindow : Window
                 _isViewingAlbumsList = false;
                 _currentDrilldownAlbum = null;
                 await LoadWebDavMusicAsync();
+            }
+            else if (idx == 9)
+            {
+                ShowConnectDialog();
             }
             _songListView.SetFocusToList();
             Application.Invoke(UpdateFrameBorderHighlights);
