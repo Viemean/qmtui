@@ -152,9 +152,8 @@ public sealed partial class MusicApi
         var sizeByTier = new Dictionary<AudioQualityTier, long>
         {
             [AudioQualityTier.Master] = GetArrayValue(sizeNew, 0),
-            [AudioQualityTier.Premium] = GetArrayValue(sizeNew, 4) > 0 ? GetArrayValue(sizeNew, 4) : GetArrayValue(sizeNew, 1),
-            [AudioQualityTier.Atmos51] = GetArrayValue(sizeNew, 1) > 0 ? GetArrayValue(sizeNew, 1) : GetArrayValue(sizeNew, 2),
-            [AudioQualityTier.Atmos71] = GetArrayValue(sizeNew, 2) > 0 ? GetArrayValue(sizeNew, 2) : GetArrayValue(sizeNew, 3),
+            [AudioQualityTier.Premium] = GetArrayValue(sizeNew, 1),
+            [AudioQualityTier.Atmos] = GetArrayValue(sizeNew, 2),
             [AudioQualityTier.Dolby] = sizeDolby,
             [AudioQualityTier.HiRes] = hiResSize,
             [AudioQualityTier.SQ] = flacSize,

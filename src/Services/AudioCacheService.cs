@@ -163,7 +163,7 @@ public static class AudioCacheService
     /// <summary>
     /// 双轨制跨音质收敛：当落盘成功时，自动清理同曲目同轨道内的低阶历史旧缓存
     /// - 立体声轨道：Master > HiRes > SQ > HQ > Standard
-    /// - 全景声轨道：Atmos71 > Atmos51 / Dolby > Premium
+    /// - 全景声轨道：Atmos / Dolby > Premium
     /// </summary>
     internal static void DeduplicateLowerQualities(string songMid, AudioQualityTier currentTier)
     {
@@ -228,8 +228,7 @@ public static class AudioCacheService
 
     internal static int GetSpatialRank(AudioQualityTier tier) => tier switch
     {
-        AudioQualityTier.Atmos71 => 3,
-        AudioQualityTier.Atmos51 => 2,
+        AudioQualityTier.Atmos => 2,
         AudioQualityTier.Dolby => 2,
         AudioQualityTier.Premium => 1,
         _ => 0

@@ -10,8 +10,7 @@ public enum AudioQualityTier
     Standard = 3,
     Master = 4,
     Premium = 5,
-    Atmos51 = 6,
-    Atmos71 = 7,
+    Atmos = 6,
     Dolby = 8
 }
 
@@ -21,8 +20,7 @@ public static class AudioQualityHelper
     {
         AudioQualityTier.Master => "母带",
         AudioQualityTier.Premium => "臻品",
-        AudioQualityTier.Atmos51 => "5.1",
-        AudioQualityTier.Atmos71 => "7.1",
+        AudioQualityTier.Atmos => "全景声",
         AudioQualityTier.Dolby => "杜比",
         AudioQualityTier.HiRes => "Hi-Res",
         AudioQualityTier.SQ => "SQ",
@@ -35,8 +33,7 @@ public static class AudioQualityHelper
     {
         AudioQualityTier.Master => "AI00",
         AudioQualityTier.Premium => "Q000",
-        AudioQualityTier.Atmos51 => "Q001",
-        AudioQualityTier.Atmos71 => "Q001",
+        AudioQualityTier.Atmos => "Q001",
         AudioQualityTier.Dolby => "Q000",
         AudioQualityTier.HiRes => "RS01",
         AudioQualityTier.SQ => "F000",
@@ -49,8 +46,7 @@ public static class AudioQualityHelper
     {
         AudioQualityTier.Master => ".flac",
         AudioQualityTier.Premium => ".flac",
-        AudioQualityTier.Atmos51 => ".flac",
-        AudioQualityTier.Atmos71 => ".flac",
+        AudioQualityTier.Atmos => ".flac",
         AudioQualityTier.Dolby => ".flac",
         AudioQualityTier.HiRes => ".flac",
         AudioQualityTier.SQ => ".flac",
@@ -63,8 +59,7 @@ public static class AudioQualityHelper
     [
         ("req_master", AudioQualityTier.Master, "AI00", ".flac"),
         ("req_premium", AudioQualityTier.Premium, "Q000", ".flac"),
-        ("req_atmos51", AudioQualityTier.Atmos51, "Q001", ".flac"),
-        ("req_atmos71", AudioQualityTier.Atmos71, "Q001", ".flac"),
+        ("req_atmos", AudioQualityTier.Atmos, "Q001", ".flac"),
         ("req_dolby", AudioQualityTier.Dolby, "Q000", ".flac"),
         ("req_hires", AudioQualityTier.HiRes, "RS01", ".flac"),
         ("req_sq", AudioQualityTier.SQ, "F000", ".flac"),
@@ -76,8 +71,7 @@ public static class AudioQualityHelper
     {
         AudioQualityTier.Master => "24bit / 192kHz",
         AudioQualityTier.Premium => "臻品音质",
-        AudioQualityTier.Atmos51 => "5.1 声道",
-        AudioQualityTier.Atmos71 => "7.1 全景声",
+        AudioQualityTier.Atmos => "5.1 环绕声",
         AudioQualityTier.Dolby => "Dolby Atmos",
         AudioQualityTier.HiRes => "24bit / 96kHz",
         AudioQualityTier.SQ => "16bit / 44.1kHz",
@@ -90,9 +84,8 @@ public static class AudioQualityHelper
     {
         if (string.IsNullOrEmpty(name)) return AudioQualityTier.SQ;
         if (name.Contains("母带", StringComparison.OrdinalIgnoreCase) || name.Contains("Master", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Master;
-        if (name.Contains("5.1", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Atmos51;
-        if (name.Contains("7.1", StringComparison.OrdinalIgnoreCase) || name.Contains("全景声", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Atmos71;
         if (name.Contains("杜比", StringComparison.OrdinalIgnoreCase) || name.Contains("Dolby", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Dolby;
+        if (name.Contains("全景声", StringComparison.OrdinalIgnoreCase) || name.Contains("Atmos", StringComparison.OrdinalIgnoreCase) || name.Contains("5.1", StringComparison.OrdinalIgnoreCase) || name.Contains("7.1", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Atmos;
         if (name.Contains("臻品", StringComparison.OrdinalIgnoreCase) || name.Contains("Premium", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Premium;
         if (name.Contains("Hi-Res", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.HiRes;
         if (name.Contains("SQ", StringComparison.OrdinalIgnoreCase) || name.Contains("flac", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.SQ;
@@ -145,8 +138,7 @@ public static class AudioQualityHelper
     [
         AudioQualityTier.Master,
         AudioQualityTier.Premium,
-        AudioQualityTier.Atmos51,
-        AudioQualityTier.Atmos71,
+        AudioQualityTier.Atmos,
         AudioQualityTier.Dolby,
         AudioQualityTier.HiRes,
         AudioQualityTier.SQ,
@@ -166,7 +158,7 @@ public static class AudioQualityHelper
     public static IReadOnlyList<AudioQualityTier> GetFallbackTiers(AudioQualityTier tier) => tier switch
     {
         AudioQualityTier.Master => [AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
-        AudioQualityTier.Premium or AudioQualityTier.Atmos51 or AudioQualityTier.Atmos71 or AudioQualityTier.Dolby =>
+        AudioQualityTier.Premium or AudioQualityTier.Atmos or AudioQualityTier.Dolby =>
             [AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
         AudioQualityTier.HiRes => [AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
         AudioQualityTier.SQ => [AudioQualityTier.HQ, AudioQualityTier.Standard],
@@ -178,8 +170,7 @@ public static class AudioQualityHelper
     {
         AudioQualityTier.Master => "臻品母带",
         AudioQualityTier.Premium => "臻品音质",
-        AudioQualityTier.Atmos51 => "臻品全景声 5.1",
-        AudioQualityTier.Atmos71 => "臻品全景声 7.1",
+        AudioQualityTier.Atmos => "臻品全景声",
         AudioQualityTier.Dolby => "杜比全景声",
         AudioQualityTier.HiRes => "Hi-Res",
         AudioQualityTier.SQ => "SQ 无损",

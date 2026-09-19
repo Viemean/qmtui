@@ -43,10 +43,7 @@ public class AudioCacheDeduplicationTests
     }
 
     [Theory]
-    [InlineData(AudioQualityTier.Atmos71, AudioQualityTier.Atmos51, true)]
-    [InlineData(AudioQualityTier.Atmos71, AudioQualityTier.Dolby, true)]
-    [InlineData(AudioQualityTier.Atmos71, AudioQualityTier.Premium, true)]
-    [InlineData(AudioQualityTier.Atmos51, AudioQualityTier.Premium, true)]
+    [InlineData(AudioQualityTier.Atmos, AudioQualityTier.Premium, true)]
     [InlineData(AudioQualityTier.Dolby, AudioQualityTier.Premium, true)]
     public void ShouldPrune_SpatialTrack_HigherQualityShouldPruneLowerQuality(
         AudioQualityTier currentTier, AudioQualityTier cachedTier, bool expected)
@@ -56,16 +53,12 @@ public class AudioCacheDeduplicationTests
 
     [Theory]
     [InlineData(AudioQualityTier.Premium, AudioQualityTier.Premium, false)]
-    [InlineData(AudioQualityTier.Premium, AudioQualityTier.Atmos51, false)]
+    [InlineData(AudioQualityTier.Premium, AudioQualityTier.Atmos, false)]
     [InlineData(AudioQualityTier.Premium, AudioQualityTier.Dolby, false)]
-    [InlineData(AudioQualityTier.Premium, AudioQualityTier.Atmos71, false)]
-    [InlineData(AudioQualityTier.Atmos51, AudioQualityTier.Atmos51, false)]
-    [InlineData(AudioQualityTier.Atmos51, AudioQualityTier.Dolby, false)]
-    [InlineData(AudioQualityTier.Dolby, AudioQualityTier.Atmos51, false)]
+    [InlineData(AudioQualityTier.Atmos, AudioQualityTier.Atmos, false)]
+    [InlineData(AudioQualityTier.Atmos, AudioQualityTier.Dolby, false)]
+    [InlineData(AudioQualityTier.Dolby, AudioQualityTier.Atmos, false)]
     [InlineData(AudioQualityTier.Dolby, AudioQualityTier.Dolby, false)]
-    [InlineData(AudioQualityTier.Atmos51, AudioQualityTier.Atmos71, false)]
-    [InlineData(AudioQualityTier.Dolby, AudioQualityTier.Atmos71, false)]
-    [InlineData(AudioQualityTier.Atmos71, AudioQualityTier.Atmos71, false)]
     public void ShouldPrune_SpatialTrack_LowerOrEqualShouldNotPrune(
         AudioQualityTier currentTier, AudioQualityTier cachedTier, bool expected)
     {
@@ -73,14 +66,14 @@ public class AudioCacheDeduplicationTests
     }
 
     [Theory]
-    [InlineData(AudioQualityTier.Master, AudioQualityTier.Atmos71, false)]
+    [InlineData(AudioQualityTier.Master, AudioQualityTier.Atmos, false)]
     [InlineData(AudioQualityTier.Master, AudioQualityTier.Dolby, false)]
     [InlineData(AudioQualityTier.HiRes, AudioQualityTier.Premium, false)]
-    [InlineData(AudioQualityTier.SQ, AudioQualityTier.Atmos51, false)]
+    [InlineData(AudioQualityTier.SQ, AudioQualityTier.Atmos, false)]
     [InlineData(AudioQualityTier.Standard, AudioQualityTier.Premium, false)]
-    [InlineData(AudioQualityTier.Atmos71, AudioQualityTier.Master, false)]
-    [InlineData(AudioQualityTier.Atmos71, AudioQualityTier.HiRes, false)]
-    [InlineData(AudioQualityTier.Atmos71, AudioQualityTier.SQ, false)]
+    [InlineData(AudioQualityTier.Atmos, AudioQualityTier.Master, false)]
+    [InlineData(AudioQualityTier.Atmos, AudioQualityTier.HiRes, false)]
+    [InlineData(AudioQualityTier.Atmos, AudioQualityTier.SQ, false)]
     [InlineData(AudioQualityTier.Dolby, AudioQualityTier.HQ, false)]
     [InlineData(AudioQualityTier.Premium, AudioQualityTier.Standard, false)]
     public void ShouldPrune_CrossTrack_ShouldNeverPrune(
