@@ -233,4 +233,23 @@ public class AudioQualityFallbackTests
         Assert.True(sqOpt.Available); // SQ 正常可用
         Assert.Equal("https://isure.stream.qqmusic.qq.com/F000001ToGjY158HHH.flac?vkey=test", sqOpt.PlayUrl);
     }
+
+    [Fact]
+    public async Task ProbeSongQualitiesAsync_MousouKanshouDaishouRenmei_ResolvesCorrectHiResSize()
+    {
+        UserSession.Load();
+        var options = await QmTui.Api.MusicApi.ProbeSongQualitiesAsync("000qiToY03CMRk", "001BZWuO0EAbYH");
+        var hiRes = options.FirstOrDefault(o => o.Tier == AudioQualityTier.HiRes);
+        var sq = options.FirstOrDefault(o => o.Tier == AudioQualityTier.SQ);
+
+        Assert.NotNull(sq);
+        Assert.True(sq.FileSizeBytes > 50_000_000); // SQ 约 61.8MB
+
+        if (hiRes != null && hiRes.Available)
+        {
+            Assert.True(hiRes.FileSizeBytes > sq.FileSizeBytes);
+            Assert.Equal("95.5MB", QualityOption.FormatFileSize(hiRes.FileSizeBytes));
+            Assert.Contains("2968kbps", hiRes.BitrateInfo);
+        }
+    }
 }

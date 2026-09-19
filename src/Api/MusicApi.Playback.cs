@@ -82,6 +82,8 @@ public sealed partial class MusicApi
                 }
             }
 
+            await CorrectQualitySizesAsync(options, doc.RootElement, ct).ConfigureAwait(false);
+
             return options;
         }
         catch (Exception ex)
@@ -251,6 +253,67 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
+
+    private static async Task CorrectQualitySizesAsync(List<QualityOption> options, JsonElement root, CancellationToken ct)
+    {
+        long interval = 0;
+        long flacSize = 0;
+        if (root.TryGetProperty("songinfo", out var si) &&
+            si.TryGetProperty("data", out var sd) &&
+            sd.TryGetProperty("track_info", out var ti))
+        {
+            if (ti.TryGetProperty("interval", out var iv)) iv.TryGetInt64(out interval);
+            if (ti.TryGetProperty("file", out var fi) && fi.TryGetProperty("size_flac", out var sf)) sf.TryGetInt64(out flacSize);
+        }
+
+        for (int i = 0; i < options.Count; i++)
+        {
+            var opt = options[i];
+            if (!opt.Available || string.IsNullOrEmpty(opt.PlayUrl)) continue;
+
+            bool needsCorrection = (opt.Tier == AudioQualityTier.HiRes && (opt.FileSizeBytes <= 0 || (flacSize > 0 && opt.FileSizeBytes <= flacSize)))
+                                   || opt.FileSizeBytes <= 0;
+
+            if (needsCorrection)
+            {
+                var realSize = await TryFetchContentLengthAsync(opt.PlayUrl, ct).ConfigureAwait(false);
+                if (realSize > 0)
+                {
+                    var bitrate = opt.BitrateInfo;
+                    if (interval > 0)
+                    {
+                        bitrate = $"{(long)Math.Round((realSize * 8.0) / interval / 1000.0)}kbps";
+                    }
+                    options[i] = opt with
+                    {
+                        FileSizeBytes = realSize,
+                        BitrateInfo = bitrate
+                    };
+                }
+            }
+        }
+    }
+
+    private static async Task<long> TryFetchContentLengthAsync(string url, CancellationToken ct)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Head, url);
+            req.Headers.TryAddWithoutValidation("Referer", "https://y.qq.com/");
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
+            using var resp = await s_httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
+            if (resp.IsSuccessStatusCode && resp.Content.Headers.ContentLength is { } cl && cl > 0)
+            {
+                return cl;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MusicApi", $"Failed to fetch Content-Length for {url}: {ex.Message}");
+        }
+        return 0;
+    }
     /// 根据用户指定或偏好的音质获取直链，支持智能梯度回退
     /// </summary>
     public static async Task<(string? Url, string Quality, AudioQualityTier Tier)> GetPlayUrlForTierAsync(string songMid, string mediaMid = "", AudioQualityTier preferred = AudioQualityTier.SQ, CancellationToken ct = default)
