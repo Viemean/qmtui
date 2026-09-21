@@ -22,10 +22,14 @@
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tui/**;tests/**;experimental/**;old/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tui/**;tests/**;experimental/**;old/**;**/*.raw.cs</DefaultItemExcludes>
     <InvariantGlobalization>true</InvariantGlobalization>
     <LinkerFlavor Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">lld</LinkerFlavor>
   </PropertyGroup>
+
+  <Target Name="SyncAcousticPipeline" BeforeTargets="BeforeBuild" Condition="Exists('src/Services/AudioRecognition/AcousticFingerprintExtractor.raw.cs')">
+    <Exec Command="python3 .bin/codegen_acoustic.py" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Terminal.Gui" Version="2.4.17" />
