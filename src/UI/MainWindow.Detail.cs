@@ -167,6 +167,37 @@ public sealed partial class MainWindow
                 }
             }
 
+            if (UserSession.Current.IsLoggedIn && detail != null && !string.IsNullOrEmpty(detail.Mid))
+            {
+                var targetMid = detail.Mid;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var onlineFav = await MusicApi.CheckSingerFollowStatusAsync(targetMid);
+                        bool localFav = UserSession.Current.FavoriteSingers.Contains(targetMid);
+                        if (onlineFav != localFav)
+                        {
+                            if (onlineFav) UserSession.Current.FavoriteSingers.Add(targetMid);
+                            else UserSession.Current.FavoriteSingers.Remove(targetMid);
+                            UserSession.Current.Save();
+
+                            Application.Invoke(() =>
+                            {
+                                if (_currentSingerMid == targetMid)
+                                {
+                                    UpdateTopContextButtons();
+                                }
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Error("MainWindow", $"Check singer follow status failed for {targetMid}", ex);
+                    }
+                });
+            }
+
             Application.Invoke(() =>
             {
                 try
@@ -315,22 +346,54 @@ public sealed partial class MainWindow
             return Task.CompletedTask;
         }
 
-        bool isFav = UserSession.Current.FavoriteSingers.Contains(_currentSingerMid);
-        if (isFav)
+        var mid = _currentSingerMid;
+        var name = _currentSingerName;
+        bool isFav = UserSession.Current.FavoriteSingers.Contains(mid);
+        bool willFollow = !isFav;
+
+        if (willFollow)
         {
-            UserSession.Current.FavoriteSingers.Remove(_currentSingerMid);
-            UserSession.Current.Save();
-            _artistAlbumDetailView.UpdateSingerActions(_singerSubMode, _singerSongOrder, false);
-            UpdateTopContextButtons();
-            _controlBar.UpdateStatus($"[已取消关注] 已取消关注歌手【{_currentSingerName}】");
+            UserSession.Current.FavoriteSingers.Add(mid);
+            _controlBar.UpdateStatus($"[已关注] 成功关注歌手【{name}】");
         }
         else
         {
-            UserSession.Current.FavoriteSingers.Add(_currentSingerMid);
-            UserSession.Current.Save();
-            _artistAlbumDetailView.UpdateSingerActions(_singerSubMode, _singerSongOrder, true);
-            UpdateTopContextButtons();
-            _controlBar.UpdateStatus($"[已关注] 成功关注歌手【{_currentSingerName}】");
+            UserSession.Current.FavoriteSingers.Remove(mid);
+            _controlBar.UpdateStatus($"[已取消关注] 已取消关注歌手【{name}】");
+        }
+        UserSession.Current.Save();
+
+        _artistAlbumDetailView.UpdateSingerActions(_singerSubMode, _singerSongOrder, willFollow);
+        UpdateTopContextButtons();
+
+        if (UserSession.Current.IsLoggedIn)
+        {
+            _ = Task.Run(async () =>
+            {
+                var ok = await MusicApi.ToggleSingerFollowAsync(mid, willFollow);
+                if (!ok)
+                {
+                    Application.Invoke(() =>
+                    {
+                        if (willFollow)
+                        {
+                            UserSession.Current.FavoriteSingers.Remove(mid);
+                        }
+                        else
+                        {
+                            UserSession.Current.FavoriteSingers.Add(mid);
+                        }
+                        UserSession.Current.Save();
+
+                        if (_currentSingerMid == mid)
+                        {
+                            _artistAlbumDetailView.UpdateSingerActions(_singerSubMode, _singerSongOrder, !willFollow);
+                            UpdateTopContextButtons();
+                        }
+                        _controlBar.UpdateStatus($"[关注同步失败] 云端上报失败，已恢复状态");
+                    });
+                }
+            });
         }
 
         return Task.CompletedTask;
