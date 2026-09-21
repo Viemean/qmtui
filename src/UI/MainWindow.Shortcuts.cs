@@ -282,46 +282,24 @@ public sealed partial class MainWindow
 
             char c = char.ToUpperInvariant((char)k.AsRune.Value);
 
-            if (_currentViewMode == ViewMode.Search && !_isSearchActive && !_searchField.HasFocus && _searchSongsBtn.Visible)
+            if (!_isSearchActive && !_searchField.HasFocus)
             {
-                if (k == Key.D1 || c == '1')
+                if ((k == Key.D1 || c == '1') && _searchSongsBtn.Visible)
                 {
                     k.Handled = true;
-                    await SwitchSearchCategoryAsync(SearchCategory.Songs);
+                    await OnContextAction1Async();
                     return;
                 }
-                if (k == Key.D2 || c == '2')
+                if ((k == Key.D2 || c == '2') && _searchPlaylistsBtn.Visible)
                 {
                     k.Handled = true;
-                    await SwitchSearchCategoryAsync(SearchCategory.Playlists);
+                    await OnContextAction2Async();
                     return;
                 }
-                if (k == Key.D3 || c == '3')
+                if ((k == Key.D3 || c == '3') && _searchAlbumsBtn.Visible)
                 {
                     k.Handled = true;
-                    await SwitchSearchCategoryAsync(SearchCategory.Albums);
-                    return;
-                }
-            }
-
-            if (_currentViewMode == ViewMode.ArtistDetail && !_isSearchActive)
-            {
-                if (k == Key.D1 || c == '1')
-                {
-                    k.Handled = true;
-                    await ToggleSingerSubModeAsync();
-                    return;
-                }
-                if (k == Key.D2 || c == '2')
-                {
-                    k.Handled = true;
-                    await ToggleSingerSongOrderAsync();
-                    return;
-                }
-                if (k == Key.D3 || c == '3')
-                {
-                    k.Handled = true;
-                    await ToggleSingerFavoriteAsync();
+                    await OnContextAction3Async();
                     return;
                 }
             }

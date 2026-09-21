@@ -131,6 +131,7 @@ public sealed partial class MainWindow
         {
             PushCurrentNavigationSnapshot();
             _currentViewMode = ViewMode.ArtistDetail;
+            UpdateTopContextButtons();
 
             _singerSubMode = SingerSubMode.Songs;
             _singerSongOrder = 1;
@@ -186,6 +187,7 @@ public sealed partial class MainWindow
                     bool isFav = !string.IsNullOrEmpty(detail.Mid) && UserSession.Current.FavoriteSingers.Contains(detail.Mid);
                     _artistAlbumDetailView.SetArtist(detail, coverPath, isFav, _singerSubMode, _singerSongOrder);
                     _artistAlbumDetailView.OnActivated();
+                    UpdateTopContextButtons();
 
                     var title = $"歌手: {detail.Name} - 热门作品 (共 {detail.Songs.Count} 首" +
                         (_hasMoreSingerSongs ? "，向下滚动加载更多" : "，已全部加载") + "，按 Esc 返回)";
@@ -231,6 +233,7 @@ public sealed partial class MainWindow
             {
                 bool isFav = !string.IsNullOrEmpty(_currentSingerMid) && UserSession.Current.FavoriteSingers.Contains(_currentSingerMid);
                 _artistAlbumDetailView.UpdateSingerActions(_singerSubMode, _singerSongOrder, isFav);
+                UpdateTopContextButtons();
                 RenderSingerAlbumsView(0);
             });
         }
@@ -246,6 +249,7 @@ public sealed partial class MainWindow
                     _artistAlbumDetailView.SetArtist(_currentSingerDetail, _currentSingerCoverPath, isFav, _singerSubMode, _singerSongOrder);
                     _artistAlbumDetailView.OnActivated();
                 }
+                UpdateTopContextButtons();
 
                 var orderText = _singerSongOrder == 1 ? "热门" : "最新";
                 var title = $"歌手: {_currentSingerName} - {orderText}作品 (共 {_singerCachedSongs.Count} 首" +
@@ -289,6 +293,7 @@ public sealed partial class MainWindow
                 _artistAlbumDetailView.UpdateSingerActions(_singerSubMode, _singerSongOrder, isFav);
                 _artistAlbumDetailView.OnActivated();
             }
+            UpdateTopContextButtons();
 
             var title = $"歌手: {_currentSingerName} - {orderText}作品 (共 {songs.Count} 首" +
                 (_hasMoreSingerSongs ? "，向下滚动加载更多" : "，已全部加载") + "，按 Esc 返回)";
@@ -316,6 +321,7 @@ public sealed partial class MainWindow
             UserSession.Current.FavoriteSingers.Remove(_currentSingerMid);
             UserSession.Current.Save();
             _artistAlbumDetailView.UpdateSingerActions(_singerSubMode, _singerSongOrder, false);
+            UpdateTopContextButtons();
             _controlBar.UpdateStatus($"[已取消关注] 已取消关注歌手【{_currentSingerName}】");
         }
         else
@@ -323,6 +329,7 @@ public sealed partial class MainWindow
             UserSession.Current.FavoriteSingers.Add(_currentSingerMid);
             UserSession.Current.Save();
             _artistAlbumDetailView.UpdateSingerActions(_singerSubMode, _singerSongOrder, true);
+            UpdateTopContextButtons();
             _controlBar.UpdateStatus($"[已关注] 成功关注歌手【{_currentSingerName}】");
         }
 
@@ -680,6 +687,7 @@ public sealed partial class MainWindow
                 _songListView.SetFocusToList();
             }
 
+            UpdateTopContextButtons();
             SetNeedsDraw();
             return;
         }
@@ -693,6 +701,7 @@ public sealed partial class MainWindow
         _songListView.SetFocusToList();
 
         ShowLyricView();
+        UpdateTopContextButtons();
         SetNeedsDraw();
     }
 

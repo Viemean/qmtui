@@ -289,7 +289,7 @@ public sealed partial class MainWindow : Window
             TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop
         };
         _searchSongsBtn.KeyBindings.Remove(Key.Space);
-        _searchSongsBtn.Accepting += async (s, e) => await SwitchSearchCategoryAsync(SearchCategory.Songs);
+        _searchSongsBtn.Accepting += async (s, e) => await OnContextAction1Async();
         Add(_searchSongsBtn);
 
         _searchPlaylistsBtn = new Button
@@ -304,7 +304,7 @@ public sealed partial class MainWindow : Window
             TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop
         };
         _searchPlaylistsBtn.KeyBindings.Remove(Key.Space);
-        _searchPlaylistsBtn.Accepting += async (s, e) => await SwitchSearchCategoryAsync(SearchCategory.Playlists);
+        _searchPlaylistsBtn.Accepting += async (s, e) => await OnContextAction2Async();
         Add(_searchPlaylistsBtn);
 
         _searchAlbumsBtn = new Button
@@ -319,7 +319,7 @@ public sealed partial class MainWindow : Window
             TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop
         };
         _searchAlbumsBtn.KeyBindings.Remove(Key.Space);
-        _searchAlbumsBtn.Accepting += async (s, e) => await SwitchSearchCategoryAsync(SearchCategory.Albums);
+        _searchAlbumsBtn.Accepting += async (s, e) => await OnContextAction3Async();
         Add(_searchAlbumsBtn);
 
         // 初始化顶部按钮的独立防重叠自适应布局
@@ -845,9 +845,6 @@ public sealed partial class MainWindow : Window
         };
         _artistAlbumDetailView.Clicked += () => SetFocusToWindow(2);
         _artistAlbumDetailView.TabNavigationRequested += forward => SwitchNextFocusWindow(forward);
-        _artistAlbumDetailView.SubModeRequested += () => _ = ToggleSingerSubModeAsync();
-        _artistAlbumDetailView.OrderRequested += () => _ = ToggleSingerSongOrderAsync();
-        _artistAlbumDetailView.FavoriteRequested += () => _ = ToggleSingerFavoriteAsync();
         _lyricFrame.Add(_artistAlbumDetailView);
 
         Add(_lyricFrame);
@@ -1504,40 +1501,143 @@ public sealed partial class MainWindow : Window
         int recAnchorOffset = userAnchorOffset + 2 + recBtnWidth;
         _recognizeBtn.X = Pos.AnchorEnd(recAnchorOffset);
 
-        // 4. [1单曲] [2歌单] [3专辑] 分类按钮总宽度与间距 (共约 26 列)
-        // 仅当分类按钮可见时为按钮留出 26 列，否则搜索框直接填满至功能按钮区
-        bool showCategoryButtons = _searchSongsBtn?.Visible == true;
-        int categoryOffset = showCategoryButtons ? 26 : 2;
+        // 4. 上下文操作按钮动态布局（[1...] [2...] [3...]）
+        int contextButtonsWidth = 0;
+        if (_searchSongsBtn?.Visible == true)
+        {
+            contextButtonsWidth += GetVisualWidth(_searchSongsBtn.Text.ToString()) + 1;
+        }
+        if (_searchPlaylistsBtn?.Visible == true)
+        {
+            contextButtonsWidth += GetVisualWidth(_searchPlaylistsBtn.Text.ToString()) + 1;
+        }
+        if (_searchAlbumsBtn?.Visible == true)
+        {
+            contextButtonsWidth += GetVisualWidth(_searchAlbumsBtn.Text.ToString()) + 1;
+        }
+
+        int categoryOffset = contextButtonsWidth > 0 ? contextButtonsWidth + 2 : 2;
         _searchField.Width = Dim.Fill(recAnchorOffset + categoryOffset);
 
-        if (showCategoryButtons)
+        Pos currentX = Pos.Right(_searchField) + 1;
+        if (_searchSongsBtn?.Visible == true)
         {
-            UpdateSearchCategoryButtons();
+            _searchSongsBtn.X = currentX;
+            currentX = Pos.Right(_searchSongsBtn) + 1;
+        }
+        if (_searchPlaylistsBtn?.Visible == true)
+        {
+            _searchPlaylistsBtn.X = currentX;
+            currentX = Pos.Right(_searchPlaylistsBtn) + 1;
+        }
+        if (_searchAlbumsBtn?.Visible == true)
+        {
+            _searchAlbumsBtn.X = currentX;
         }
 
         SetNeedsLayout();
     }
 
-    internal void UpdateSearchCategoryVisibility(bool visible)
+    private async Task OnContextAction1Async()
     {
-        if (_searchSongsBtn == null || _searchPlaylistsBtn == null || _searchAlbumsBtn == null) return;
+        if (_currentViewMode == ViewMode.Search)
+        {
+            await SwitchSearchCategoryAsync(SearchCategory.Songs);
+        }
+        else if (_currentViewMode == ViewMode.ArtistDetail)
+        {
+            await ToggleSingerSubModeAsync();
+        }
+    }
 
-        bool shouldShow = visible && _currentViewMode == ViewMode.Search && !_isImmersiveMode && !_isNowPlayingViewActive && !_isAodMode;
+    private async Task OnContextAction2Async()
+    {
+        if (_currentViewMode == ViewMode.Search)
+        {
+            await SwitchSearchCategoryAsync(SearchCategory.Playlists);
+        }
+        else if (_currentViewMode == ViewMode.ArtistDetail)
+        {
+            await ToggleSingerSongOrderAsync();
+        }
+    }
 
-        _searchSongsBtn.Visible = shouldShow;
-        _searchPlaylistsBtn.Visible = shouldShow;
-        _searchAlbumsBtn.Visible = shouldShow;
+    private async Task OnContextAction3Async()
+    {
+        if (_currentViewMode == ViewMode.Search)
+        {
+            await SwitchSearchCategoryAsync(SearchCategory.Albums);
+        }
+        else if (_currentViewMode == ViewMode.ArtistDetail)
+        {
+            await ToggleSingerFavoriteAsync();
+        }
+    }
 
-        UpdateTopRightButtonsLayout();
+    internal void UpdateSearchCategoryVisibility(bool visible = true)
+    {
+        _ = visible;
+        UpdateTopContextButtons();
     }
 
     internal void UpdateSearchCategoryButtons()
     {
+        UpdateTopContextButtons();
+    }
+
+    internal void UpdateTopContextButtons()
+    {
         if (_searchSongsBtn == null || _searchPlaylistsBtn == null || _searchAlbumsBtn == null) return;
 
-        _searchSongsBtn.SetScheme(_searchCategory == SearchCategory.Songs ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
-        _searchPlaylistsBtn.SetScheme(_searchCategory == SearchCategory.Playlists ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
-        _searchAlbumsBtn.SetScheme(_searchCategory == SearchCategory.Albums ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+        if (_isImmersiveMode || _isNowPlayingViewActive || _isAodMode)
+        {
+            _searchSongsBtn.Visible = false;
+            _searchPlaylistsBtn.Visible = false;
+            _searchAlbumsBtn.Visible = false;
+            UpdateTopRightButtonsLayout();
+            return;
+        }
+
+        switch (_currentViewMode)
+        {
+            case ViewMode.Search:
+                _searchSongsBtn.Text = "[1单曲]";
+                _searchPlaylistsBtn.Text = "[2歌单]";
+                _searchAlbumsBtn.Text = "[3专辑]";
+
+                _searchSongsBtn.Visible = true;
+                _searchPlaylistsBtn.Visible = true;
+                _searchAlbumsBtn.Visible = true;
+
+                _searchSongsBtn.SetScheme(_searchCategory == SearchCategory.Songs ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+                _searchPlaylistsBtn.SetScheme(_searchCategory == SearchCategory.Playlists ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+                _searchAlbumsBtn.SetScheme(_searchCategory == SearchCategory.Albums ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+                break;
+
+            case ViewMode.ArtistDetail:
+                _searchSongsBtn.Text = _singerSubMode == SingerSubMode.Songs ? "[1专辑]" : "[1歌曲]";
+                _searchPlaylistsBtn.Text = _singerSongOrder == 1 ? "[2最新]" : "[2热门]";
+
+                bool isSingerFav = !string.IsNullOrEmpty(_currentSingerMid) && UserSession.Current.FavoriteSingers.Contains(_currentSingerMid);
+                _searchAlbumsBtn.Text = isSingerFav ? "[3已关注]" : "[3关注]";
+
+                _searchSongsBtn.Visible = true;
+                _searchPlaylistsBtn.Visible = _singerSubMode == SingerSubMode.Songs;
+                _searchAlbumsBtn.Visible = true;
+
+                _searchSongsBtn.SetScheme(MikuTheme.SearchCategoryDim);
+                _searchPlaylistsBtn.SetScheme(MikuTheme.SearchCategoryDim);
+                _searchAlbumsBtn.SetScheme(isSingerFav ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+                break;
+
+            default:
+                _searchSongsBtn.Visible = false;
+                _searchPlaylistsBtn.Visible = false;
+                _searchAlbumsBtn.Visible = false;
+                break;
+        }
+
+        UpdateTopRightButtonsLayout();
 
         _searchSongsBtn.SetNeedsDraw();
         _searchPlaylistsBtn.SetNeedsDraw();
