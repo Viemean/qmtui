@@ -654,5 +654,83 @@ public sealed partial class MusicApi
 
         return new AlbumDetail(albumMid, albumName, artistName, publishDate, company, desc, songs);
     }
+
+    public static async Task<List<Album>> SearchAlbumsAsync(string query, int page = 1, int pageSize = 30, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return [];
+
+        try
+        {
+            var escapedQuery = JsonEncodedText.Encode(query).ToString();
+            var payload = $$"""
+            {
+              "music.search.SearchCgiService": {
+                "module": "music.search.SearchCgiService",
+                "method": "DoSearchForQQMusicDesktop",
+                "param": {
+                  "query": "{{escapedQuery}}",
+                  "page_num": {{page}},
+                  "num_per_page": {{pageSize}},
+                  "search_type": 2
+                }
+              }
+            }
+            """;
+
+            var json = await PostAg1Async(payload, ct).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("music.search.SearchCgiService", out var svc) &&
+                svc.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("body", out var body) &&
+                body.TryGetProperty("album", out var albumObj) &&
+                albumObj.TryGetProperty("list", out var albumArray) &&
+                albumArray.ValueKind == JsonValueKind.Array)
+            {
+                var list = new List<Album>(albumArray.GetArrayLength());
+                foreach (var item in albumArray.EnumerateArray())
+                {
+                    string mid = item.TryGetProperty("albumMID", out var amp) ? amp.GetString() ?? "" : "";
+                    if (string.IsNullOrWhiteSpace(mid)) continue;
+
+                    long id = 0;
+                    if (item.TryGetProperty("albumID", out var aip))
+                    {
+                        if (aip.ValueKind == JsonValueKind.Number) id = aip.GetInt64();
+                        else if (aip.ValueKind == JsonValueKind.String && long.TryParse(aip.GetString(), out var parsedId)) id = parsedId;
+                    }
+
+                    string title = item.TryGetProperty("albumName", out var anp) ? anp.GetString() ?? "" : "";
+                    string artist = item.TryGetProperty("singerName", out var snp) ? snp.GetString() ?? "" : "";
+                    if (string.IsNullOrWhiteSpace(artist) && item.TryGetProperty("singer_list", out var slp) && slp.ValueKind == JsonValueKind.Array && slp.GetArrayLength() > 0)
+                    {
+                        var firstSinger = slp[0];
+                        if (firstSinger.TryGetProperty("name", out var fn)) artist = fn.GetString() ?? "";
+                    }
+
+                    string pic = item.TryGetProperty("albumPic", out var app) ? app.GetString() ?? "" : "";
+                    int songCount = item.TryGetProperty("song_count", out var scp) && scp.TryGetInt32(out var sn) ? sn : 0;
+
+                    list.Add(new Album(
+                        Id: id,
+                        Mid: mid,
+                        Title: string.IsNullOrWhiteSpace(title) ? "未命名专辑" : title,
+                        Artist: string.IsNullOrWhiteSpace(artist) ? "未知歌手" : artist,
+                        SongCount: songCount,
+                        CoverUrl: pic
+                    ));
+                }
+                return list;
+            }
+
+            return [];
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MusicApi", $"SearchAlbumsAsync error for '{query}'", ex);
+            return [];
+        }
+    }
 }
 

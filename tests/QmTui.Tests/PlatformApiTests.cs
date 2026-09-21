@@ -445,5 +445,44 @@ public class PlatformApiTests
         Assert.True(detail.Songs.Count > 0);
     }
 
+    [Fact]
+    public async Task SearchPlaylistsAsync_ReturnsResults()
+    {
+        if (!IsOnlineTestEnabled()) return;
+
+        var playlists = await MusicApi.SearchPlaylistsAsync("周杰伦", 1, 50);
+        Assert.NotNull(playlists);
+        Assert.True(playlists.Count >= 40);
+    }
+
+    [Fact]
+    public async Task SearchAlbumsAsync_ReturnsResults()
+    {
+        if (!IsOnlineTestEnabled()) return;
+
+        var albums = await MusicApi.SearchAlbumsAsync("周杰伦", 1, 50);
+        Assert.NotNull(albums);
+        Assert.True(albums.Count >= 40);
+        _output.WriteLine($"搜索专辑成功: 共 {albums.Count} 张，第一条: {albums[0].Title} - {albums[0].Artist}");
+    }
+
+    [Fact]
+    public async Task SearchPaginationAsync_ReturnsNextPageResults()
+    {
+        if (!IsOnlineTestEnabled()) return;
+
+        var p1 = await MusicApi.SearchPlaylistsAsync("周杰伦", 1, 10);
+        var p2 = await MusicApi.SearchPlaylistsAsync("周杰伦", 2, 10);
+        Assert.NotEmpty(p1);
+        Assert.NotEmpty(p2);
+        Assert.NotEqual(p1[0].DirId, p2[0].DirId);
+
+        var a1 = await MusicApi.SearchAlbumsAsync("周杰伦", 1, 10);
+        var a2 = await MusicApi.SearchAlbumsAsync("周杰伦", 2, 10);
+        Assert.NotEmpty(a1);
+        Assert.NotEmpty(a2);
+        Assert.NotEqual(a1[0].Mid, a2[0].Mid);
+    }
+
     #endregion
 }

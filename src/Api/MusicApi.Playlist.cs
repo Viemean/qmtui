@@ -57,7 +57,76 @@ public sealed partial class MusicApi
         }
         catch (Exception ex)
         {
-            AppLogger.Error("Search", $"SearchAsync failed for query '{query}'", ex);
+            AppLogger.Error("MusicApi", $"SearchAsync error for '{query}'", ex);
+            return [];
+        }
+    }
+
+    public static async Task<List<Playlist>> SearchPlaylistsAsync(string query, int page = 1, int pageSize = 30, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return [];
+
+        try
+        {
+            var escapedQuery = JsonEncodedText.Encode(query).ToString();
+            var payload = $$"""
+            {
+              "music.search.SearchCgiService": {
+                "module": "music.search.SearchCgiService",
+                "method": "DoSearchForQQMusicDesktop",
+                "param": {
+                  "query": "{{escapedQuery}}",
+                  "page_num": {{page}},
+                  "num_per_page": {{pageSize}},
+                  "search_type": 3
+                }
+              }
+            }
+            """;
+
+            var json = await PostAg1Async(payload, ct).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("music.search.SearchCgiService", out var svc) &&
+                svc.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("body", out var body) &&
+                body.TryGetProperty("songlist", out var songlistObj) &&
+                songlistObj.TryGetProperty("list", out var songlistArray) &&
+                songlistArray.ValueKind == JsonValueKind.Array)
+            {
+                var list = new List<Playlist>(songlistArray.GetArrayLength());
+                foreach (var item in songlistArray.EnumerateArray())
+                {
+                    long dirId = 0;
+                    if (item.TryGetProperty("dissid", out var dip))
+                    {
+                        if (dip.ValueKind == JsonValueKind.Number) dirId = dip.GetInt64();
+                        else if (dip.ValueKind == JsonValueKind.String && long.TryParse(dip.GetString(), out var parsedId)) dirId = parsedId;
+                    }
+                    if (dirId <= 0) continue;
+
+                    string name = item.TryGetProperty("dissname", out var dnp) ? dnp.GetString() ?? "" : "";
+                    string pic = item.TryGetProperty("imgurl", out var imp) ? imp.GetString() ?? "" : "";
+                    int songCount = item.TryGetProperty("song_count", out var scp) && scp.TryGetInt32(out var sn) ? sn : 0;
+
+                    list.Add(new Playlist(
+                        DirId: dirId,
+                        Name: string.IsNullOrWhiteSpace(name) ? "未命名歌单" : name,
+                        SongCount: songCount,
+                        Tid: dirId,
+                        IsFav: true,
+                        PicUrl: pic
+                    ));
+                }
+                return list;
+            }
+
+            return [];
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MusicApi", $"SearchPlaylistsAsync error for '{query}'", ex);
             return [];
         }
     }
