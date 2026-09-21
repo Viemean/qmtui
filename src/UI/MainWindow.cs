@@ -99,6 +99,7 @@ public sealed partial class MainWindow : Window
         Search,
         Favorite,
         DailyRecommend,
+        MillionRecommend,
         GuessRecommend,
         PlaylistDrilldown,
         PlaylistsList,
@@ -349,6 +350,7 @@ public sealed partial class MainWindow : Window
             "搜索结果",
             "我的喜欢",
             "每日30首",
+            "百万收藏",
             "猜你喜欢",
             "我的歌单",
             "收藏专辑",
@@ -481,27 +483,27 @@ public sealed partial class MainWindow : Window
                 _currentDrilldownPlaylist = null;
                 _isViewingAlbumsList = false;
                 _currentDrilldownAlbum = null;
-                await ResumeOrStartGuessRadioAsync();
+                await LoadMillionRecommendSongsAsync();
             }
             else if (idx == 4)
+            {
+                _isViewingPlaylistsList = false;
+                _currentDrilldownPlaylist = null;
+                _isViewingAlbumsList = false;
+                _currentDrilldownAlbum = null;
+                await ResumeOrStartGuessRadioAsync();
+            }
+            else if (idx == 5)
             {
                 _isViewingAlbumsList = false;
                 _currentDrilldownAlbum = null;
                 await LoadPlaylistsAsync();
             }
-            else if (idx == 5)
-            {
-                _isViewingPlaylistsList = false;
-                _currentDrilldownPlaylist = null;
-                await LoadFavoriteAlbumsAsync();
-            }
             else if (idx == 6)
             {
                 _isViewingPlaylistsList = false;
                 _currentDrilldownPlaylist = null;
-                _isViewingAlbumsList = false;
-                _currentDrilldownAlbum = null;
-                await LoadRecentPlaySongsAsync();
+                await LoadFavoriteAlbumsAsync();
             }
             else if (idx == 7)
             {
@@ -509,7 +511,7 @@ public sealed partial class MainWindow : Window
                 _currentDrilldownPlaylist = null;
                 _isViewingAlbumsList = false;
                 _currentDrilldownAlbum = null;
-                await LoadLocalMusicAsync();
+                await LoadRecentPlaySongsAsync();
             }
             else if (idx == 8)
             {
@@ -517,9 +519,17 @@ public sealed partial class MainWindow : Window
                 _currentDrilldownPlaylist = null;
                 _isViewingAlbumsList = false;
                 _currentDrilldownAlbum = null;
-                await LoadWebDavMusicAsync();
+                await LoadLocalMusicAsync();
             }
             else if (idx == 9)
+            {
+                _isViewingPlaylistsList = false;
+                _currentDrilldownPlaylist = null;
+                _isViewingAlbumsList = false;
+                _currentDrilldownAlbum = null;
+                await LoadWebDavMusicAsync();
+            }
+            else if (idx == 10)
             {
                 ShowConnectDialog();
             }

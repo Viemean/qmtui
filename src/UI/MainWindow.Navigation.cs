@@ -107,9 +107,39 @@ public sealed partial class MainWindow
         });
     }
 
-    private async Task LoadDailyRecommendSongsAsync(bool forceRefresh = false)
+    private Task LoadDailyRecommendSongsAsync(bool forceRefresh = false) =>
+        LoadDailyFeedRecommendPlaylistAsync(
+            targetViewMode: ViewMode.DailyRecommend,
+            featureName: "每日30首",
+            statusTag: "每日推荐",
+            loginPrompt: "请按 U 键登录后获取您的每日 30 首个性化推荐歌单",
+            getCache: MetadataCacheService.GetDailyRecommend,
+            saveCache: MetadataCacheService.SaveDailyRecommend,
+            fetchApiAsync: MusicApi.GetDailyRecommendSongsAsync,
+            forceRefresh: forceRefresh);
+
+    private Task LoadMillionRecommendSongsAsync(bool forceRefresh = false) =>
+        LoadDailyFeedRecommendPlaylistAsync(
+            targetViewMode: ViewMode.MillionRecommend,
+            featureName: "百万收藏",
+            statusTag: "百万收藏",
+            loginPrompt: "请按 U 键登录后获取您的官方百万收藏精选歌单",
+            getCache: MetadataCacheService.GetMillionRecommend,
+            saveCache: MetadataCacheService.SaveMillionRecommend,
+            fetchApiAsync: MusicApi.GetMillionRecommendSongsAsync,
+            forceRefresh: forceRefresh);
+
+    private async Task LoadDailyFeedRecommendPlaylistAsync(
+        ViewMode targetViewMode,
+        string featureName,
+        string statusTag,
+        string loginPrompt,
+        Func<string, string, DailyRecommendCache?> getCache,
+        Action<string, string, List<Song>> saveCache,
+        Func<CancellationToken, Task<List<Song>>> fetchApiAsync,
+        bool forceRefresh = false)
     {
-        _currentViewMode = ViewMode.DailyRecommend;
+        _currentViewMode = targetViewMode;
         _hasMoreSearchResults = false;
         _isViewingPlaylistsList = false;
         _currentDrilldownPlaylist = null;
@@ -120,7 +150,7 @@ public sealed partial class MainWindow
         {
             Application.Invoke(() =>
             {
-                _songListView.SetMessage("请按 U 键登录后获取您的每日 30 首个性化推荐歌单", "每日30首 (未登录)");
+                _songListView.SetMessage(loginPrompt, $"{featureName} (未登录)");
             });
             return;
         }
@@ -130,13 +160,13 @@ public sealed partial class MainWindow
 
         if (!forceRefresh)
         {
-            var cached = MetadataCacheService.GetDailyRecommend(uin, today);
+            var cached = getCache(uin, today);
             if (cached != null && cached.Songs.Count > 0)
             {
                 var cachedSongs = cached.Songs;
                 Application.Invoke(() =>
                 {
-                    _songListView.SetSongs(cachedSongs, $"每日30首: 今日精选 {cachedSongs.Count} 首");
+                    _songListView.SetSongs(cachedSongs, $"{featureName}: 今日精选 {cachedSongs.Count} 首");
                     if (_activeSong != null)
                     {
                         _songListView.SetPlayingSong(_activeSong.Mid);
@@ -145,32 +175,32 @@ public sealed partial class MainWindow
                         _controlBar.SetFavoriteStatus(isFav);
                     }
                     _songListView.SetFocusToList();
-                    _controlBar.UpdateStatus($"[每日推荐] 今日 30 首推荐已从本地缓存载入（共 {cachedSongs.Count} 首）");
+                    _controlBar.UpdateStatus($"[{statusTag}] 今日 {featureName} 已从本地缓存载入（共 {cachedSongs.Count} 首）");
                 });
                 return;
             }
         }
 
-        _songListView.SetMessage("正在同步今日推荐歌单（每日30首）...", "每日30首 (加载中)");
-        _controlBar.UpdateStatus("[正在加载] 正在请求每日30首推荐曲目...");
+        _songListView.SetMessage($"正在同步今日推荐歌单（{featureName}）...", $"{featureName} (加载中)");
+        _controlBar.UpdateStatus($"[正在加载] 正在请求{featureName}推荐曲目...");
 
-        var songs = await MusicApi.GetDailyRecommendSongsAsync();
+        var songs = await fetchApiAsync(CancellationToken.None);
 
         if (songs.Count > 0)
         {
-            MetadataCacheService.SaveDailyRecommend(uin, today, songs);
+            saveCache(uin, today, songs);
         }
 
         Application.Invoke(() =>
         {
             if (songs.Count == 0)
             {
-                _songListView.SetMessage("今日推荐歌单获取为空，请按 U 检查登录状态或稍后重试", "每日30首: 0 首");
+                _songListView.SetMessage("今日推荐歌单获取为空，请按 U 检查登录状态或稍后重试", $"{featureName}: 0 首");
                 _controlBar.UpdateStatus("[加载提示] 未能获取到今日推荐歌单数据");
                 return;
             }
 
-            _songListView.SetSongs(songs, $"每日30首: 今日精选 {songs.Count} 首");
+            _songListView.SetSongs(songs, $"{featureName}: 今日精选 {songs.Count} 首");
             if (_activeSong != null)
             {
                 _songListView.SetPlayingSong(_activeSong.Mid);
@@ -179,7 +209,7 @@ public sealed partial class MainWindow
                 _controlBar.SetFavoriteStatus(isFav);
             }
             _songListView.SetFocusToList();
-            _controlBar.UpdateStatus($"[每日推荐] 今日 30 首推荐已成功载入（共 {songs.Count} 首）");
+            _controlBar.UpdateStatus($"[{statusTag}] 今日 {featureName} 已成功载入（共 {songs.Count} 首）");
         });
     }
 
