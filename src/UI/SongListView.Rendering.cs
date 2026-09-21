@@ -199,9 +199,21 @@ public sealed partial class SongListView
             else if (_displayMode == SongListDisplayMode.Albums)
             {
                 int countColW = 10;
-                int remain = Math.Max(30, totalWidth - indexArea - countColW - 8);
-                int newAlbumW = Math.Max(16, (int)Math.Round(remain * 0.60));
-                int newArtistW = Math.Max(10, remain - newAlbumW);
+                bool isDateMode = _albums.Count > 0 && _albums.Any(a => !string.IsNullOrEmpty(a.PublishDate));
+                int newAlbumW;
+                int newArtistW;
+                if (isDateMode)
+                {
+                    newArtistW = 12;
+                    newAlbumW = Math.Max(16, totalWidth - indexArea - countColW - newArtistW - 8);
+                }
+                else
+                {
+                    int remain = Math.Max(30, totalWidth - indexArea - countColW - 8);
+                    newAlbumW = Math.Max(16, (int)Math.Round(remain * 0.60));
+                    newArtistW = Math.Max(10, remain - newAlbumW);
+                }
+
                 if (newAlbumW != _albumTitleColWidth || newArtistW != _albumArtistColWidth || _indexColWidth != idxWidth)
                 {
                     _albumTitleColWidth = newAlbumW;
@@ -304,15 +316,17 @@ public sealed partial class SongListView
         if (index < 0 || index >= _albums.Count) return "";
         var a = _albums[index];
         string countStr = a.SongCount > 0 ? $"{a.SongCount} 首" : "";
-        string artist = string.IsNullOrWhiteSpace(a.Artist) ? "群星" : a.Artist;
+        string middleText = !string.IsNullOrEmpty(a.PublishDate)
+            ? a.PublishDate
+            : (string.IsNullOrWhiteSpace(a.Artist) ? "群星" : a.Artist);
 
         var albumCol = FormatCell(a.Title, _albumTitleColWidth, isSelected);
-        var artistCol = FormatCell(artist, _albumArtistColWidth, false);
+        var middleCol = FormatCell(middleText, _albumArtistColWidth, false);
         var countCol = FormatCell(countStr, 10, false);
 
         int idxWidth = _indexColWidth > 0 ? _indexColWidth : GetIndexWidth();
         string idxStr = (index + 1).ToString().PadLeft(idxWidth, '0');
-        return $"{idxStr}  {albumCol}  {artistCol}  {countCol}";
+        return $"{idxStr}  {albumCol}  {middleCol}  {countCol}";
     }
 
     private string FormatSongRow(int index, bool isSelected)

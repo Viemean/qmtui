@@ -575,8 +575,7 @@ public sealed partial class MusicApi
 
                     if (!string.IsNullOrEmpty(mid) && !string.IsNullOrEmpty(name))
                     {
-                        var artistDisplay = string.IsNullOrEmpty(singer) ? pubTime : (string.IsNullOrEmpty(pubTime) ? singer : $"{singer} ({pubTime})");
-                        albums.Add(new Album(id, mid, name, artistDisplay, songCount));
+                        albums.Add(new Album(id, mid, name, singer, songCount, PublishDate: pubTime));
                     }
                 }
                 return albums;

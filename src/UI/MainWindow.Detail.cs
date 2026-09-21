@@ -419,19 +419,11 @@ public sealed partial class MainWindow
                         _hasMoreSingerAlbums = false;
                     }
 
-                    int startIdx = _singerAlbums.Count;
                     _singerAlbums.AddRange(moreAlbums);
-
-                    var newItems = new List<string>(moreAlbums.Count);
-                    for (int i = 0; i < moreAlbums.Count; i++)
-                    {
-                        var a = moreAlbums[i];
-                        newItems.Add($"{(startIdx + i + 1):D2}  {a.Title}  -  {a.Artist}  (共 {a.SongCount} 首)");
-                    }
 
                     var title = $"歌手专辑: {_currentSingerName} (共 {_singerAlbums.Count} 张" +
                         (_hasMoreSingerAlbums ? "，向下滚动加载更多" : "，已全部加载") + ", 按 Enter 进入, D 收藏)";
-                    _songListView.AppendCustomItems(newItems, title);
+                    _songListView.AppendAlbums(moreAlbums, title);
                     _controlBar.UpdateStatus($"[加载完成] 歌手专辑已载入 {_singerAlbums.Count} 张");
                 }
                 else
@@ -494,16 +486,9 @@ public sealed partial class MainWindow
             return;
         }
 
-        var items = new List<string>(_singerAlbums.Count);
-        for (int i = 0; i < _singerAlbums.Count; i++)
-        {
-            var a = _singerAlbums[i];
-            items.Add($"{(i + 1):D2}  {a.Title}  -  {a.Artist}  (共 {a.SongCount} 首)");
-        }
-
         var title = $"歌手专辑: {_currentSingerName} (共 {_singerAlbums.Count} 张" +
             (_hasMoreSingerAlbums ? "，向下滚动加载更多" : "，已全部加载") + ", 按 Enter 进入, D 收藏)";
-        _songListView.SetCustomItems(items, title, async (idx) =>
+        _songListView.SetAlbums(_singerAlbums, title, async (idx) =>
         {
             if (idx >= 0 && idx < _singerAlbums.Count)
             {
