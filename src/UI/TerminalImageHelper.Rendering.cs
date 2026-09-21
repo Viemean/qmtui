@@ -14,7 +14,7 @@ namespace QmTui.UI;
 
 public static partial class TerminalImageHelper
 {
-    private const int MaxCoverDimension = 1000;
+    private const int MaxCoverDimension = 1200;
 
     private static (int width, int height, byte[] pixelData)? DecodeImageRgba(byte[] fileBytes, bool isWebp)
     {
@@ -85,7 +85,8 @@ public static partial class TerminalImageHelper
             int height = decoded.Value.height;
             byte[] pixelData = decoded.Value.pixelData;
 
-            // 若图像尺寸超过 1000 像素，使用双线性插值算法等比缩放至 1000 像素内，大幅节省大对象堆与 Kitty Base64 传输内存
+            // 若图像尺寸超过 1200 像素（如单曲原画母图），使用双线性插值算法等比缩放至 1200 像素内；
+            // 官方 1200x1200 专辑封面直接保留原生分辨率，消除额外重采样开销并保证 2K/4K 屏幕清晰呈现
             if (width > MaxCoverDimension || height > MaxCoverDimension)
             {
                 float scale = Math.Min((float)MaxCoverDimension / width, (float)MaxCoverDimension / height);
@@ -302,7 +303,7 @@ public static partial class TerminalImageHelper
     private readonly record struct ImageCacheKey(string FilePath, int Cols, int Rows, long LastWriteTicks);
 
     private static readonly Lock s_cacheLock = new();
-    private const int MaxMemoryCacheEntries = 12;
+    private const int MaxMemoryCacheEntries = 4;
     private static readonly Dictionary<ImageCacheKey, LinkedListNode<(ImageCacheKey Key, byte[] Payload)>> s_memoryCache = new(MaxMemoryCacheEntries);
     private static readonly LinkedList<(ImageCacheKey Key, byte[] Payload)> s_lruList = new();
 
