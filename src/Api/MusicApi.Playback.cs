@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -82,7 +83,7 @@ public sealed partial class MusicApi
                 }
             }
 
-            await CorrectQualitySizesAsync(options, doc.RootElement, ct).ConfigureAwait(false);
+            await RefineQualityMetadataAsync(options, doc.RootElement, songMid, ct).ConfigureAwait(false);
 
             return options;
         }
@@ -256,7 +257,7 @@ public sealed partial class MusicApi
 
     /// <summary>
 
-    private static async Task CorrectQualitySizesAsync(List<QualityOption> options, JsonElement root, CancellationToken ct)
+    private static async Task RefineQualityMetadataAsync(List<QualityOption> options, JsonElement root, string songMid, CancellationToken ct)
     {
         long interval = 0;
         long flacSize = 0;
@@ -268,32 +269,153 @@ public sealed partial class MusicApi
             if (ti.TryGetProperty("file", out var fi) && fi.TryGetProperty("size_flac", out var sf)) sf.TryGetInt64(out flacSize);
         }
 
+        var tasks = new List<Task>();
         for (int i = 0; i < options.Count; i++)
         {
-            var opt = options[i];
-            if (!opt.Available || string.IsNullOrEmpty(opt.PlayUrl)) continue;
+            var index = i;
+            var opt = options[index];
+            if (!opt.Available) continue;
 
-            bool needsCorrection = (opt.Tier == AudioQualityTier.HiRes && (opt.FileSizeBytes <= 0 || (flacSize > 0 && opt.FileSizeBytes <= flacSize)))
-                                   || opt.FileSizeBytes <= 0;
-
-            if (needsCorrection)
+            tasks.Add(Task.Run(async () =>
             {
-                var realSize = await TryFetchContentLengthAsync(opt.PlayUrl, ct).ConfigureAwait(false);
-                if (realSize > 0)
+                try
                 {
-                    var bitrate = opt.BitrateInfo;
-                    if (interval > 0)
+                    var isFlac = AudioQualityHelper.GetExtension(opt.Tier) == ".flac";
+                    string? newSpec = null;
+                    long realSize = opt.FileSizeBytes;
+
+                    // 1. 优先检查本地磁盘缓存
+                    if (!string.IsNullOrEmpty(songMid))
                     {
-                        bitrate = $"{(long)Math.Round((realSize * 8.0) / interval / 1000.0)}kbps";
+                        var localCached = AudioCacheService.GetCachedAudioPath(songMid, opt.Tier);
+                        if (!string.IsNullOrEmpty(localCached) && File.Exists(localCached))
+                        {
+                            var fi = new FileInfo(localCached);
+                            if (realSize <= 0 && fi.Length > 0)
+                            {
+                                realSize = fi.Length;
+                            }
+
+                            if (isFlac && fi.Length >= 42)
+                            {
+                                using var fs = File.OpenRead(localCached);
+                                var buf = new byte[42];
+                                int read = await fs.ReadAsync(buf.AsMemory(0, 42), ct).ConfigureAwait(false);
+                                if (read == 42 && AudioQualityHelper.TryParseFlacStreamInfo(buf, out var sr, out var bps, out var ch))
+                                {
+                                    newSpec = AudioQualityHelper.FormatAudioSpec(sr, bps, ch, opt.Tier);
+                                }
+                            }
+                        }
                     }
-                    options[i] = opt with
+
+                    // 2. 若本地未命中 FLAC 规格且存在播放直链，通过 Range: bytes=0-41 嗅探
+                    if (isFlac && newSpec == null && !string.IsNullOrEmpty(opt.PlayUrl))
                     {
-                        FileSizeBytes = realSize,
-                        BitrateInfo = bitrate
-                    };
+                        var probeResult = await TryProbeFlacRangeAsync(opt.PlayUrl, ct).ConfigureAwait(false);
+                        if (probeResult != null)
+                        {
+                            if (probeResult.Value.SampleRate > 0)
+                            {
+                                newSpec = AudioQualityHelper.FormatAudioSpec(
+                                    probeResult.Value.SampleRate,
+                                    probeResult.Value.BitsPerSample,
+                                    probeResult.Value.Channels,
+                                    opt.Tier);
+                            }
+                            if (realSize <= 0 && probeResult.Value.TotalLength > 0)
+                            {
+                                realSize = probeResult.Value.TotalLength;
+                            }
+                        }
+                    }
+
+                    // 3. 兜底处理：若仍未获取到有效文件大小且有直链，使用 HEAD 请求探测 Content-Length
+                    bool needsSizeCorrection = (opt.Tier == AudioQualityTier.HiRes && (realSize <= 0 || (flacSize > 0 && realSize <= flacSize)))
+                                               || realSize <= 0;
+                    if (needsSizeCorrection && !string.IsNullOrEmpty(opt.PlayUrl))
+                    {
+                        var fetchedLength = await TryFetchContentLengthAsync(opt.PlayUrl, ct).ConfigureAwait(false);
+                        if (fetchedLength > 0)
+                        {
+                            realSize = fetchedLength;
+                        }
+                    }
+
+                    // 4. 组装更新后的 QualityOption
+                    var updated = opt;
+                    if (realSize > 0 && realSize != opt.FileSizeBytes)
+                    {
+                        var bitrate = opt.BitrateInfo;
+                        if (interval > 0)
+                        {
+                            bitrate = $"{(long)Math.Round((realSize * 8.0) / interval / 1000.0)}kbps";
+                        }
+                        updated = updated with { FileSizeBytes = realSize, BitrateInfo = bitrate };
+                    }
+                    if (!string.IsNullOrEmpty(newSpec) && newSpec != opt.Spec)
+                    {
+                        updated = updated with { Spec = newSpec };
+                    }
+
+                    lock (options)
+                    {
+                        options[index] = updated;
+                    }
                 }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("MusicApi", $"Failed to refine metadata for tier {opt.Tier}: {ex.Message}");
+                }
+            }, ct));
+        }
+
+        if (tasks.Count > 0)
+        {
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task<(int SampleRate, int BitsPerSample, int Channels, long TotalLength)?> TryProbeFlacRangeAsync(string url, CancellationToken ct)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.TryAddWithoutValidation("Referer", "https://y.qq.com/");
+            req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 41);
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
+
+            using var resp = await s_httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) return null;
+
+            long totalLength = 0;
+            if (resp.Content.Headers.ContentRange?.Length is { } len && len > 0)
+            {
+                totalLength = len;
+            }
+
+            var buffer = new byte[42];
+            using var stream = await resp.Content.ReadAsStreamAsync(cts.Token).ConfigureAwait(false);
+            int totalRead = 0;
+            while (totalRead < 42)
+            {
+                int r = await stream.ReadAsync(buffer.AsMemory(totalRead, 42 - totalRead), cts.Token).ConfigureAwait(false);
+                if (r <= 0) break;
+                totalRead += r;
+            }
+
+            if (totalRead == 42 && AudioQualityHelper.TryParseFlacStreamInfo(buffer, out var sampleRate, out var bitsPerSample, out var channels))
+            {
+                return (sampleRate, bitsPerSample, channels, totalLength);
             }
         }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MusicApi", $"TryProbeFlacRangeAsync error for {url}: {ex.Message}");
+        }
+        return null;
     }
 
     private static async Task<long> TryFetchContentLengthAsync(string url, CancellationToken ct)
