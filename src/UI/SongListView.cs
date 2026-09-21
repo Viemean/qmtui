@@ -24,11 +24,27 @@ public enum SongSubColumn
     Album
 }
 
+public enum SongListDisplayMode
+{
+    Songs,
+    Playlists,
+    Albums,
+    CustomText,
+    Radio
+}
+
 public sealed partial class SongListView : FrameView
 {
     private readonly ListView _listView;
+    private SongListDisplayMode _displayMode = SongListDisplayMode.Songs;
+    public SongListDisplayMode DisplayMode => _displayMode;
     private readonly List<Song> _songs = [];
+    private readonly List<Playlist> _playlists = [];
+    private readonly List<Album> _albums = [];
     private readonly List<string> _customItems = [];
+
+    public IReadOnlyList<Playlist> Playlists => _playlists;
+    public IReadOnlyList<Album> Albums => _albums;
 
     public event Func<Song, Task>? SongAccepted;
     public event Func<Task>? LoadMoreRequested;
@@ -50,6 +66,9 @@ public sealed partial class SongListView : FrameView
     private int _titleColWidth = 20;
     private int _artistColWidth = 12;
     private int _albumColWidth = 14;
+    private int _playlistTitleColWidth = 40;
+    private int _albumTitleColWidth = 24;
+    private int _albumArtistColWidth = 16;
     private int _indexColWidth = 2;
     private int _lastHighlightRow = -1;
     private readonly ThinScrollBarView _scrollBar = new();
@@ -646,14 +665,107 @@ public sealed partial class SongListView : FrameView
         }
     }
 
-    public void SetCustomItems(List<string> items, string title, Func<int, Task> onAccepted, Action<int>? onSelectionChanged = null)
+    public void SetPlaylists(List<Playlist> playlists, string statusTitle, Func<int, Task> onAccepted, Action<int>? onSelectionChanged = null)
     {
+        _displayMode = SongListDisplayMode.Playlists;
         _isRadioMode = false;
         _currentRadioSong = null;
         _radioDisplayLines.Clear();
         _scrollTopBtn.Visible = true;
         _locatePlayingBtn.Visible = true;
         _songs.Clear();
+        _customItems.Clear();
+        _albums.Clear();
+        _cachedNormalRows.Clear();
+        _playlists.Clear();
+        _playlists.AddRange(playlists);
+        _customItemAccepted = onAccepted;
+        _customItemSelectionChanged = onSelectionChanged;
+        _listView.Viewport = new Rectangle(_listView.Viewport.X, 0, _listView.Viewport.Width, _listView.Viewport.Height);
+        RefreshDisplayList();
+        SetMarqueeTitle(statusTitle);
+
+        if (playlists.Count > 0 && onSelectionChanged != null)
+        {
+            onSelectionChanged(0);
+        }
+    }
+
+    public void AppendPlaylists(List<Playlist> newPlaylists, string statusTitle)
+    {
+        _displayMode = SongListDisplayMode.Playlists;
+        _isRadioMode = false;
+        _currentRadioSong = null;
+        _radioDisplayLines.Clear();
+        _scrollTopBtn.Visible = true;
+        _locatePlayingBtn.Visible = true;
+
+        int startIndex = _playlists.Count;
+        _playlists.AddRange(newPlaylists);
+        for (int i = startIndex; i < _playlists.Count; i++)
+        {
+            _cachedNormalRows.Add(FormatPlaylistRow(i, isSelected: false));
+        }
+        RefreshDisplayList();
+        SetMarqueeTitle(statusTitle);
+    }
+
+    public void SetAlbums(List<Album> albums, string statusTitle, Func<int, Task> onAccepted, Action<int>? onSelectionChanged = null)
+    {
+        _displayMode = SongListDisplayMode.Albums;
+        _isRadioMode = false;
+        _currentRadioSong = null;
+        _radioDisplayLines.Clear();
+        _scrollTopBtn.Visible = true;
+        _locatePlayingBtn.Visible = true;
+        _songs.Clear();
+        _customItems.Clear();
+        _playlists.Clear();
+        _cachedNormalRows.Clear();
+        _albums.Clear();
+        _albums.AddRange(albums);
+        _customItemAccepted = onAccepted;
+        _customItemSelectionChanged = onSelectionChanged;
+        _listView.Viewport = new Rectangle(_listView.Viewport.X, 0, _listView.Viewport.Width, _listView.Viewport.Height);
+        RefreshDisplayList();
+        SetMarqueeTitle(statusTitle);
+
+        if (albums.Count > 0 && onSelectionChanged != null)
+        {
+            onSelectionChanged(0);
+        }
+    }
+
+    public void AppendAlbums(List<Album> newAlbums, string statusTitle)
+    {
+        _displayMode = SongListDisplayMode.Albums;
+        _isRadioMode = false;
+        _currentRadioSong = null;
+        _radioDisplayLines.Clear();
+        _scrollTopBtn.Visible = true;
+        _locatePlayingBtn.Visible = true;
+
+        int startIndex = _albums.Count;
+        _albums.AddRange(newAlbums);
+        for (int i = startIndex; i < _albums.Count; i++)
+        {
+            _cachedNormalRows.Add(FormatAlbumRow(i, isSelected: false));
+        }
+        RefreshDisplayList();
+        SetMarqueeTitle(statusTitle);
+    }
+
+    public void SetCustomItems(List<string> items, string title, Func<int, Task> onAccepted, Action<int>? onSelectionChanged = null)
+    {
+        _displayMode = SongListDisplayMode.CustomText;
+        _isRadioMode = false;
+        _currentRadioSong = null;
+        _radioDisplayLines.Clear();
+        _scrollTopBtn.Visible = true;
+        _locatePlayingBtn.Visible = true;
+        _songs.Clear();
+        _playlists.Clear();
+        _albums.Clear();
         _cachedNormalRows.Clear();
         _customItems.Clear();
         _customItems.AddRange(items);
@@ -674,6 +786,7 @@ public sealed partial class SongListView : FrameView
 
     public void AppendCustomItems(List<string> newItems, string statusTitle)
     {
+        _displayMode = SongListDisplayMode.CustomText;
         _isRadioMode = false;
         _currentRadioSong = null;
         _radioDisplayLines.Clear();
@@ -709,6 +822,7 @@ public sealed partial class SongListView : FrameView
 
     public void SetSongs(List<Song> songs, string statusTitle)
     {
+        _displayMode = SongListDisplayMode.Songs;
         _isRadioMode = false;
         _currentRadioSong = null;
         _radioDisplayLines.Clear();
@@ -717,6 +831,8 @@ public sealed partial class SongListView : FrameView
         _customItemAccepted = null;
         _customItemSelectionChanged = null;
         _customItems.Clear();
+        _playlists.Clear();
+        _albums.Clear();
         _songs.Clear();
         _cachedNormalRows.Clear();
         _listView.Viewport = new Rectangle(_listView.Viewport.X, 0, _listView.Viewport.Width, _listView.Viewport.Height);
@@ -727,6 +843,7 @@ public sealed partial class SongListView : FrameView
 
     public void AppendSongs(List<Song> newSongs, string statusTitle)
     {
+        _displayMode = SongListDisplayMode.Songs;
         _isRadioMode = false;
         _currentRadioSong = null;
         _radioDisplayLines.Clear();
@@ -744,6 +861,7 @@ public sealed partial class SongListView : FrameView
 
     public void SetMessage(string message, string title)
     {
+        _displayMode = SongListDisplayMode.CustomText;
         _isRadioMode = false;
         _currentRadioSong = null;
         _radioDisplayLines.Clear();
@@ -751,6 +869,8 @@ public sealed partial class SongListView : FrameView
         _locatePlayingBtn.Visible = true;
         _customItemAccepted = null;
         _songs.Clear();
+        _playlists.Clear();
+        _albums.Clear();
         _customItems.Clear();
         _displayRows.Clear();
         _displayRows.Add(message);
@@ -760,12 +880,15 @@ public sealed partial class SongListView : FrameView
 
     public void SetRadioCard(Song song, string qualityBadge, int playedCount)
     {
+        _displayMode = SongListDisplayMode.Radio;
         _isRadioMode = true;
         _currentRadioSong = song;
         _currentRadioQuality = string.IsNullOrWhiteSpace(qualityBadge) ? "[标准]" : qualityBadge;
         _currentRadioPlayedCount = Math.Max(1, playedCount);
         _customItemAccepted = null;
         _customItems.Clear();
+        _playlists.Clear();
+        _albums.Clear();
         _songs.Clear();
         _playingSongMid = song.Mid;
 

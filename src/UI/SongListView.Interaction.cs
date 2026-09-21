@@ -14,7 +14,7 @@ public sealed partial class SongListView
 
     public void SetSelectedIndex(int index)
     {
-        int total = _customItems.Count > 0 ? _customItems.Count : _songs.Count;
+        int total = GetCurrentItemCount();
         if (index >= 0 && index < total)
         {
             _listView.SelectedItem = index;
@@ -39,7 +39,7 @@ public sealed partial class SongListView
     {
         if (_isRadioMode) return;
 
-        var count = _songs.Count > 0 ? _songs.Count : _customItems.Count;
+        var count = GetCurrentItemCount();
         if (count > 0)
         {
             _listView.SelectedItem = 0;
@@ -98,7 +98,8 @@ public sealed partial class SongListView
 
     public void PageUpList()
     {
-        if (_songs.Count == 0) return;
+        int total = GetCurrentItemCount();
+        if (total == 0) return;
         int pageStep = Math.Max(1, _listView.Viewport.Height > 0 ? _listView.Viewport.Height - 1 : 10);
         int cur = _listView.SelectedItem ?? 0;
         int target = Math.Max(0, cur - pageStep);
@@ -109,10 +110,11 @@ public sealed partial class SongListView
 
     public void PageDownList()
     {
-        if (_songs.Count == 0) return;
+        int total = GetCurrentItemCount();
+        if (total == 0) return;
         int pageStep = Math.Max(1, _listView.Viewport.Height > 0 ? _listView.Viewport.Height - 1 : 10);
         int cur = _listView.SelectedItem ?? 0;
-        int target = Math.Min(_songs.Count - 1, cur + pageStep);
+        int target = Math.Min(total - 1, cur + pageStep);
         _listView.SelectedItem = target;
         _scrollBar.TriggerActivity();
         UpdateSubColumnTitle(target);
@@ -121,21 +123,24 @@ public sealed partial class SongListView
 
     public void UpdateFocusedRowDisplay()
     {
-        if (_isRadioMode || _songs.Count == 0) return;
+        if (_isRadioMode) return;
+
+        int totalCount = GetCurrentItemCount();
+        if (totalCount == 0) return;
 
         int currentRow = _listView.SelectedItem ?? 0;
-        if (currentRow < 0 || currentRow >= _songs.Count) return;
+        if (currentRow < 0 || currentRow >= totalCount) return;
 
-        if (_lastHighlightRow >= 0 && _lastHighlightRow < _songs.Count && _lastHighlightRow != currentRow && _lastHighlightRow < _displayRows.Count)
+        if (_lastHighlightRow >= 0 && _lastHighlightRow < totalCount && _lastHighlightRow != currentRow && _lastHighlightRow < _displayRows.Count)
         {
             _displayRows[_lastHighlightRow] = _lastHighlightRow < _cachedNormalRows.Count
                 ? _cachedNormalRows[_lastHighlightRow]
-                : FormatSongRow(_lastHighlightRow, isSelected: false);
+                : FormatCurrentRow(_lastHighlightRow, isSelected: false);
         }
 
         if (currentRow < _displayRows.Count)
         {
-            _displayRows[currentRow] = FormatSongRow(currentRow, isSelected: true);
+            _displayRows[currentRow] = FormatCurrentRow(currentRow, isSelected: true);
             _lastHighlightRow = currentRow;
         }
 
@@ -155,7 +160,7 @@ public sealed partial class SongListView
     {
         if (_isRadioMode) return false;
 
-        int totalCount = _songs.Count > 0 ? _songs.Count : _customItems.Count;
+        int totalCount = GetCurrentItemCount();
         if (targetIdx < 0 || targetIdx >= totalCount) return false;
 
         _listView.SelectedItem = targetIdx;
@@ -183,12 +188,36 @@ public sealed partial class SongListView
         }
 
         var kw = keyword.Trim();
-        if (_songs.Count > 0)
+        if (_displayMode == SongListDisplayMode.Playlists)
+        {
+            for (int i = 0; i < _playlists.Count; i++)
+            {
+                var p = _playlists[i];
+                if (p.Title?.Contains(kw, StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    matched.Add(i);
+                    _searchMatchedRows.Add(i);
+                }
+            }
+        }
+        else if (_displayMode == SongListDisplayMode.Albums)
+        {
+            for (int i = 0; i < _albums.Count; i++)
+            {
+                var a = _albums[i];
+                if ((a.Title?.Contains(kw, StringComparison.OrdinalIgnoreCase) == true) ||
+                    (a.Artist?.Contains(kw, StringComparison.OrdinalIgnoreCase) == true))
+                {
+                    matched.Add(i);
+                    _searchMatchedRows.Add(i);
+                }
+            }
+        }
+        else if (_songs.Count > 0)
         {
             for (int i = 0; i < _songs.Count; i++)
             {
                 var s = _songs[i];
-                // 行粒度去重：单行内无论命中 Title、Artist 还是 Album，仅录入一次
                 if ((s.Title?.Contains(kw, StringComparison.OrdinalIgnoreCase) == true) ||
                     (s.Artist?.Contains(kw, StringComparison.OrdinalIgnoreCase) == true) ||
                     (s.Album?.Contains(kw, StringComparison.OrdinalIgnoreCase) == true))

@@ -67,11 +67,19 @@ public sealed partial class SongListView
         }
     }
 
+    private int GetCurrentItemCount() => _displayMode switch
+    {
+        SongListDisplayMode.Playlists => _playlists.Count,
+        SongListDisplayMode.Albums => _albums.Count,
+        SongListDisplayMode.CustomText => _customItems.Count,
+        _ => _songs.Count
+    };
+
     private void CheckTriggerLoadMore()
     {
         if (_isRadioMode) return;
 
-        int totalCount = _songs.Count > 0 ? _songs.Count : _customItems.Count;
+        int totalCount = GetCurrentItemCount();
         if (totalCount == 0) return;
 
         int current = _listView.SelectedItem ?? 0;
@@ -154,7 +162,8 @@ public sealed partial class SongListView
     {
         if (_isUpdatingDisplay) return;
 
-        if (_songs.Count == 0)
+        int totalCount = GetCurrentItemCount();
+        if (totalCount == 0)
         {
             _displayRows.Clear();
             _listView.SelectedItem = null;
@@ -175,38 +184,67 @@ public sealed partial class SongListView
 
             int idxWidth = GetIndexWidth();
             int indexArea = idxWidth + 2;
-            int remain = Math.Max(30, totalWidth - indexArea - 9);
-            int newTitleW = Math.Max(16, (int)Math.Round(remain * 0.46));
-            int newArtistW = Math.Max(10, (int)Math.Round(remain * 0.24));
-            int newAlbumW = Math.Max(12, remain - newTitleW - newArtistW);
 
-            if (newTitleW != _titleColWidth || newArtistW != _artistColWidth || newAlbumW != _albumColWidth || _indexColWidth != idxWidth)
+            if (_displayMode == SongListDisplayMode.Playlists)
             {
-                _titleColWidth = newTitleW;
-                _artistColWidth = newArtistW;
-                _albumColWidth = newAlbumW;
-                _indexColWidth = idxWidth;
-                _cachedNormalRows.Clear();
-            }
-
-            var prevSelected = _listView.SelectedItem;
-            int selectedIdx = (prevSelected.HasValue && prevSelected.Value >= 0 && prevSelected.Value < _songs.Count)
-                ? prevSelected.Value
-                : 0;
-
-            if (_cachedNormalRows.Count != _songs.Count)
-            {
-                _cachedNormalRows.Clear();
-                for (int i = 0; i < _songs.Count; i++)
+                int countColW = 10;
+                int newTitleW = Math.Max(20, totalWidth - indexArea - countColW - 6);
+                if (newTitleW != _playlistTitleColWidth || _indexColWidth != idxWidth)
                 {
-                    _cachedNormalRows.Add(FormatSongRow(i, isSelected: false));
+                    _playlistTitleColWidth = newTitleW;
+                    _indexColWidth = idxWidth;
+                    _cachedNormalRows.Clear();
+                }
+            }
+            else if (_displayMode == SongListDisplayMode.Albums)
+            {
+                int countColW = 10;
+                int remain = Math.Max(30, totalWidth - indexArea - countColW - 8);
+                int newAlbumW = Math.Max(16, (int)Math.Round(remain * 0.60));
+                int newArtistW = Math.Max(10, remain - newAlbumW);
+                if (newAlbumW != _albumTitleColWidth || newArtistW != _albumArtistColWidth || _indexColWidth != idxWidth)
+                {
+                    _albumTitleColWidth = newAlbumW;
+                    _albumArtistColWidth = newArtistW;
+                    _indexColWidth = idxWidth;
+                    _cachedNormalRows.Clear();
+                }
+            }
+            else
+            {
+                int remain = Math.Max(30, totalWidth - indexArea - 9);
+                int newTitleW = Math.Max(16, (int)Math.Round(remain * 0.46));
+                int newArtistW = Math.Max(10, (int)Math.Round(remain * 0.24));
+                int newAlbumW = Math.Max(12, remain - newTitleW - newArtistW);
+
+                if (newTitleW != _titleColWidth || newArtistW != _artistColWidth || newAlbumW != _albumColWidth || _indexColWidth != idxWidth)
+                {
+                    _titleColWidth = newTitleW;
+                    _artistColWidth = newArtistW;
+                    _albumColWidth = newAlbumW;
+                    _indexColWidth = idxWidth;
+                    _cachedNormalRows.Clear();
                 }
             }
 
-            var displayList = new List<string>(_songs.Count);
-            for (int i = 0; i < _songs.Count; i++)
+            var prevSelected = _listView.SelectedItem;
+            int selectedIdx = (prevSelected.HasValue && prevSelected.Value >= 0 && prevSelected.Value < totalCount)
+                ? prevSelected.Value
+                : 0;
+
+            if (_cachedNormalRows.Count != totalCount)
             {
-                displayList.Add(i == selectedIdx ? FormatSongRow(i, isSelected: true) : _cachedNormalRows[i]);
+                _cachedNormalRows.Clear();
+                for (int i = 0; i < totalCount; i++)
+                {
+                    _cachedNormalRows.Add(FormatCurrentRow(i, isSelected: false));
+                }
+            }
+
+            var displayList = new List<string>(totalCount);
+            for (int i = 0; i < totalCount; i++)
+            {
+                displayList.Add(i == selectedIdx ? FormatCurrentRow(i, isSelected: true) : _cachedNormalRows[i]);
             }
             _lastHighlightRow = selectedIdx;
 
@@ -216,11 +254,11 @@ public sealed partial class SongListView
             {
                 _displayRows.Add(item);
             }
-            if (prevSelected.HasValue && prevSelected.Value >= 0 && prevSelected.Value < _songs.Count)
+            if (prevSelected.HasValue && prevSelected.Value >= 0 && prevSelected.Value < totalCount)
             {
                 _listView.SelectedItem = prevSelected.Value;
             }
-            else if (_songs.Count > 0)
+            else if (totalCount > 0)
             {
                 _listView.SelectedItem = 0;
             }
@@ -232,12 +270,49 @@ public sealed partial class SongListView
             {
                 _listView.Viewport = new Rectangle(_listView.Viewport.X, prevViewportY, _listView.Viewport.Width, _listView.Viewport.Height);
             }
-            _scrollBar.UpdateMetrics(_songs.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+            _scrollBar.UpdateMetrics(totalCount, _listView.Viewport.Height, _listView.Viewport.Y);
         }
         finally
         {
             _isUpdatingDisplay = false;
         }
+    }
+
+    private string FormatCurrentRow(int index, bool isSelected) => _displayMode switch
+    {
+        SongListDisplayMode.Playlists => FormatPlaylistRow(index, isSelected),
+        SongListDisplayMode.Albums => FormatAlbumRow(index, isSelected),
+        _ => FormatSongRow(index, isSelected)
+    };
+
+    private string FormatPlaylistRow(int index, bool isSelected)
+    {
+        if (index < 0 || index >= _playlists.Count) return "";
+        var p = _playlists[index];
+        string countStr = $"{p.SongNum} 首";
+
+        var titleCol = FormatCell(p.Title, _playlistTitleColWidth, isSelected);
+        var countCol = FormatCell(countStr, 10, false);
+
+        int idxWidth = _indexColWidth > 0 ? _indexColWidth : GetIndexWidth();
+        string idxStr = (index + 1).ToString().PadLeft(idxWidth, '0');
+        return $"{idxStr}  {titleCol}  {countCol}";
+    }
+
+    private string FormatAlbumRow(int index, bool isSelected)
+    {
+        if (index < 0 || index >= _albums.Count) return "";
+        var a = _albums[index];
+        string countStr = a.SongCount > 0 ? $"{a.SongCount} 首" : "";
+        string artist = string.IsNullOrWhiteSpace(a.Artist) ? "群星" : a.Artist;
+
+        var albumCol = FormatCell(a.Title, _albumTitleColWidth, isSelected);
+        var artistCol = FormatCell(artist, _albumArtistColWidth, false);
+        var countCol = FormatCell(countStr, 10, false);
+
+        int idxWidth = _indexColWidth > 0 ? _indexColWidth : GetIndexWidth();
+        string idxStr = (index + 1).ToString().PadLeft(idxWidth, '0');
+        return $"{idxStr}  {albumCol}  {artistCol}  {countCol}";
     }
 
     private string FormatSongRow(int index, bool isSelected)

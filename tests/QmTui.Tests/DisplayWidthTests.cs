@@ -67,4 +67,14 @@ public class DisplayWidthTests
         Assert.Equal(12, SongListView.GetDisplayWidth(truncated));
         Assert.Contains("..", truncated);
     }
+
+    [Fact]
+    public void MultiColumn_AlignedCells_HaveConsistentWidth()
+    {
+        var item1 = SongListView.TruncateAndPadWide("短歌单", 30) + "  " + SongListView.TruncateAndPadWide("12 首", 10);
+        var item2 = SongListView.TruncateAndPadWide("超长标题歌单名字测试一二三四五六七八九十", 30) + "  " + SongListView.TruncateAndPadWide("176 首", 10);
+
+        Assert.Equal(30 + 2 + 10, SongListView.GetDisplayWidth(item1));
+        Assert.Equal(30 + 2 + 10, SongListView.GetDisplayWidth(item2));
+    }
 }
