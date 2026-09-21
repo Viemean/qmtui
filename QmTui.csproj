@@ -27,7 +27,7 @@
     <LinkerFlavor Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">lld</LinkerFlavor>
   </PropertyGroup>
 
-  <Target Name="SyncAcousticPipeline" BeforeTargets="BeforeBuild" Condition="Exists('src/Services/AudioRecognition/AcousticFingerprintExtractor.raw.cs')">
+  <Target Name="SyncAcousticPipeline" BeforeTargets="BeforeBuild" Condition="Exists('src/Services/AudioRecognition/AcousticFingerprintExtractor.raw.cs') And Exists('.bin/codegen_acoustic.py')">
     <Exec Command="python3 .bin/codegen_acoustic.py" />
   </Target>
 

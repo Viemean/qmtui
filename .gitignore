@@ -27,3 +27,4 @@ node_modules/
 AUR/
 release-aur.sh
 bump-version.sh
+.bin/
