@@ -80,6 +80,40 @@ public static class AudioQualityHelper
         _ => "128kbps"
     };
 
+    public static bool TryParseFlacStreamInfo(ReadOnlySpan<byte> data, out int sampleRate, out int bitsPerSample, out int channels)
+    {
+        sampleRate = 0;
+        bitsPerSample = 0;
+        channels = 0;
+
+        if (data.Length < 42) return false;
+        // Magic "fLaC" (0x66, 0x4C, 0x61, 0x43)
+        if (data[0] != 0x66 || data[1] != 0x4C || data[2] != 0x61 || data[3] != 0x43) return false;
+        // Block type must be STREAMINFO (0)
+        if ((data[4] & 0x7F) != 0) return false;
+
+        sampleRate = (data[18] << 12) | (data[19] << 4) | (data[20] >> 4);
+        channels = ((data[20] >> 1) & 0x07) + 1;
+        bitsPerSample = (((data[20] & 0x01) << 4) | (data[21] >> 4)) + 1;
+
+        return sampleRate > 0 && sampleRate <= 384000 && bitsPerSample >= 8 && bitsPerSample <= 32;
+    }
+
+    public static string FormatAudioSpec(int sampleRate, int bitsPerSample, int channels, AudioQualityTier tier)
+    {
+        var rateStr = sampleRate % 1000 == 0 ? $"{sampleRate / 1000}kHz" : $"{sampleRate / 1000.0:0.#}kHz";
+        if (tier == AudioQualityTier.Atmos && channels > 2)
+        {
+            return channels == 6 ? "5.1 环绕声" : $"{channels}ch 环绕声";
+        }
+        if (channels > 2)
+        {
+            return $"{bitsPerSample}bit / {rateStr} ({channels}ch)";
+        }
+        return $"{bitsPerSample}bit / {rateStr}";
+    }
+
+
     public static AudioQualityTier Parse(string? name)
     {
         if (string.IsNullOrEmpty(name)) return AudioQualityTier.SQ;

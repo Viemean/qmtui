@@ -293,4 +293,49 @@ public class AudioQualityFallbackTests
         Assert.NotNull(dolbyOpt);
         Assert.False(dolbyOpt.Available);
     }
+
+    [Fact]
+    public void TryParseFlacStreamInfo_Valid48k24bitHeader_ParsesSuccessfully()
+    {
+        // 构造标准的 42 字节 FLAC 头部，包含 24bit / 48kHz 立体声 STREAMINFO
+        var header = new byte[42];
+        header[0] = (byte)'f';
+        header[1] = (byte)'L';
+        header[2] = (byte)'a';
+        header[3] = (byte)'C';
+        header[4] = 0x00; // BlockType = 0 (STREAMINFO)
+        header[5] = 0x00;
+        header[6] = 0x00;
+        header[7] = 0x22; // Length = 34
+
+        // 48000 Hz = 0x0BB80 (20 bits)
+        // byte 18: 0x0B (高 8 位)
+        // byte 19: 0xB8 (中 8 位)
+        // byte 20: bits 7..4 = 0x0 (低 4 位)
+        //          bits 3..1 = channels - 1 = 1 (立体声 2ch -> 0b001 -> 0x02)
+        //          bit 0     = (bits_per_sample - 1) 的高 1 位 = (23 >> 4) = 1 (0b0001)
+        //          因此 byte 20 = (0x0 << 4) | (1 << 1) | 1 = 0x03
+        // byte 21: bits 7..4 = (bits_per_sample - 1) 的低 4 位 = (23 & 0x0F) = 7 (0b0111) -> 0x70
+        header[18] = 0x0B;
+        header[19] = 0xB8;
+        header[20] = 0x03;
+        header[21] = 0x70;
+
+        var success = AudioQualityHelper.TryParseFlacStreamInfo(header, out var sampleRate, out var bitsPerSample, out var channels);
+        Assert.True(success);
+        Assert.Equal(48000, sampleRate);
+        Assert.Equal(24, bitsPerSample);
+        Assert.Equal(2, channels);
+
+        var spec = AudioQualityHelper.FormatAudioSpec(sampleRate, bitsPerSample, channels, AudioQualityTier.SQ);
+        Assert.Equal("24bit / 48kHz", spec);
+    }
+
+    [Fact]
+    public void FormatAudioSpec_6ChannelAtmos_FormatsAsSurround()
+    {
+        var spec = AudioQualityHelper.FormatAudioSpec(44100, 16, 6, AudioQualityTier.Atmos);
+        Assert.Equal("5.1 环绕声", spec);
+    }
 }
+
