@@ -29,13 +29,25 @@ public static class MetadataCacheService
         }
     }
 
-    #region 每日 30 首推荐缓存
+    #region 每日推荐与百万收藏快照缓存
 
-    public static DailyRecommendCache? GetDailyRecommend(string uin, string date)
+    public static DailyRecommendCache? GetDailyRecommend(string uin, string date) =>
+        GetDailyDatedSongsCache("daily", uin, date);
+
+    public static void SaveDailyRecommend(string uin, string date, List<Song> songs) =>
+        SaveDailyDatedSongsCache("daily", uin, date, songs);
+
+    public static DailyRecommendCache? GetMillionRecommend(string uin, string date) =>
+        GetDailyDatedSongsCache("million", uin, date);
+
+    public static void SaveMillionRecommend(string uin, string date, List<Song> songs) =>
+        SaveDailyDatedSongsCache("million", uin, date, songs);
+
+    private static DailyRecommendCache? GetDailyDatedSongsCache(string category, string uin, string date)
     {
         if (string.IsNullOrWhiteSpace(uin) || string.IsNullOrWhiteSpace(date)) return null;
 
-        var path = Path.Combine(s_metadataDir, $"daily_{uin}_{date}.json");
+        var path = Path.Combine(s_metadataDir, $"{category}_{uin}_{date}.json");
         lock (s_fileLock)
         {
             if (!File.Exists(path)) return null;
@@ -51,17 +63,17 @@ public static class MetadataCacheService
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("MetadataCacheService", $"Read daily recommend cache failed for {date}: {ex.Message}");
+                AppLogger.Warn("MetadataCacheService", $"Read {category} recommend cache failed for {date}: {ex.Message}");
             }
         }
         return null;
     }
 
-    public static void SaveDailyRecommend(string uin, string date, List<Song> songs)
+    public static void SaveDailyDatedSongsCache(string category, string uin, string date, List<Song> songs)
     {
         if (string.IsNullOrWhiteSpace(uin) || string.IsNullOrWhiteSpace(date) || songs.Count == 0) return;
 
-        var targetPath = Path.Combine(s_metadataDir, $"daily_{uin}_{date}.json");
+        var targetPath = Path.Combine(s_metadataDir, $"{category}_{uin}_{date}.json");
         var cache = new DailyRecommendCache
         {
             Date = date,
@@ -78,25 +90,25 @@ public static class MetadataCacheService
                 File.WriteAllText(tmpPath, json);
                 File.Move(tmpPath, targetPath, overwrite: true);
 
-                // 清理历史日期的每日推荐旧缓存
-                CleanupOutdatedDailyRecommends(uin, date);
+                // 清理历史日期的旧快照缓存
+                CleanupOutdatedDailySnapshots(category, uin, date);
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("MetadataCacheService", $"Save daily recommend cache failed: {ex.Message}");
+                AppLogger.Warn("MetadataCacheService", $"Save {category} recommend cache failed: {ex.Message}");
             }
         }
     }
 
-    private static void CleanupOutdatedDailyRecommends(string uin, string currentDate)
+    private static void CleanupOutdatedDailySnapshots(string category, string uin, string currentDate)
     {
         try
         {
-            var prefix = $"daily_{uin}_";
+            var prefix = $"{category}_{uin}_";
             foreach (var file in Directory.GetFiles(s_metadataDir, $"{prefix}*.json"))
             {
                 var fileName = Path.GetFileName(file);
-                if (!fileName.Equals($"daily_{uin}_{currentDate}.json", StringComparison.OrdinalIgnoreCase))
+                if (!fileName.Equals($"{category}_{uin}_{currentDate}.json", StringComparison.OrdinalIgnoreCase))
                 {
                     File.Delete(file);
                 }

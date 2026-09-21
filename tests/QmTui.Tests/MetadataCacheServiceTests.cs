@@ -35,6 +35,32 @@ public class MetadataCacheServiceTests
     }
 
     [Fact]
+    public void MillionRecommendCache_Roundtrip_WorksCorrectly()
+    {
+        var testUin = "test_uin_million";
+        var testDate = "2026-09-21";
+        var songs = new List<Song>
+        {
+            new Song("million_01", "Million One", "Artist M1", "Album M1", 195),
+            new Song("million_02", "Million Two", "Artist M2", "Album M2", 225)
+        };
+
+        MetadataCacheService.SaveMillionRecommend(testUin, testDate, songs);
+
+        var cached = MetadataCacheService.GetMillionRecommend(testUin, testDate);
+        Assert.NotNull(cached);
+        Assert.Equal(testDate, cached.Date);
+        Assert.Equal(testUin, cached.Uin);
+        Assert.Equal(2, cached.Songs.Count);
+        Assert.Equal("million_01", cached.Songs[0].Mid);
+        Assert.Equal("Million One", cached.Songs[0].Title);
+
+        // 不同日期应未命中
+        var wrongDateCache = MetadataCacheService.GetMillionRecommend(testUin, "2026-09-22");
+        Assert.Null(wrongDateCache);
+    }
+
+    [Fact]
     public void FavoriteCache_Roundtrip_WorksCorrectly()
     {
         var testUin = "test_fav_888";
