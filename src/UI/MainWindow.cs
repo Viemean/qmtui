@@ -276,6 +276,11 @@ public sealed partial class MainWindow : Window
                 _searchField.SetFocus();
             }
         };
+        _searchField.EnableMiddleClickPaste(onFocused: () =>
+        {
+            _isSearchActive = true;
+            Application.Invoke(UpdateFrameBorderHighlights);
+        });
 
         _searchSongsBtn = new Button
         {
@@ -326,6 +331,12 @@ public sealed partial class MainWindow : Window
         UpdateTopRightButtonsLayout();
         _searchField.KeyDown += async (s, k) =>
         {
+            if (k == Key.V.WithCtrl)
+            {
+                k.Handled = true;
+                _searchField.PasteFromClipboard(preferPrimary: false);
+                return;
+            }
             if (k == Key.Enter)
             {
                 k.Handled = true;

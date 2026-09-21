@@ -3,6 +3,7 @@ using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
+using QmTui.Services;
 
 namespace QmTui.UI;
 
@@ -64,6 +65,7 @@ public sealed class CreatePlaylistDialog : Dialog
             Normal = new Terminal.Gui.Drawing.Attribute(Color.White, Color.Black),
             Focus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark)
         });
+        _nameField.EnableMiddleClickPaste();
         Add(_nameField);
 
         var confirmBtn = new Button

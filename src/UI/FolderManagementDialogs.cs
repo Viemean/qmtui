@@ -58,6 +58,7 @@ public sealed class AddFolderDialog : Dialog
             Text = ""
         };
         _pathInput.SetScheme(TransparentDialogScheme);
+        _pathInput.EnableMiddleClickPaste();
         _pathInput.KeyDown += (s, k) =>
         {
             if (k == Key.Enter)

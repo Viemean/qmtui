@@ -55,6 +55,70 @@ public static class ClipboardService
         return success;
     }
 
+    /// <summary>
+    /// 从系统剪贴板读取文本（支持 Wayland wl-paste、X11 xclip/xsel）
+    /// </summary>
+    /// <param name="primary">是否优先读取鼠标选区 (Primary Selection，通常用于鼠标中键粘贴)</param>
+    public static string GetText(bool primary = false)
+    {
+        // 1. Wayland 环境优先尝试 wl-paste
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")))
+        {
+            var text = primary
+                ? TryReadStdout("wl-paste", "-n", "--primary")
+                : TryReadStdout("wl-paste", "-n");
+            if (!string.IsNullOrEmpty(text)) return text;
+        }
+
+        // 2. X11 环境（或 Wayland 未能成功）尝试 xclip / xsel
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
+        {
+            var text = primary
+                ? (TryReadStdout("xclip", "-selection", "primary", "-o") ?? TryReadStdout("xsel", "--primary", "--output"))
+                : (TryReadStdout("xclip", "-selection", "clipboard", "-o") ?? TryReadStdout("xsel", "--clipboard", "--output"));
+            if (!string.IsNullOrEmpty(text)) return text;
+        }
+
+        // 若请求 primary 但为空，可尝试回退读取普通剪贴板
+        if (primary)
+        {
+            return GetText(primary: false);
+        }
+
+        return "";
+    }
+
+    private static string? TryReadStdout(string fileName, params string[] args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = fileName,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            foreach (var arg in args)
+            {
+                psi.ArgumentList.Add(arg);
+            }
+
+            using var proc = Process.Start(psi);
+            if (proc == null) return null;
+
+            var output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit(500);
+            return proc.ExitCode == 0 ? output : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static bool TryRunWithStdin(string fileName, string input, params string[] args)
     {
         try
@@ -90,5 +154,96 @@ public static class ClipboardService
         {
             return false;
         }
+    }
+}
+
+/// <summary>
+/// 适配 Terminal.Gui 的跨桌面环境 Linux 系统剪贴板实现
+/// </summary>
+public sealed class LinuxSystemClipboard : Terminal.Gui.App.IClipboard
+{
+    public bool IsSupported => true;
+
+    public string GetClipboardData()
+    {
+        return ClipboardService.GetText(primary: false);
+    }
+
+    public void SetClipboardData(string text)
+    {
+        ClipboardService.SetText(text);
+    }
+
+    public bool TryGetClipboardData(out string result)
+    {
+        result = GetClipboardData();
+        return !string.IsNullOrEmpty(result);
+    }
+
+    public bool TrySetClipboardData(string text)
+    {
+        return ClipboardService.SetText(text);
+    }
+}
+
+/// <summary>
+/// 文本输入控件剪贴板与鼠标中键粘贴扩展
+/// </summary>
+public static class TextFieldClipboardExtensions
+{
+    /// <summary>
+    /// 将剪贴板或 Primary 选区文本粘贴至输入框当前光标或指定位置
+    /// </summary>
+    public static void PasteFromClipboard(this Terminal.Gui.Views.TextField textField, bool preferPrimary = false, int? targetPosition = null)
+    {
+        var pasteText = ClipboardService.GetText(primary: preferPrimary);
+        if (string.IsNullOrEmpty(pasteText)) return;
+
+        pasteText = pasteText.Replace("\r", "").Replace("\n", " ");
+        var current = textField.Text ?? "";
+        int pos = targetPosition.HasValue
+            ? Math.Clamp(targetPosition.Value, 0, current.Length)
+            : Math.Clamp(textField.InsertionPoint, 0, current.Length);
+
+        if (textField.SelectedLength > 0 && textField.SelectedStart >= 0)
+        {
+            int selStart = Math.Clamp(textField.SelectedStart, 0, current.Length);
+            int selLen = Math.Clamp(textField.SelectedLength, 0, current.Length - selStart);
+            current = current.Remove(selStart, selLen);
+            pos = selStart;
+        }
+
+        textField.Text = current.Insert(pos, pasteText);
+        textField.InsertionPoint = pos + pasteText.Length;
+        textField.SetNeedsDraw();
+    }
+
+    /// <summary>
+    /// 为 TextField 启用鼠标中键粘贴（Primary Selection 或系统剪贴板）并自动获焦
+    /// </summary>
+    public static void EnableMiddleClickPaste(this Terminal.Gui.Views.TextField textField, Action? onFocused = null)
+    {
+        textField.MouseEvent += (s, m) =>
+        {
+            if (m.Flags.HasFlag(Terminal.Gui.Input.MouseFlags.MiddleButtonClicked) ||
+                m.Flags.HasFlag(Terminal.Gui.Input.MouseFlags.MiddleButtonPressed))
+            {
+                m.Handled = true;
+                onFocused?.Invoke();
+                if (!textField.CanFocus)
+                {
+                    textField.CanFocus = true;
+                }
+                if (!textField.HasFocus)
+                {
+                    textField.SetFocus();
+                }
+
+                int clickX = m.Position?.X ?? textField.InsertionPoint;
+                int clickPos = Math.Clamp(clickX + textField.ScrollOffset, 0, (textField.Text ?? "").Length);
+
+                textField.PasteFromClipboard(preferPrimary: true, targetPosition: clickPos);
+            }
+        };
     }
 }

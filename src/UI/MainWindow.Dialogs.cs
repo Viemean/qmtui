@@ -477,6 +477,7 @@ public sealed partial class MainWindow
             Width = 9
         };
         portField.SetScheme(TransparentDialogScheme);
+        portField.EnableMiddleClickPaste();
 
         var portHintLabel = new Label
         {

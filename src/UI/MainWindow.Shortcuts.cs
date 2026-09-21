@@ -269,14 +269,18 @@ public sealed partial class MainWindow
                 Application.Invoke(UpdateFrameBorderHighlights);
             }
 
-            // 6. 只有未在搜索框内打字时，按 F3 或 '/' 才作为激活搜索框的快捷键（大播放界面下禁止唤出搜索）
-            if (k == Key.F3 || k.AsRune.Value == '/')
+            // 6. 只有未在搜索框内打字时，按 F3、'/' 或 Ctrl+V 才作为激活搜索框的快捷键（大播放界面下禁止唤出搜索）
+            if (k == Key.F3 || k.AsRune.Value == '/' || k == Key.V.WithCtrl)
             {
                 if (_isNowPlayingViewActive) return;
                 k.Handled = true;
                 _searchField.CanFocus = true;
                 _isSearchActive = true;
                 _searchField.SetFocus();
+                if (k == Key.V.WithCtrl)
+                {
+                    _searchField.PasteFromClipboard(preferPrimary: false);
+                }
                 return;
             }
 

@@ -58,6 +58,7 @@ public sealed class WebdavServerEditDialog : Dialog
             Text = _server.Name
         };
         _nameInput.SetScheme(TransparentDialogScheme);
+        _nameInput.EnableMiddleClickPaste();
         Add(_nameInput);
 
         // 2. 服务器 URL
@@ -70,6 +71,7 @@ public sealed class WebdavServerEditDialog : Dialog
             Text = _server.Url
         };
         _urlInput.SetScheme(TransparentDialogScheme);
+        _urlInput.EnableMiddleClickPaste();
         Add(_urlInput);
 
         // 3. 用户名
@@ -82,6 +84,7 @@ public sealed class WebdavServerEditDialog : Dialog
             Text = _server.Username
         };
         _userInput.SetScheme(TransparentDialogScheme);
+        _userInput.EnableMiddleClickPaste();
         Add(_userInput);
 
         // 4. 密码
@@ -95,6 +98,7 @@ public sealed class WebdavServerEditDialog : Dialog
             Secret = true
         };
         _passInput.SetScheme(TransparentDialogScheme);
+        _passInput.EnableMiddleClickPaste();
         Add(_passInput);
 
         // 5. 根路径
@@ -107,6 +111,7 @@ public sealed class WebdavServerEditDialog : Dialog
             Text = string.IsNullOrEmpty(_server.RootPath) ? "/" : _server.RootPath
         };
         _rootPathInput.SetScheme(TransparentDialogScheme);
+        _rootPathInput.EnableMiddleClickPaste();
         Add(_rootPathInput);
 
         // 6. 信任自签名证书（单层方括号切换控件）

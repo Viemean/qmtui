@@ -4,6 +4,7 @@ using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Color = Terminal.Gui.Drawing.Color;
+using QmTui.Services;
 
 namespace QmTui.UI;
 
@@ -66,6 +67,7 @@ public sealed class QuickSearchFloatingBar : FrameView
             CanFocus = true
         };
         _searchField.SetScheme(FloatingSearchScheme);
+        _searchField.EnableMiddleClickPaste();
         Add(_searchField);
 
         _countLabel = new Label
@@ -90,6 +92,13 @@ public sealed class QuickSearchFloatingBar : FrameView
         // 按键监听：Enter / Down 顺向循环跳转，Shift+Enter / Up 反向循环跳转，Esc 收起
         _searchField.KeyDown += (s, k) =>
         {
+            if (k == Key.V.WithCtrl)
+            {
+                k.Handled = true;
+                _searchField.PasteFromClipboard(preferPrimary: false);
+                return;
+            }
+
             if (k == Key.Esc)
             {
                 k.Handled = true;
