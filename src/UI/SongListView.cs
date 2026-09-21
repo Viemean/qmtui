@@ -458,17 +458,7 @@ public sealed partial class SongListView : FrameView
                 }
             }
 
-            // 鼠标悬浮其上时，即刻在顶部 Frame 标题提示显示完整歌名、歌手与专辑全称（跑马灯支持）
-            if (m.Position.HasValue)
-            {
-                var hoverIndex = _listView.Viewport.Y + m.Position.Value.Y;
-                if (hoverIndex >= 0 && hoverIndex < _songs.Count)
-                {
-                    var hSong = _songs[hoverIndex];
-                    var albumText = string.IsNullOrWhiteSpace(hSong.Album) ? "单曲" : hSong.Album;
-                    SetMarqueeTitle($"《{hSong.Title}》 歌手: {hSong.Artist}  专辑: {albumText}");
-                }
-            }
+            // 鼠标悬停保持列表标题稳定，不再覆写跑马灯
         };
 
         _listView.ViewportChanged += (s, e) =>

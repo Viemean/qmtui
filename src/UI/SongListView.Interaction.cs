@@ -142,23 +142,10 @@ public sealed partial class SongListView
         _listView.SetNeedsDraw();
     }
 
-    private void UpdateSubColumnTitle(int? index = null)
+    private static void UpdateSubColumnTitle(int? index = null)
     {
-        if (_isRadioMode) return;
-
-        var current = index ?? _listView.SelectedItem ?? 0;
-        if (current >= 0 && current < _songs.Count)
-        {
-            var selSong = _songs[current];
-            var albumText = string.IsNullOrWhiteSpace(selSong.Album) ? "单曲" : selSong.Album;
-            string titleText = _focusedSubColumn switch
-            {
-                SongSubColumn.Artist => $"《{selSong.Title}》 · [已选歌手: {selSong.Artist} (回车进入)]  [←/→]切换",
-                SongSubColumn.Album => $"《{selSong.Title}》 · [已选专辑: {albumText} (回车进入)]  [←/→]切换",
-                _ => $"《{selSong.Title}》  歌手: {selSong.Artist}  专辑: {albumText}  [←/→]歌手/专辑"
-            };
-            SetMarqueeTitle(titleText);
-        }
+        _ = index;
+        // 保持列表 FrameView 标题稳定展示列表名称与曲目数量，不再覆写为选中项跑马灯
     }
 
     /// <summary>
