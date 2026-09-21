@@ -51,6 +51,8 @@ public static class MikuTheme
     public static Scheme FrameBorderActive { get; } = CreateFrameBorderActiveScheme();
     public static Scheme TitleHighlight { get; } = CreateTitleHighlightScheme();
     public static Scheme QrCode { get; } = CreateQrCodeScheme();
+    public static Scheme SearchCategoryActive { get; } = CreateSearchCategoryActiveScheme();
+    public static Scheme SearchCategoryDim { get; } = CreateSearchCategoryDimScheme();
 
     private static Scheme CreateBaseScheme()
     {
@@ -217,6 +219,38 @@ public static class MikuTheme
             Active    = attr,
             ReadOnly  = attr,
             Editable  = attr
+        };
+    }
+
+    private static Scheme CreateSearchCategoryActiveScheme()
+    {
+        return new Scheme
+        {
+            Normal    = new Attribute(Color.White,    QqGreenDark),
+            Focus     = new Attribute(Color.White,    QqGreenPrimary),
+            HotNormal = new Attribute(QqGreenLight,   QqGreenDark),
+            HotFocus  = new Attribute(Color.White,    QqGreenPrimary),
+            Disabled  = new Attribute(MikuTextMuted,  Color.None),
+            Highlight = new Attribute(QqGreenLight,   QqGreenDark),
+            Active    = new Attribute(Color.White,    QqGreenDark),
+            ReadOnly  = new Attribute(Color.White,    QqGreenDark),
+            Editable  = new Attribute(Color.White,    QqGreenDark)
+        };
+    }
+
+    private static Scheme CreateSearchCategoryDimScheme()
+    {
+        return new Scheme
+        {
+            Normal    = new Attribute(MikuTextMuted,  Color.None),
+            Focus     = new Attribute(QqGreenLight,   Color.None),
+            HotNormal = new Attribute(MikuTextSub,    Color.None),
+            HotFocus  = new Attribute(Color.White,    QqGreenPrimary),
+            Disabled  = new Attribute(MikuTextMuted,  Color.None),
+            Highlight = new Attribute(MikuTextMuted,  Color.None),
+            Active    = new Attribute(MikuTextMuted,  Color.None),
+            ReadOnly  = new Attribute(MikuTextMuted,  Color.None),
+            Editable  = new Attribute(MikuTextMuted,  Color.None)
         };
     }
 

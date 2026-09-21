@@ -36,6 +36,9 @@ public sealed partial class MainWindow
         // 1. 上方搜索框与账号状态栏显隐
         _searchLabel.Visible = !enable;
         _searchField.Visible = !enable;
+        _searchSongsBtn.Visible = !enable;
+        _searchPlaylistsBtn.Visible = !enable;
+        _searchAlbumsBtn.Visible = !enable;
         _userStatusBtn.Visible = !enable;
         _recognizeBtn.Visible = !enable;
         _webBtn.Visible = !enable;
@@ -251,6 +254,9 @@ public sealed partial class MainWindow
         _lyricFrame.Visible = false;
         _searchLabel.Visible = false;
         _searchField.Visible = false;
+        _searchSongsBtn.Visible = false;
+        _searchPlaylistsBtn.Visible = false;
+        _searchAlbumsBtn.Visible = false;
         _userStatusBtn.Visible = false;
         _recognizeBtn.Visible = false;
         _webBtn.Visible = false;
@@ -280,6 +286,9 @@ public sealed partial class MainWindow
         _lyricFrame.Visible = true;
         _searchLabel.Visible = !_isImmersiveMode;
         _searchField.Visible = !_isImmersiveMode;
+        _searchSongsBtn.Visible = !_isImmersiveMode;
+        _searchPlaylistsBtn.Visible = !_isImmersiveMode;
+        _searchAlbumsBtn.Visible = !_isImmersiveMode;
         _userStatusBtn.Visible = !_isImmersiveMode;
         _recognizeBtn.Visible = !_isImmersiveMode;
         _webBtn.Visible = !_isImmersiveMode;
@@ -306,6 +315,9 @@ public sealed partial class MainWindow
         _lyricFrame.Visible = false;
         _searchLabel.Visible = false;
         _searchField.Visible = false;
+        _searchSongsBtn.Visible = false;
+        _searchPlaylistsBtn.Visible = false;
+        _searchAlbumsBtn.Visible = false;
         _userStatusBtn.Visible = false;
         _recognizeBtn.Visible = false;
         _webBtn.Visible = false;
@@ -361,6 +373,9 @@ public sealed partial class MainWindow
             _lyricFrame.Visible = true;
             _searchLabel.Visible = !_isImmersiveMode;
             _searchField.Visible = !_isImmersiveMode;
+            _searchSongsBtn.Visible = !_isImmersiveMode;
+            _searchPlaylistsBtn.Visible = !_isImmersiveMode;
+            _searchAlbumsBtn.Visible = !_isImmersiveMode;
             _userStatusBtn.Visible = !_isImmersiveMode;
             _recognizeBtn.Visible = !_isImmersiveMode;
             _webBtn.Visible = !_isImmersiveMode;
@@ -416,11 +431,25 @@ public sealed partial class MainWindow
         }
         else if (_currentDrilldownPlaylist != null)
         {
-            await LoadPlaylistsAsync();
+            if (_searchCategory == SearchCategory.Playlists && !string.IsNullOrEmpty(_lastSearchQuery))
+            {
+                await ExecuteSearchAsync();
+            }
+            else
+            {
+                await LoadPlaylistsAsync();
+            }
         }
         else if (_currentDrilldownAlbum != null)
         {
-            await LoadFavoriteAlbumsAsync();
+            if (_searchCategory == SearchCategory.Albums && !string.IsNullOrEmpty(_lastSearchQuery))
+            {
+                await ExecuteSearchAsync();
+            }
+            else
+            {
+                await LoadFavoriteAlbumsAsync();
+            }
         }
         else if (_currentViewMode == ViewMode.WebDav && !_isWebDavFlatMode && _webDavPathHistory.Count > 0)
         {

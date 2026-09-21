@@ -25,6 +25,7 @@ public sealed partial class MainWindow
         var ct = _favoriteSyncCts.Token;
 
         _currentViewMode = ViewMode.Favorite;
+        UpdateSearchCategoryVisibility(false);
         _hasMoreSearchResults = false;
         _isViewingPlaylistsList = false;
         _currentDrilldownPlaylist = null;
@@ -886,6 +887,7 @@ public sealed partial class MainWindow
     private async Task LoadLocalMusicAsync()
     {
         _currentViewMode = ViewMode.LocalMusic;
+        UpdateSearchCategoryVisibility(false);
         _hasMoreSearchResults = false;
         _isViewingPlaylistsList = false;
         _currentDrilldownPlaylist = null;
