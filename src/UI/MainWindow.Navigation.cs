@@ -2,6 +2,7 @@ using Terminal.Gui.App;
 using QmTui.Api;
 using QmTui.Models;
 using QmTui.Services;
+using QmTui.Utils;
 
 namespace QmTui.UI;
 
@@ -123,23 +124,72 @@ public sealed partial class MainWindow
         _isViewingAlbumsList = false;
         _currentDrilldownAlbum = null;
 
-        var songs = RecentPlayHistory.GetSongs();
+        // 先用本地缓存立即渲染，不阻塞 UI
+        var localSongs = RecentPlayHistory.GetSongs();
         Application.Invoke(() =>
         {
-            if (songs.Count == 0)
+            if (localSongs.Count == 0)
             {
                 _songListView.SetMessage("暂无最近播放记录，快去点播一首歌曲吧！", "最近播放 (0 首)");
                 return;
             }
 
-            _songListView.SetSongs(songs, $"最近播放: 共 {songs.Count} 首 (按 D 移除历史)");
+            _songListView.SetSongs(localSongs, $"最近播放: 共 {localSongs.Count} 首 (按 D 移除历史)");
             if (_activeSong != null)
             {
                 _songListView.SetPlayingSong(_activeSong.Mid);
             }
             _songListView.SetFocusToList();
         });
-        _controlBar.UpdateStatus($"[最近播放] 已加载本地播放轨迹共 {songs.Count} 首");
+        _controlBar.UpdateStatus($"[最近播放] 已加载本地播放轨迹共 {localSongs.Count} 首");
+
+        // 已登录时异步拉取云端增量数据，覆盖更新本地
+        if (!UserSession.Current.IsLoggedIn)
+        {
+            return;
+        }
+
+        try
+        {
+            var (cloudSongs, newUpdateTime) = await MusicApi.GetRecentSongsAsync(_lastRecentCloudUpdateTime).ConfigureAwait(false);
+
+            // 无论是否有新数据，只要服务端返回了有效的 updateTime 就更新锚点，防止下次重复全量拉取
+            if (newUpdateTime > 0)
+            {
+                _lastRecentCloudUpdateTime = newUpdateTime;
+            }
+
+            if (cloudSongs.Count == 0)
+            {
+                return;
+            }
+
+            RecentPlayHistory.OverwriteFromCloud(cloudSongs);
+
+            if (_currentViewMode != ViewMode.RecentPlay)
+            {
+                return;
+            }
+
+            Application.Invoke(() =>
+            {
+                if (_currentViewMode != ViewMode.RecentPlay)
+                {
+                    return;
+                }
+
+                _songListView.SetSongs(cloudSongs, $"最近播放: 共 {cloudSongs.Count} 首 (按 D 移除历史)");
+                if (_activeSong != null)
+                {
+                    _songListView.SetPlayingSong(_activeSong.Mid);
+                }
+            });
+            _controlBar.UpdateStatus($"[最近播放] 已同步云端数据共 {cloudSongs.Count} 首");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MainWindow", $"LoadRecentPlaySongsAsync cloud fetch failed: {ex.Message}");
+        }
     }
 
     private async Task LoadPlaylistsAsync()

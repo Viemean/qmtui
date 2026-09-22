@@ -34,6 +34,11 @@ public sealed partial class MainWindow
     private string? _lastResolvedPlayUrl;
     private double _accumulatedPlaySeconds;
     private double _lastProgressSec;
+
+    // 云端最近播放上报状态机（单曲 5s / 歌单或专辑上下文 15s 独立触发）
+    private bool _hasReportedCurrentSong;
+    private bool _hasReportedCurrentContext;
+    private string? _currentContextKey;
     private string? _currentCoverFilePath;
     private long _lastConnectBroadcastTick;
 
@@ -63,6 +68,19 @@ public sealed partial class MainWindow
         catch {}
         _cachingCts = new CancellationTokenSource();
         _hasTriggeredCacheForCurrentSong = false;
+        _hasReportedCurrentSong = false;
+        var srcCtx = PlaybackQueueService.Instance.SourceContext;
+        string? newContextKey = srcCtx switch
+        {
+            PlaybackSourceContext.Playlist p => $"playlist:{p.Id}",
+            PlaybackSourceContext.Album a => $"album:{(a.Id > 0 ? a.Id.ToString() : a.Mid)}",
+            _ => null
+        };
+        if (newContextKey != _currentContextKey)
+        {
+            _currentContextKey = newContextKey;
+            _hasReportedCurrentContext = false;
+        }
         _lastResolvedPlayUrl = null;
         _accumulatedPlaySeconds = 0.0;
         _lastProgressSec = startPosition;
@@ -627,6 +645,33 @@ public sealed partial class MainWindow
             }
         }
 
+        // 云端最近播放上报：单曲 >= 5s，歌单/专辑上下文 >= 15s 独立解耦触发
+        if (!_activeSong.IsLocal && !_activeSong.IsWebDav && UserSession.Current.IsLoggedIn)
+        {
+            if (!_hasReportedCurrentSong && _accumulatedPlaySeconds >= 5.0)
+            {
+                _hasReportedCurrentSong = true;
+                var songToReport = _activeSong;
+                Task.Run(() => MusicApi.ReportRecentSongAsync(songToReport, CancellationToken.None));
+            }
+
+            if (!_hasReportedCurrentContext && _accumulatedPlaySeconds >= 15.0)
+            {
+                var srcCtx = PlaybackQueueService.Instance.SourceContext;
+                if (srcCtx is PlaybackSourceContext.Playlist pCtx)
+                {
+                    _hasReportedCurrentContext = true;
+                    Task.Run(() => MusicApi.ReportRecentPlaylistAsync(pCtx.Id, pCtx.Title, CancellationToken.None));
+                }
+                else if (srcCtx is PlaybackSourceContext.Album aCtx)
+                {
+                    _hasReportedCurrentContext = true;
+                    string aId = aCtx.Id > 0 ? aCtx.Id.ToString() : aCtx.Mid;
+                    Task.Run(() => MusicApi.ReportRecentAlbumAsync(aId, aCtx.Mid, aCtx.Title, CancellationToken.None));
+                }
+            }
+        }
+
         // AOD 后台息屏模式：仅在后台同步 D-Bus 位置与防抖持久化，不触发前台界面控件重绘
         if (_isAodMode)
         {
@@ -847,6 +892,4 @@ public sealed partial class MainWindow
             AppLogger.Debug("MainWindow", $"PrefetchNextSongAsync exception: {ex.Message}");
         }
     }
-
-
 }

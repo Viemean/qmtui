@@ -102,8 +102,12 @@ public sealed partial class MainWindow : Window
     private int _isAddToPlaylistOpen;
 
     private Album? _currentDrilldownAlbum;
+    private AlbumDetail? _currentAlbumDetail;
     private List<Album> _cachedAlbums = [];
     private bool _isViewingAlbumsList;
+
+    // 云端最近播放增量拉取的 updateTime 锚点（0 表示首次全量）
+    private long _lastRecentCloudUpdateTime;
 
     internal enum SearchCategory
     {
@@ -464,8 +468,32 @@ public sealed partial class MainWindow : Window
                     curIdx = _songListView.Songs.ToList().FindIndex(s => s.Mid == song.Mid);
                     if (curIdx < 0) curIdx = 0;
                 }
+                PlaybackSourceContext? sourceContext = null;
+                if (_currentViewMode == ViewMode.PlaylistDrilldown && _currentDrilldownPlaylist != null)
+                {
+                    var p = _currentDrilldownPlaylist;
+                    if (!p.IsMyFavorite && p.DirId != 201 && p.DirId != 211111)
+                    {
+                        string pId = p.Tid > 0 ? p.Tid.ToString() : p.DirId.ToString();
+                        if (!string.IsNullOrEmpty(pId) && pId != "0")
+                        {
+                            sourceContext = new PlaybackSourceContext.Playlist(pId, p.Title);
+                        }
+                    }
+                }
+                else if (_currentViewMode == ViewMode.AlbumDrilldown && _currentDrilldownAlbum != null)
+                {
+                    var a = _currentDrilldownAlbum;
+                    sourceContext = new PlaybackSourceContext.Album(a.Mid, a.Id, a.Title);
+                }
+                else if (_currentViewMode == ViewMode.AlbumDetail && _currentAlbumDetail != null)
+                {
+                    var a = _currentAlbumDetail;
+                    sourceContext = new PlaybackSourceContext.Album(a.Mid, a.Id, a.Name);
+                }
+
                 PlaybackQueueService.Instance.Mode = _currentPlaybackMode;
-                PlaybackQueueService.Instance.SetQueue(_songListView.Songs, curIdx);
+                PlaybackQueueService.Instance.SetQueue(_songListView.Songs, curIdx, sourceContext);
             }
             await PlaySongAsync(song);
         };

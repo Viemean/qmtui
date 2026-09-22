@@ -555,7 +555,7 @@ public sealed partial class MainWindow
         {
             if (idx >= 0 && idx < _singerAlbums.Count)
             {
-                await DrilldownToAlbumAsync(_singerAlbums[idx].Mid, _singerAlbums[idx].Title, _singerAlbums[idx].Artist);
+                await DrilldownToAlbumAsync(_singerAlbums[idx].Mid, _singerAlbums[idx].Title, _singerAlbums[idx].Artist, _singerAlbums[idx].Id);
             }
         }, (selectedIdx) =>
         {
@@ -622,7 +622,7 @@ public sealed partial class MainWindow
         }
     }
 
-    private async Task DrilldownToAlbumAsync(string albumMid, string albumName, string artistName)
+    private async Task DrilldownToAlbumAsync(string albumMid, string albumName, string artistName, long albumId = 0)
     {
         PushCurrentNavigationSnapshot();
         _currentViewMode = ViewMode.AlbumDetail;
@@ -655,6 +655,12 @@ public sealed partial class MainWindow
                 return;
             }
 
+            if (detail.Id == 0 && albumId > 0)
+            {
+                detail = detail with { Id = albumId };
+            }
+
+            _currentAlbumDetail = detail;
             _artistAlbumDetailView.SetAlbum(detail, coverPath);
             _artistAlbumDetailView.SetHintText("Enter: 播放歌曲  D/S: 收藏  Esc: 返回");
             _artistAlbumDetailView.OnActivated();

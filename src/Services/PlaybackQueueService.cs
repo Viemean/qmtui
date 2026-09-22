@@ -58,16 +58,18 @@ public sealed class PlaybackQueueService
     }
 
     public PlaybackMode Mode { get; set; } = PlaybackMode.ListLoop;
+    public PlaybackSourceContext? SourceContext { get; set; }
 
     private PlaybackQueueService() { }
 
     /// <summary>
-    /// 装载全新播放队列并定位起始播放索引
+    /// 装载全新播放队列并定位起始播放索引与来源上下文
     /// </summary>
-    public void SetQueue(IEnumerable<Song> songs, int startIndex = 0)
+    public void SetQueue(IEnumerable<Song> songs, int startIndex = 0, PlaybackSourceContext? sourceContext = null)
     {
         lock (_lock)
         {
+            SourceContext = sourceContext;
             _activeSongs.Clear();
             _activeSongs.AddRange(songs);
 
