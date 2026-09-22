@@ -189,11 +189,20 @@ public static class MikuTheme
 
     public static void Apply()
     {
-        // 将按钮外框括号统一为 ASCII 简洁半角中括号 [ ]
-        Glyphs.LeftBracket = new Rune('[');
-        Glyphs.RightBracket = new Rune(']');
-        Terminal.Gui.Views.Button.DefaultShadow = ShadowStyles.None;
-        Terminal.Gui.Views.Dialog.DefaultShadow = ShadowStyles.None;
+        // 将按钮外框括号统一为 ASCII 简洁半角中括号 [ ]，去除默认投影
+        GlyphSettings.Current = GlyphSettings.Current with
+        {
+            LeftBracket = new Rune('['),
+            RightBracket = new Rune(']')
+        };
+        ButtonSettings.Current = ButtonSettings.Current with
+        {
+            DefaultShadow = ShadowStyles.None
+        };
+        DialogSettings.Current = DialogSettings.Current with
+        {
+            DefaultShadow = ShadowStyles.None
+        };
         SchemeManager.AddScheme("Base", Base);
         SchemeManager.AddScheme("Dialog", Dialog);
         SchemeManager.AddScheme("PlayerBar", PlayerBar);
