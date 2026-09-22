@@ -294,6 +294,7 @@ public sealed partial class SongListView
     {
         SongListDisplayMode.Playlists => FormatPlaylistRow(index, isSelected),
         SongListDisplayMode.Albums => FormatAlbumRow(index, isSelected),
+        SongListDisplayMode.CustomText => index >= 0 && index < _customItems.Count ? _customItems[index] : "",
         _ => FormatSongRow(index, isSelected)
     };
 

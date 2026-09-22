@@ -123,7 +123,7 @@ public sealed partial class SongListView
 
     public void UpdateFocusedRowDisplay()
     {
-        if (_isRadioMode) return;
+        if (_isRadioMode || _displayMode == SongListDisplayMode.CustomText) return;
 
         int totalCount = GetCurrentItemCount();
         if (totalCount == 0) return;
