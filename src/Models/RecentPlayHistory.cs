@@ -89,6 +89,30 @@ public static class RecentPlayHistory
         Save();
     }
 
+    /// <summary>
+    /// 以云端拉取结果全量覆盖本地历史，云端为主数据源
+    /// </summary>
+    public static void OverwriteFromCloud(IEnumerable<Song> cloudSongs)
+    {
+        EnsureLoaded();
+        lock (s_lock)
+        {
+            s_songs.Clear();
+            foreach (var song in cloudSongs)
+            {
+                if (song != null && (!string.IsNullOrEmpty(song.Mid) || song.Id > 0))
+                {
+                    s_songs.Add(song);
+                }
+            }
+            if (s_songs.Count > MaxHistoryCount)
+            {
+                s_songs.RemoveRange(MaxHistoryCount, s_songs.Count - MaxHistoryCount);
+            }
+        }
+        Save();
+    }
+
     private static void EnsureLoaded()
     {
         if (s_loaded) return;

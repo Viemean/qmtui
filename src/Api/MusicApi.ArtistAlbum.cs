@@ -606,6 +606,7 @@ public sealed partial class MusicApi
         string publishDate = "";
         string company = "";
         string desc = "";
+        long albumId = 0;
 
         try
         {
@@ -628,7 +629,15 @@ public sealed partial class MusicApi
                 adObj.TryGetProperty("data", out var dataObj) &&
                 dataObj.TryGetProperty("basicInfo", out var basicInfo))
             {
-                if (basicInfo.TryGetProperty("name", out var nProp)) albumName = nProp.GetString() ?? "";
+                if (basicInfo.TryGetProperty("albumID", out var aIdProp) ||
+                    basicInfo.TryGetProperty("id", out aIdProp) ||
+                    basicInfo.TryGetProperty("album_id", out aIdProp))
+                {
+                    if (aIdProp.ValueKind == JsonValueKind.Number) albumId = aIdProp.GetInt64();
+                    else if (aIdProp.ValueKind == JsonValueKind.String && long.TryParse(aIdProp.GetString(), out var parsedId)) albumId = parsedId;
+                }
+                if (basicInfo.TryGetProperty("albumName", out var anProp)) albumName = anProp.GetString() ?? "";
+                else if (basicInfo.TryGetProperty("name", out var nProp)) albumName = nProp.GetString() ?? "";
                 if (basicInfo.TryGetProperty("singerName", out var snProp)) artistName = snProp.GetString() ?? "";
                 if (basicInfo.TryGetProperty("publishDate", out var pdProp)) publishDate = pdProp.GetString() ?? "";
                 if (basicInfo.TryGetProperty("company", out var cProp)) company = cProp.GetString() ?? "";
@@ -651,7 +660,7 @@ public sealed partial class MusicApi
             artistName = songs[0].Artist;
         }
 
-        return new AlbumDetail(albumMid, albumName, artistName, publishDate, company, desc, songs);
+        return new AlbumDetail(albumMid, albumName, artistName, publishDate, company, desc, songs, albumId);
     }
 
     public static async Task<List<Album>> SearchAlbumsAsync(string query, int page = 1, int pageSize = 30, CancellationToken ct = default)

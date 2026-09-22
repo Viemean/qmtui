@@ -24,7 +24,8 @@ public sealed record AlbumDetail(
     string PublishDate,
     string Company,
     string Description,
-    List<Song> Songs
+    List<Song> Songs,
+    long Id = 0
 );
 
 /// <summary>
