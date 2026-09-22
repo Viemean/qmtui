@@ -36,12 +36,10 @@ public sealed partial class MainWindow
         // 1. 上方搜索框与账号状态栏显隐
         _searchLabel.Visible = !enable;
         _searchField.Visible = !enable;
-        _searchSongsBtn.Visible = !enable;
-        _searchPlaylistsBtn.Visible = !enable;
-        _searchAlbumsBtn.Visible = !enable;
         _userStatusBtn.Visible = !enable;
         _recognizeBtn.Visible = !enable;
         _webBtn.Visible = !enable;
+        UpdateTopContextButtons();
 
         // 2. 下方控制栏与快捷栏显隐
         _controlBar.Visible = !enable;
@@ -286,13 +284,11 @@ public sealed partial class MainWindow
         _lyricFrame.Visible = true;
         _searchLabel.Visible = !_isImmersiveMode;
         _searchField.Visible = !_isImmersiveMode;
-        _searchSongsBtn.Visible = !_isImmersiveMode;
-        _searchPlaylistsBtn.Visible = !_isImmersiveMode;
-        _searchAlbumsBtn.Visible = !_isImmersiveMode;
         _userStatusBtn.Visible = !_isImmersiveMode;
         _recognizeBtn.Visible = !_isImmersiveMode;
         _webBtn.Visible = !_isImmersiveMode;
         _hotkeyHintLabel.Visible = !_isImmersiveMode;
+        UpdateTopContextButtons();
 
         _isSearchActive = false;
         _songListView.SetFocusToList();
@@ -373,15 +369,13 @@ public sealed partial class MainWindow
             _lyricFrame.Visible = true;
             _searchLabel.Visible = !_isImmersiveMode;
             _searchField.Visible = !_isImmersiveMode;
-            _searchSongsBtn.Visible = !_isImmersiveMode;
-            _searchPlaylistsBtn.Visible = !_isImmersiveMode;
-            _searchAlbumsBtn.Visible = !_isImmersiveMode;
             _userStatusBtn.Visible = !_isImmersiveMode;
             _recognizeBtn.Visible = !_isImmersiveMode;
             _webBtn.Visible = !_isImmersiveMode;
             _sidebarTitleLabel.Visible = true;
             _songListTitleLabel.Visible = true;
             _lyricTitleLabel.Visible = true;
+            UpdateTopContextButtons();
             if (_artistAlbumDetailView.Visible)
             {
                 _artistAlbumDetailView.OnActivated();
