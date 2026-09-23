@@ -13,7 +13,7 @@ public static partial class Program
     {
         if (args.Contains("--version") || args.Contains("-v"))
         {
-            Console.WriteLine("qmtui 0.3.9");
+            Console.WriteLine("qmtui 0.3.10");
             return;
         }
 
