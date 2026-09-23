@@ -324,11 +324,6 @@ public sealed partial class MainWindow
 
                 if (song != null)
                 {
-                    if (song.IsLocal || !string.IsNullOrEmpty(song.LocalFilePath))
-                    {
-                        return await LocalMusicService.EnsureCoverAsync(song).ConfigureAwait(false);
-                    }
-
                     if (song.IsWebDav || !string.IsNullOrEmpty(song.WebDavHref))
                     {
                         var servers = WebDavService.GetServers();
@@ -339,30 +334,16 @@ public sealed partial class MainWindow
                             return await WebDavService.EnsureCoverAsync(server, song).ConfigureAwait(false);
                         }
                     }
+                    else if (song.IsLocal || !string.IsNullOrEmpty(song.LocalFilePath))
+                    {
+                        return await LocalMusicService.EnsureCoverAsync(song).ConfigureAwait(false);
+                    }
                 }
 
                 return null;
             };
 
-                _connectServer.CurrentLyricsTextProvider = () =>
-                {
-                    if (_currentLyrics != null && _currentLyrics.Count > 0)
-                    {
-                        var sb = new StringBuilder();
-                        foreach (var line in _currentLyrics)
-                        {
-                            var ts = line.Timestamp;
-                            var timeStr = $"[{ts.Minutes:D2}:{ts.Seconds:D2}.{ts.Milliseconds / 10:D2}]";
-                            sb.AppendLine($"{timeStr}{line.Text}");
-                            if (!string.IsNullOrWhiteSpace(line.Trans))
-                            {
-                                sb.AppendLine($"{timeStr}{line.Trans}");
-                            }
-                        }
-                        return sb.ToString();
-                    }
-                    return null;
-                };
+                _connectServer.CurrentLyricsTextProvider = () => GetOrBuildFormattedLyricsPayload();
 
                 _connectServer.Start();
                 _connectMdns = new ConnectMdnsService(_connectStorage, port: _connectServer.ActualPort);
@@ -410,22 +391,7 @@ public sealed partial class MainWindow
                     nextSong = ConnectSong.FromDomainSong(nextDomain, AudioQualityTier.SQ, actualPort);
                 }
 
-                string? lrcPayload = null;
-                if (_currentLyrics != null && _currentLyrics.Count > 0)
-                {
-                    var sb = new StringBuilder();
-                    foreach (var line in _currentLyrics)
-                    {
-                        var ts = line.Timestamp;
-                        var timeStr = $"[{ts.Minutes:D2}:{ts.Seconds:D2}.{ts.Milliseconds / 10:D2}]";
-                        sb.AppendLine($"{timeStr}{line.Text}");
-                        if (!string.IsNullOrWhiteSpace(line.Trans))
-                        {
-                            sb.AppendLine($"{timeStr}{line.Trans}");
-                        }
-                    }
-                    lrcPayload = sb.ToString();
-                }
+                string? lrcPayload = GetOrBuildFormattedLyricsPayload();
 
                 var availableTiers = new List<string> { "Standard", "HQ", "SQ", "HiRes", "Master" };
 

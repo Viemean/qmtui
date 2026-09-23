@@ -21,10 +21,10 @@ public record Song(
     public string? PlayUrl { get; set; }
     public string Quality { get; set; } = "标准 128k";
     public string? LocalFilePath { get; set; }
-    public bool IsLocal => !string.IsNullOrEmpty(LocalFilePath);
     public string? WebDavServerId { get; set; }
     public string? WebDavHref { get; set; }
     public bool IsWebDav => !string.IsNullOrEmpty(WebDavHref);
+    public bool IsLocal => !string.IsNullOrEmpty(LocalFilePath) && !IsWebDav;
     public string? CoverUrl { get; set; }
     public List<ArtistInfo> Singers { get; set; } = [];
 }

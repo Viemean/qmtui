@@ -89,7 +89,7 @@ public sealed partial class MainWindow
         bool IsStale() => ct.IsCancellationRequested || Interlocked.Read(ref _playbackSessionId) != currentSession;
 
         // 对齐官方双向反向接力：若为移动端本地曲目且 PC 本地不存在物理文件，向移动端请求 HTTP 串流代理
-        bool isLocalSong = song.IsLocal || song.Mid.StartsWith("local_", StringComparison.OrdinalIgnoreCase);
+        bool isLocalSong = !song.IsWebDav && (song.IsLocal || song.Mid.StartsWith("local_", StringComparison.OrdinalIgnoreCase));
         bool directFileExists = !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath);
         if (isLocalSong && !directFileExists && string.IsNullOrEmpty(overridePlayUrl))
         {
@@ -169,6 +169,7 @@ public sealed partial class MainWindow
         MemoryManager.TrimBackground();
 
         _currentLyrics.Clear();
+        InvalidateFormattedLyricsCache();
         _currentActiveLyricIndex = -1;
         _lastRemoteSyncedSongMid = null;
 
@@ -367,6 +368,7 @@ public sealed partial class MainWindow
 
         _currentLyrics.Clear();
         _currentLyrics.AddRange(lyrics);
+        InvalidateFormattedLyricsCache();
         _player.UpdateCurrentLyrics(lyrics);
         if (_standaloneWebServer != null && _standaloneWebServer.IsRunning)
         {

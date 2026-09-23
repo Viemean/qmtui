@@ -1,6 +1,7 @@
 using System.Text.Json;
 using QmTui.Connect.Discovery;
 using QmTui.Connect.Models;
+using QmTui.Connect.Server;
 using QmTui.Connect.Storage;
 using QmTui.Models;
 using QmTui.Utils;
@@ -433,5 +434,40 @@ public class ConnectTests
         // Accept query for melodist-connect service
         var validBytes = System.Text.Encoding.ASCII.GetBytes("\0\0\0\0\0\x01\0\0\0\0\0\0_melodist-connect._tcp.local");
         Assert.True(ConnectMdnsService.ShouldHandleQuery(validBytes, "Melodist-TV-1234"));
+    }
+
+    [Fact]
+    public void TvConnectServer_Lifecycle_ManagesClientsSafely()
+    {
+        var storage = new ConnectStorage();
+        using var server = new TvConnectServer(storage, port: 19876);
+        Assert.Equal(0, server.ConnectedCount);
+        Assert.False(server.IsRunning);
+
+        server.Stop();
+        Assert.Equal(0, server.ConnectedCount);
+    }
+
+    [Fact]
+    public void Song_IsLocal_IsWebDav_MutualExclusion()
+    {
+        var localSong = new Song("local_123", "Title", "Artist", "Album", 180)
+        {
+            LocalFilePath = "/music/local.mp3"
+        };
+        Assert.True(localSong.IsLocal);
+        Assert.False(localSong.IsWebDav);
+
+        var webDavSong = new Song("webdav_123", "Title", "Artist", "Album", 180)
+        {
+            WebDavHref = "/dav/music/track.flac",
+            LocalFilePath = "/home/user/.cache/qqmusic-tui/webdav/track.flac"
+        };
+        Assert.True(webDavSong.IsWebDav);
+        Assert.False(webDavSong.IsLocal);
+
+        var connectSong = ConnectSong.FromDomainSong(webDavSong);
+        Assert.True(connectSong.IsWebDav);
+        Assert.False(connectSong.IsLocal);
     }
 }
