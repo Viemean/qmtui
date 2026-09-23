@@ -1192,7 +1192,7 @@ public sealed partial class MainWindow : Window
                     return;
                 }
 
-                if (_songListView.Songs.Count > 0 && _activeSong != null)
+                if ((PlaybackQueueService.Instance.ActiveSongs.Count > 0 || _songListView.Songs.Count > 0) && _activeSong != null)
                 {
                     if (_currentPlaybackMode == PlaybackMode.SingleLoop)
                     {
