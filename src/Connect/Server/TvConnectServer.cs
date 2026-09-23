@@ -16,7 +16,55 @@ public sealed class TvConnectServer : IDisposable
     private readonly int _port;
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
-    private readonly ConcurrentDictionary<WebSocket, ConnectDevice> _activeClients = new();
+    private sealed class ClientSession : IDisposable
+    {
+        public WebSocket Socket { get; }
+        public ConnectDevice? Device { get; set; }
+        private readonly SemaphoreSlim _sendLock = new(1, 1);
+        private bool _disposed;
+
+        public ClientSession(WebSocket socket, ConnectDevice? device = null)
+        {
+            Socket = socket;
+            Device = device;
+        }
+
+        public async Task SendAsync(ReadOnlyMemory<byte> bytes, CancellationToken ct = default)
+        {
+            if (Socket.State != WebSocketState.Open || _disposed) return;
+            await _sendLock.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if (Socket.State != WebSocketState.Open || _disposed) return;
+                await Socket.SendAsync(bytes, WebSocketMessageType.Text, true, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                _sendLock.Release();
+            }
+        }
+
+        public async Task SendSafeAsync(ReadOnlyMemory<byte> bytes)
+        {
+            try
+            {
+                await SendAsync(bytes).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("TvConnectServer", $"Safe send failed: {ex.Message}");
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _sendLock.Dispose();
+        }
+    }
+
+    private readonly ConcurrentDictionary<WebSocket, ClientSession> _activeClients = new();
 
     public int Port => _port;
     public int ActualPort { get; private set; } = 8765;
@@ -168,6 +216,8 @@ public sealed class TvConnectServer : IDisposable
         }
 
         var socket = wsCtx.WebSocket;
+        var session = new ClientSession(socket);
+        _activeClients[socket] = session;
         AppLogger.Info("TvConnectServer", $"WebSocket client connected from {ctx.Request.RemoteEndPoint}");
 
         var buffer = new byte[8192];
@@ -203,9 +253,13 @@ public sealed class TvConnectServer : IDisposable
         }
         finally
         {
-            if (_activeClients.TryRemove(socket, out var disconnectedDev))
+            if (_activeClients.TryRemove(socket, out var disconnectedSession))
             {
-                DeviceDisconnected?.Invoke(disconnectedDev);
+                if (disconnectedSession.Device != null)
+                {
+                    DeviceDisconnected?.Invoke(disconnectedSession.Device);
+                }
+                disconnectedSession.Dispose();
             }
             socket.Dispose();
             AppLogger.Info("TvConnectServer", "WebSocket client disconnected");
@@ -254,7 +308,10 @@ public sealed class TvConnectServer : IDisposable
                         if (isTrusted)
                         {
                             _storage.SavePairedDevice(req.Device);
-                            _activeClients[socket] = req.Device;
+                            if (_activeClients.TryGetValue(socket, out var session))
+                            {
+                                session.Device = req.Device;
+                            }
                             var local = _storage.GetLocalDevice(port: ActualPort);
                             var resp = new PairResponsePayload(
                                 Accepted: true,
@@ -274,7 +331,10 @@ public sealed class TvConnectServer : IDisposable
                                 if (accept)
                                 {
                                     _storage.SavePairedDevice(req.Device);
-                                    _activeClients[socket] = req.Device;
+                                    if (_activeClients.TryGetValue(socket, out var session))
+                                    {
+                                        session.Device = req.Device;
+                                    }
                                     var local = _storage.GetLocalDevice(port: ActualPort);
                                     var resp = new PairResponsePayload(
                                         Accepted: true,
@@ -302,9 +362,13 @@ public sealed class TvConnectServer : IDisposable
                 break;
 
             case ConnectActions.Disconnect:
-                if (_activeClients.TryRemove(socket, out var disconnectedDev))
+                if (_activeClients.TryRemove(socket, out var disconnectedSession))
                 {
-                    DeviceDisconnected?.Invoke(disconnectedDev);
+                    if (disconnectedSession.Device != null)
+                    {
+                        DeviceDisconnected?.Invoke(disconnectedSession.Device);
+                    }
+                    disconnectedSession.Dispose();
                 }
                 try { await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disconnect", CancellationToken.None).ConfigureAwait(false); } catch { }
                 break;
@@ -480,13 +544,12 @@ public sealed class TvConnectServer : IDisposable
         var msg = ConnectMessage.Create(action, "");
         var json = JsonSerializer.Serialize(msg, ConnectJsonContext.Default.ConnectMessage);
         var bytes = Encoding.UTF8.GetBytes(json);
-        var segment = new ArraySegment<byte>(bytes);
 
-        foreach (var ws in _activeClients.Keys)
+        foreach (var session in _activeClients.Values)
         {
-            if (ws.State == WebSocketState.Open)
+            if (session.Socket.State == WebSocketState.Open)
             {
-                _ = ws.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None);
+                _ = session.SendSafeAsync(bytes);
             }
         }
     }
@@ -496,33 +559,38 @@ public sealed class TvConnectServer : IDisposable
         var msg = ConnectMessage.Create(action, data, jsonTypeInfo);
         var json = JsonSerializer.Serialize(msg, ConnectJsonContext.Default.ConnectMessage);
         var bytes = Encoding.UTF8.GetBytes(json);
-        var segment = new ArraySegment<byte>(bytes);
 
-        foreach (var ws in _activeClients.Keys)
+        foreach (var session in _activeClients.Values)
         {
-            if (ws.State == WebSocketState.Open)
+            if (session.Socket.State == WebSocketState.Open)
             {
-                _ = ws.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None);
+                _ = session.SendSafeAsync(bytes);
             }
         }
     }
 
-    private static async Task SendMessageAsync<T>(WebSocket socket, string action, T data, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> jsonTypeInfo)
+    private async Task SendMessageAsync<T>(WebSocket socket, string action, T data, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> jsonTypeInfo)
     {
         if (socket.State != WebSocketState.Open) return;
-        var msg = ConnectMessage.Create(action, data, jsonTypeInfo);
-        var json = JsonSerializer.Serialize(msg, ConnectJsonContext.Default.ConnectMessage);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        await socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(false);
+        if (_activeClients.TryGetValue(socket, out var session))
+        {
+            var msg = ConnectMessage.Create(action, data, jsonTypeInfo);
+            var json = JsonSerializer.Serialize(msg, ConnectJsonContext.Default.ConnectMessage);
+            var bytes = Encoding.UTF8.GetBytes(json);
+            await session.SendAsync(bytes).ConfigureAwait(false);
+        }
     }
 
-    private static async Task SendMessageAsync(WebSocket socket, string action, string payload = "")
+    private async Task SendMessageAsync(WebSocket socket, string action, string payload = "")
     {
         if (socket.State != WebSocketState.Open) return;
-        var msg = ConnectMessage.Create(action, payload);
-        var json = JsonSerializer.Serialize(msg, ConnectJsonContext.Default.ConnectMessage);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        await socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(false);
+        if (_activeClients.TryGetValue(socket, out var session))
+        {
+            var msg = ConnectMessage.Create(action, payload);
+            var json = JsonSerializer.Serialize(msg, ConnectJsonContext.Default.ConnectMessage);
+            var bytes = Encoding.UTF8.GetBytes(json);
+            await session.SendAsync(bytes).ConfigureAwait(false);
+        }
     }
 
     public void Stop()
@@ -536,6 +604,10 @@ public sealed class TvConnectServer : IDisposable
         }
         catch { }
         _listener = null;
+        foreach (var session in _activeClients.Values)
+        {
+            session.Dispose();
+        }
         _activeClients.Clear();
     }
 

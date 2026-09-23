@@ -45,7 +45,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="www/**" />
-    <None Update="www/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="www/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
 </Project>
