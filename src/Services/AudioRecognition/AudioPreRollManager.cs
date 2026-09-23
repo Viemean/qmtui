@@ -218,7 +218,7 @@ public static class AudioPreRollManager
                         try { PulseAudioSimpleNative.pa_simple_free(localHandle); } catch { }
                         localHandle = IntPtr.Zero;
                     }
-                    Thread.Sleep(1000);
+                    Thread.Sleep(2500);
                     if (AudioDeviceHelper.HasActiveAudioPlayback())
                     {
                         s_isSleeping = false;

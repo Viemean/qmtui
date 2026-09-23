@@ -1,6 +1,7 @@
 using QmTui.Models;
 using QmTui.Services;
 using QmTui.Services.AudioRecognition;
+using QmTui.Utils;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -232,5 +233,21 @@ public class AcousticRecognitionTests
             new LyricLine(TimeSpan.Zero, "Hello", "你好"),
             new LyricLine(TimeSpan.FromSeconds(2), "World", "世界")
         ]));
+    }
+
+    [Fact]
+    public void AudioDeviceHelper_DeviceQueries_ReturnValidDefaults()
+    {
+        var sinkMonitor = AudioDeviceHelper.GetDefaultSinkMonitorDevice();
+        Assert.Equal("@DEFAULT_SINK@.monitor", sinkMonitor);
+
+        var mic = AudioDeviceHelper.GetDefaultMicrophoneDevice();
+        Assert.Equal("default", mic);
+
+        // Verify calls complete without throwing exceptions
+        _ = AudioDeviceHelper.HasAudioOutputDevice();
+        _ = AudioDeviceHelper.HasInternalRecordDevice();
+        _ = AudioDeviceHelper.HasMicrophoneDevice();
+        _ = AudioDeviceHelper.HasActiveAudioPlayback();
     }
 }
