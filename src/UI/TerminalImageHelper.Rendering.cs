@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,23 +17,92 @@ public static partial class TerminalImageHelper
 {
     private const int MaxCoverDimension = 1200;
 
-    private static (int width, int height, byte[] pixelData)? DecodeImageRgba(byte[] fileBytes, bool isWebp)
+    private static unsafe class WebPNative
     {
-        if (isWebp)
+        private static delegate* unmanaged[Cdecl]<byte*, nuint, int*, int*, byte*> s_decodeRgba;
+        private static delegate* unmanaged[Cdecl]<void*, void> s_webpFree;
+        private static bool s_initialized;
+        private static readonly Lock s_lock = new();
+
+        private static bool EnsureLoaded()
         {
+            if (s_initialized) return s_decodeRgba != null;
+            lock (s_lock)
+            {
+                if (s_initialized) return s_decodeRgba != null;
+                s_initialized = true;
+
+                string[] candidates = OperatingSystem.IsLinux()
+                    ? ["libwebp.so.7", "libwebp.so", "libwebpdecoder.so.3", "libwebpdecoder.so"]
+                    : OperatingSystem.IsMacOS()
+                        ? ["libwebp.7.dylib", "libwebp.dylib"]
+                        : ["webp.dll", "libwebp.dll"];
+
+                foreach (var candidate in candidates)
+                {
+                    if (NativeLibrary.TryLoad(candidate, out var handle))
+                    {
+                        if (NativeLibrary.TryGetExport(handle, "WebPDecodeRGBA", out var decodePtr) &&
+                            NativeLibrary.TryGetExport(handle, "WebPFree", out var freePtr))
+                        {
+                            s_decodeRgba = (delegate* unmanaged[Cdecl]<byte*, nuint, int*, int*, byte*>)decodePtr;
+                            s_webpFree = (delegate* unmanaged[Cdecl]<void*, void>)freePtr;
+                            return true;
+                        }
+                    }
+                }
+
+                AppLogger.Debug("TerminalImageHelper", "Native libwebp library not available on system.");
+                return false;
+            }
+        }
+
+        public static byte[]? DecodeRgba(byte[] data, out int width, out int height)
+        {
+            width = 0;
+            height = 0;
+            if (data == null || data.Length < 12 || !EnsureLoaded()) return null;
+
             try
             {
-                using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(fileBytes);
-                if (image.Width <= 0 || image.Height <= 0) return null;
-                var pixelData = new byte[image.Width * image.Height * 4];
-                image.CopyPixelDataTo(pixelData);
-                return (image.Width, image.Height, pixelData);
+                fixed (byte* pData = data)
+                {
+                    int w = 0, h = 0;
+                    byte* raw = s_decodeRgba(pData, (nuint)data.Length, &w, &h);
+                    if (raw == null || w <= 0 || h <= 0) return null;
+
+                    try
+                    {
+                        width = w;
+                        height = h;
+                        var result = new byte[w * h * 4];
+                        new ReadOnlySpan<byte>(raw, result.Length).CopyTo(result);
+                        return result;
+                    }
+                    finally
+                    {
+                        s_webpFree(raw);
+                    }
+                }
             }
             catch (Exception ex)
             {
-                AppLogger.Debug("TerminalImageHelper", $"ImageSharp WebP decode failed: {ex.Message}");
+                AppLogger.Debug("TerminalImageHelper", $"WebPDecodeRGBA error: {ex.Message}");
                 return null;
             }
+        }
+    }
+
+    internal static (int width, int height, byte[] pixelData)? DecodeImageRgba(byte[] fileBytes, bool isWebp)
+    {
+        if (isWebp)
+        {
+            var webpDecoded = WebPNative.DecodeRgba(fileBytes, out int w, out int h);
+            if (webpDecoded != null)
+            {
+                return (w, h, webpDecoded);
+            }
+            return null;
         }
 
         try
@@ -45,22 +115,16 @@ public static partial class TerminalImageHelper
         }
         catch
         {
-            // fallback to ImageSharp
+            // fallback to WebP native decode
         }
 
-        try
+        var fallbackDecoded = WebPNative.DecodeRgba(fileBytes, out int fallbackW, out int fallbackH);
+        if (fallbackDecoded != null)
         {
-            using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(fileBytes);
-            if (image.Width <= 0 || image.Height <= 0) return null;
-            var pixelData = new byte[image.Width * image.Height * 4];
-            image.CopyPixelDataTo(pixelData);
-            return (image.Width, image.Height, pixelData);
+            return (fallbackW, fallbackH, fallbackDecoded);
         }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("TerminalImage", $"Image decode failed: {ex.Message}");
-            return null;
-        }
+
+        return null;
     }
 
     private static async Task<string?> ApplyRoundedCornersAsync(string sourceFile, string targetPng, CancellationToken cancellationToken = default)

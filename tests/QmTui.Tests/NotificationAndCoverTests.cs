@@ -72,4 +72,26 @@ public class NotificationAndCoverTests
             try { if (File.Exists(tempPng)) File.Delete(tempPng); } catch {}
         }
     }
+
+    [Fact]
+    public void DecodeImageRgba_WebP_DecodesSuccessfully()
+    {
+        byte[] webpBytes =
+        [
+            82, 73, 70, 70, 60, 0, 0, 0, 87, 69, 66, 80, 86, 80, 56, 32,
+            48, 0, 0, 0, 208, 1, 0, 157, 1, 42, 2, 0, 2, 0, 1, 64,
+            38, 37, 160, 2, 116, 186, 1, 248, 0, 3, 176, 0, 254, 242, 235, 127,
+            252, 216, 21, 205, 115, 239, 247, 255, 210, 224, 253, 46, 15, 210, 224, 255,
+            210, 144, 0, 0
+        ];
+
+        var result = TerminalImageHelper.DecodeImageRgba(webpBytes, isWebp: true);
+        if (OperatingSystem.IsLinux())
+        {
+            Assert.NotNull(result);
+            Assert.Equal(2, result.Value.width);
+            Assert.Equal(2, result.Value.height);
+            Assert.Equal(2 * 2 * 4, result.Value.pixelData.Length);
+        }
+    }
 }
