@@ -887,7 +887,7 @@ public sealed partial class MainWindow
     private async Task LoadLocalMusicAsync()
     {
         _currentViewMode = ViewMode.LocalMusic;
-        UpdateSearchCategoryVisibility(false);
+        UpdateTopContextButtons();
         _hasMoreSearchResults = false;
         _isViewingPlaylistsList = false;
         _currentDrilldownPlaylist = null;
@@ -899,7 +899,7 @@ public sealed partial class MainWindow
         {
             Application.Invoke(() =>
             {
-                _songListView.SetMessage("本地音乐库为空 (请按 A 键添加本地音乐文件夹进行扫描，按 F 管理目录)", "本地音乐: 0 首");
+                _songListView.SetMessage("本地音乐库为空 (请使用顶部 [A添加目录] 扫描，或 [F管理目录])", "本地音乐: 0 首");
                 _controlBar.UpdateStatus("[本地音乐] 未配置扫描目录，请按 A 键添加本地音乐目录");
             });
             return;
@@ -910,7 +910,7 @@ public sealed partial class MainWindow
         {
             Application.Invoke(() =>
             {
-                var title = $"本地音乐: 共 {cachedSongs.Count} 首 (按 A 添加目录，按 R 重新扫描，按 F 管理目录)";
+                var title = $"本地音乐: 共 {cachedSongs.Count} 首";
                 _songListView.SetSongs(cachedSongs, title);
                 if (_activeSong != null)
                 {
@@ -974,7 +974,7 @@ public sealed partial class MainWindow
                     return;
                 }
 
-                var title = $"本地音乐: 共 {songs.Count} 首 (按 A 添加目录，按 R 重新扫描，按 F 管理目录)";
+                var title = $"本地音乐: 共 {songs.Count} 首";
                 _songListView.SetSongs(songs, title);
                 if (_activeSong != null)
                 {
@@ -1018,12 +1018,12 @@ public sealed partial class MainWindow
                 {
                     if (cached.Count == 0)
                     {
-                        _songListView.SetMessage("本地音乐库为空 (请按 A 键添加本地音乐文件夹进行扫描，按 F 管理目录)", "本地音乐: 0 首");
+                        _songListView.SetMessage("本地音乐库为空 (请使用顶部 [A添加目录] 扫描，或 [F管理目录])", "本地音乐: 0 首");
                     }
                     else
                     {
                         var folders = QmTui.Services.LocalMusicService.GetFolders();
-                        var title = $"本地音乐: 共 {cached.Count} 首 (按 A 添加目录，按 R 重新扫描，按 F 管理目录)";
+                        var title = $"本地音乐: 共 {cached.Count} 首";
                         _songListView.SetSongs(cached, title);
                     }
                 }

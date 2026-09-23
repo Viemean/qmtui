@@ -85,6 +85,46 @@ public sealed partial class MainWindow : Window
     private AudioQualityTier _preferredQualityTier;
     private AudioQualityTier _actualQualityTier;
 
+    private string? _cachedFormattedLyricsPayload;
+    private string? _cachedFormattedLyricsSongMid;
+    private int _cachedFormattedLyricsCount = -1;
+
+    private string? GetOrBuildFormattedLyricsPayload()
+    {
+        if (_currentLyrics.Count == 0) return null;
+        var currentMid = _activeSong?.Mid ?? "";
+        if (_cachedFormattedLyricsPayload != null &&
+            _cachedFormattedLyricsSongMid == currentMid &&
+            _cachedFormattedLyricsCount == _currentLyrics.Count)
+        {
+            return _cachedFormattedLyricsPayload;
+        }
+
+        var sb = new StringBuilder();
+        foreach (var line in _currentLyrics)
+        {
+            var ts = line.Timestamp;
+            var timeStr = $"[{ts.Minutes:D2}:{ts.Seconds:D2}.{ts.Milliseconds / 10:D2}]";
+            sb.AppendLine($"{timeStr}{line.Text}");
+            if (!string.IsNullOrWhiteSpace(line.Trans))
+            {
+                sb.AppendLine($"{timeStr}{line.Trans}");
+            }
+        }
+
+        _cachedFormattedLyricsSongMid = currentMid;
+        _cachedFormattedLyricsCount = _currentLyrics.Count;
+        _cachedFormattedLyricsPayload = sb.ToString();
+        return _cachedFormattedLyricsPayload;
+    }
+
+    private void InvalidateFormattedLyricsCache()
+    {
+        _cachedFormattedLyricsPayload = null;
+        _cachedFormattedLyricsSongMid = null;
+        _cachedFormattedLyricsCount = -1;
+    }
+
     private string _lastSearchQuery = "";
     private int _searchCurrentPage = 1;
     private bool _hasMoreSearchResults;
@@ -1587,6 +1627,14 @@ public sealed partial class MainWindow : Window
         {
             await ToggleSingerSubModeAsync();
         }
+        else if (_currentViewMode == ViewMode.LocalMusic)
+        {
+            ShowAddFolderDialog();
+        }
+        else if (_currentViewMode == ViewMode.WebDav)
+        {
+            await ToggleWebDavViewModeAsync();
+        }
     }
 
     private async Task OnContextAction2Async()
@@ -1599,6 +1647,21 @@ public sealed partial class MainWindow : Window
         {
             await ToggleSingerSongOrderAsync();
         }
+        else if (_currentViewMode == ViewMode.LocalMusic)
+        {
+            await RescanLocalMusicAsync();
+        }
+        else if (_currentViewMode == ViewMode.WebDav)
+        {
+            if (_isWebDavFlatMode)
+            {
+                await ScanWebDavMetadataAsync();
+            }
+            else
+            {
+                await ImportCurrentWebDavFolderAsync();
+            }
+        }
     }
 
     private async Task OnContextAction3Async()
@@ -1610,6 +1673,14 @@ public sealed partial class MainWindow : Window
         else if (_currentViewMode == ViewMode.ArtistDetail)
         {
             await ToggleSingerFavoriteAsync();
+        }
+        else if (_currentViewMode == ViewMode.LocalMusic)
+        {
+            ShowFolderManageDialog();
+        }
+        else if (_currentViewMode == ViewMode.WebDav)
+        {
+            ShowWebdavManageDialog();
         }
     }
 
@@ -1667,6 +1738,34 @@ public sealed partial class MainWindow : Window
                 _searchSongsBtn.SetScheme(MikuTheme.SearchCategoryDim);
                 _searchPlaylistsBtn.SetScheme(MikuTheme.SearchCategoryDim);
                 _searchAlbumsBtn.SetScheme(isSingerFav ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+                break;
+
+            case ViewMode.LocalMusic:
+                _searchSongsBtn.Text = "[A添加目录]";
+                _searchPlaylistsBtn.Text = "[R重新扫描]";
+                _searchAlbumsBtn.Text = "[F管理目录]";
+
+                _searchSongsBtn.Visible = true;
+                _searchPlaylistsBtn.Visible = true;
+                _searchAlbumsBtn.Visible = true;
+
+                _searchSongsBtn.SetScheme(MikuTheme.SearchCategoryDim);
+                _searchPlaylistsBtn.SetScheme(MikuTheme.SearchCategoryDim);
+                _searchAlbumsBtn.SetScheme(MikuTheme.SearchCategoryDim);
+                break;
+
+            case ViewMode.WebDav:
+                _searchSongsBtn.Text = _isWebDavFlatMode ? "[D目录树]" : "[D平铺曲库]";
+                _searchPlaylistsBtn.Text = _isWebDavFlatMode ? "[S嗅探元数据]" : "[A导入目录]";
+                _searchAlbumsBtn.Text = "[F管理站点]";
+
+                _searchSongsBtn.Visible = true;
+                _searchPlaylistsBtn.Visible = true;
+                _searchAlbumsBtn.Visible = true;
+
+                _searchSongsBtn.SetScheme(MikuTheme.SearchCategoryDim);
+                _searchPlaylistsBtn.SetScheme(MikuTheme.SearchCategoryDim);
+                _searchAlbumsBtn.SetScheme(MikuTheme.SearchCategoryDim);
                 break;
 
             default:

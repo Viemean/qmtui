@@ -23,6 +23,7 @@ public sealed partial class MainWindow
     private async Task LoadWebDavMusicAsync()
     {
         _currentViewMode = ViewMode.WebDav;
+        UpdateTopContextButtons();
         _hasMoreSearchResults = false;
         _isViewingPlaylistsList = false;
         _currentDrilldownPlaylist = null;
@@ -34,7 +35,7 @@ public sealed partial class MainWindow
         {
             Application.Invoke(() =>
             {
-                _songListView.SetMessage("未配置 WebDAV 服务器 (请按 F 键管理/添加 WebDAV 站点)", "WebDAV: 未连接");
+                _songListView.SetMessage("未配置 WebDAV 服务器 (请使用顶部 [F管理站点] 添加配置)", "WebDAV: 未连接");
                 _controlBar.UpdateStatus("[WebDAV] 未配置私有云站点，请按 F 键添加站点");
             });
             return;
@@ -62,7 +63,7 @@ public sealed partial class MainWindow
         {
             Application.Invoke(() =>
             {
-                _songListView.SetMessage("WebDAV 曲库为空 (按 D 切换至目录树后按 A 导入目录，按 F 管理站点)", $"WebDAV: {server.Name} (0 首)");
+                _songListView.SetMessage("WebDAV 曲库为空 (请使用顶部 [D目录树] 浏览导入目录，或 [F管理站点])", $"WebDAV: {server.Name} (0 首)");
                 _controlBar.UpdateStatus($"[WebDAV · 平铺曲库] 当前站点 [{server.Name}] 暂无导入歌曲，按 D 切换到目录树");
             });
             return;
@@ -73,15 +74,15 @@ public sealed partial class MainWindow
 
         Application.Invoke(() =>
         {
-            var dupNotice = songs.Count < cached.Count ? $"已智能去重 {cached.Count - songs.Count} 首重复镜像，" : "";
-            var title = $"WebDAV 曲库: {server.Name} ({dupNotice}共 {songs.Count} 首，按 S 嗅探歌曲信息，按 A 导入目录，按 D 切目录树，按 F 管理)";
+            var dupNotice = songs.Count < cached.Count ? $"，已去重 {cached.Count - songs.Count} 首重复镜像" : "";
+            var title = $"WebDAV: {server.Name} ({songs.Count} 首)";
             _songListView.SetSongs(songs, title);
             if (_activeSong != null)
             {
                 _songListView.SetPlayingSong(_activeSong.Mid);
             }
             _songListView.SetFocusToList();
-            _controlBar.UpdateStatus($"[WebDAV · 平铺曲库] 已载入 {songs.Count} 首歌曲 (站点: {server.Name})");
+            _controlBar.UpdateStatus($"[WebDAV · 平铺曲库] 已载入 {songs.Count} 首歌曲 (站点: {server.Name}{dupNotice})");
         });
     }
 
@@ -118,14 +119,15 @@ public sealed partial class MainWindow
 
         Application.Invoke(() =>
         {
+            var shortHref = href.Length > 25 ? "..." + href[^22..] : href;
             if (displayLines.Count == 0)
             {
-                _songListView.SetMessage("当前 WebDAV 目录为空或未发现音频文件 (按 A 导入，按 F 管理站点)", $"WebDAV: {href}");
+                _songListView.SetMessage("当前 WebDAV 目录为空或未发现音频文件 (请使用顶部 [A导入目录] 或 [F管理站点])", $"WebDAV: {shortHref}");
                 _controlBar.UpdateStatus($"[WebDAV] 目录为空: {href}");
                 return;
             }
 
-            var title = $"WebDAV 目录: {href} (按 Enter 打开/播放，按 A 扫描本目录/选中项，按 D 切平铺曲库，按 F 管理)";
+            var title = $"WebDAV 目录: {shortHref}";
             _songListView.SetCustomItems(
                 displayLines,
                 title,
