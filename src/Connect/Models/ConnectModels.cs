@@ -163,29 +163,55 @@ public sealed record ConnectSong(
 {
     public Song ToDomainSong()
     {
+        var mid = SongMid ?? "";
+        bool isPcLocal = mid.StartsWith("pc_local_", StringComparison.OrdinalIgnoreCase);
+        if (isPcLocal)
+        {
+            mid = "local_" + mid["pc_local_".Length..];
+        }
+
+        var localPath = LocalFilePath;
+        if (string.IsNullOrEmpty(localPath) && !string.IsNullOrEmpty(MediaMid) && MediaMid.Contains("/stream/local"))
+        {
+            try
+            {
+                var qIdx = MediaMid.IndexOf("path=", StringComparison.OrdinalIgnoreCase);
+                if (qIdx >= 0)
+                {
+                    var pathPart = MediaMid[(qIdx + 5)..].Split('&')[0];
+                    var decoded = Uri.UnescapeDataString(pathPart);
+                    if (!string.IsNullOrEmpty(decoded))
+                    {
+                        localPath = decoded;
+                    }
+                }
+            }
+            catch { }
+        }
+
         var singers = SingerList?.Select(a => new ArtistInfo(a.Name, a.Mid, a.Id)).ToList() ?? [];
         var song = new Song(
-            Mid: string.IsNullOrEmpty(SongMid) ? "" : SongMid,
+            Mid: mid,
             Title: string.IsNullOrEmpty(Name) ? "未知曲目" : Name,
             Artist: string.IsNullOrEmpty(Singer) ? "未知歌手" : Singer,
             Album: string.IsNullOrEmpty(Album) ? "" : Album,
             Duration: DurationSeconds,
-            MediaMid: string.IsNullOrEmpty(MediaMid) ? SongMid : MediaMid,
+            MediaMid: string.IsNullOrEmpty(MediaMid) ? mid : MediaMid,
             Id: SongId,
             AlbumMid: string.IsNullOrEmpty(AlbumMid) ? "" : AlbumMid
         )
         {
-            LocalFilePath = LocalFilePath,
+            LocalFilePath = localPath,
             CoverUrl = CoverUrl,
             Singers = singers
         };
 
-        if (IsWebDav || SongMid.StartsWith("webdav_", StringComparison.OrdinalIgnoreCase))
+        if (IsWebDav || mid.StartsWith("webdav_", StringComparison.OrdinalIgnoreCase))
         {
-            song.WebDavHref = !string.IsNullOrEmpty(MediaMid) ? MediaMid : (LocalFilePath ?? SongMid);
-            if (SongMid.StartsWith("webdav_", StringComparison.OrdinalIgnoreCase))
+            song.WebDavHref = !string.IsNullOrEmpty(MediaMid) ? MediaMid : (localPath ?? mid);
+            if (mid.StartsWith("webdav_", StringComparison.OrdinalIgnoreCase))
             {
-                var trimmed = SongMid["webdav_".Length..];
+                var trimmed = mid["webdav_".Length..];
                 var lastIdx = trimmed.LastIndexOf('_');
                 song.WebDavServerId = lastIdx > 0 ? trimmed[..lastIdx] : trimmed;
             }
@@ -197,13 +223,48 @@ public sealed record ConnectSong(
     public static ConnectSong FromDomainSong(Song song, AudioQualityTier tier = AudioQualityTier.SQ, int port = 8765)
     {
         var singerList = song.Singers.Select(s => new ConnectArtist(s.Id, s.Mid, s.Name, "")).ToList();
+
+        // 仅当物理音频文件在当前 PC 本地磁盘真实存在且非 WebDAV 时，才属于 PC 本地托管音频 (pc_local_)
+        bool isPcLocalFile = !song.IsWebDav && !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath);
+
+        string effectiveSongMid = song.Mid;
+        bool effectiveIsLocal = song.IsLocal;
         string effectiveMediaMid = song.IsWebDav && !string.IsNullOrEmpty(song.WebDavHref)
             ? song.WebDavHref
             : song.EffectiveMediaMid;
+
+        if (isPcLocalFile)
+        {
+            // 依据规范 7.3：PC 物理音频文件广播给移动端时，添加 pc_local_ 前缀，isLocal 设为 false，mediaMid 提供 PC 端的 /stream/local 直通流
+            effectiveIsLocal = false;
+            var rawMid = song.Mid.StartsWith("local_", StringComparison.OrdinalIgnoreCase)
+                ? song.Mid["local_".Length..]
+                : song.Mid;
+            effectiveSongMid = $"pc_local_{rawMid}";
+
+            var localIp = QmTui.Connect.Discovery.ConnectMdnsService.GetBestLocalIpAddress();
+            effectiveMediaMid = $"http://{localIp}:{port}/stream/local?path={Uri.EscapeDataString(song.LocalFilePath!)}";
+        }
+        else
+        {
+            // 若为移动端本地曲目（文件在手机端，如 /storage/emulated/0/...，PC 本地物理文件不存在）：
+            // 严禁标记为 pc_local_，严禁伪造 PC 本地流地址；保持 local_ 前缀与 isLocal=true，使手机端识别为手机自有文件
+            if (effectiveSongMid.StartsWith("pc_local_", StringComparison.OrdinalIgnoreCase))
+            {
+                effectiveSongMid = "local_" + effectiveSongMid["pc_local_".Length..];
+                effectiveIsLocal = true;
+            }
+            if (effectiveMediaMid.Contains("/stream/local") && effectiveMediaMid.Contains($":{port}/"))
+            {
+                // 清除指向本机不可用端口的无效流地址，防止手机端直接复用导致 404
+                effectiveMediaMid = effectiveSongMid;
+            }
+        }
+
         string cover = ResolveCoverUrl(song, port);
         return new ConnectSong(
             SongId: song.Id,
-            SongMid: song.Mid,
+            SongMid: effectiveSongMid,
             Name: song.Title,
             Singer: song.Artist,
             Album: song.Album,
@@ -214,7 +275,7 @@ public sealed record ConnectSong(
             MediaMid: effectiveMediaMid,
             SingerList: singerList,
             LocalFilePath: song.LocalFilePath,
-            IsLocal: song.IsLocal,
+            IsLocal: effectiveIsLocal,
             IsWebDav: song.IsWebDav
         );
     }

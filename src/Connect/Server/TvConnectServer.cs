@@ -623,9 +623,25 @@ public sealed class TvConnectServer : IDisposable
                 string? coverPath = null;
                 var mid = ctx.Request.QueryString["mid"];
                 var localCoverPath = ctx.Request.QueryString["path"];
+                var coverName = ctx.Request.QueryString["name"];
+
+                // 支持 /cover?name=<cached_cover_filename>
+                if (!string.IsNullOrEmpty(coverName))
+                {
+                    try
+                    {
+                        var safeName = Path.GetFileName(coverName);
+                        var cachedPath = Path.Combine(QmTui.Services.CacheManager.CoversDir, safeName);
+                        if (File.Exists(cachedPath))
+                        {
+                            coverPath = cachedPath;
+                        }
+                    }
+                    catch { }
+                }
 
                 // 优先支持 /cover/local?path=<url_encoded_path>
-                if (!string.IsNullOrEmpty(localCoverPath))
+                if (string.IsNullOrEmpty(coverPath) && !string.IsNullOrEmpty(localCoverPath))
                 {
                     try
                     {
@@ -697,6 +713,33 @@ public sealed class TvConnectServer : IDisposable
                     return;
                 }
             }
+            else if (path.StartsWith("/stream/local"))
+            {
+                var localAudioPath = ctx.Request.QueryString["path"];
+                if (string.IsNullOrEmpty(localAudioPath))
+                {
+                    ctx.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                    ctx.Response.Close();
+                    return;
+                }
+
+                string? decodedPath = null;
+                try
+                {
+                    decodedPath = Uri.UnescapeDataString(localAudioPath);
+                }
+                catch { }
+
+                if (string.IsNullOrEmpty(decodedPath) || !File.Exists(decodedPath))
+                {
+                    ctx.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                    ctx.Response.Close();
+                    return;
+                }
+
+                await ServeLocalAudioStreamAsync(ctx, decodedPath, isHead).ConfigureAwait(false);
+                return;
+            }
             else if (path.StartsWith("/lyrics/"))
             {
                 var lyricsText = CurrentLyricsTextProvider?.Invoke();
@@ -727,6 +770,98 @@ public sealed class TvConnectServer : IDisposable
             }
             catch { }
         }
+    }
+
+    private static async Task ServeLocalAudioStreamAsync(HttpListenerContext ctx, string filePath, bool isHead)
+    {
+        var fi = new FileInfo(filePath);
+        long totalLength = fi.Length;
+        var ext = Path.GetExtension(filePath).ToLowerInvariant();
+        var contentType = ext switch
+        {
+            ".flac" => "audio/flac",
+            ".wav" => "audio/wav",
+            ".ogg" or ".oga" => "audio/ogg",
+            ".m4a" or ".aac" or ".mp4" => "audio/mp4",
+            ".opus" => "audio/opus",
+            _ => "audio/mpeg"
+        };
+
+        var rangeHeader = ctx.Request.Headers["Range"];
+        long start = 0;
+        long end = totalLength - 1;
+        bool isRange = false;
+
+        if (!string.IsNullOrWhiteSpace(rangeHeader) && rangeHeader.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase))
+        {
+            var rangeVal = rangeHeader["bytes=".Length..].Trim();
+            if (rangeVal.StartsWith('-'))
+            {
+                if (long.TryParse(rangeVal[1..], out var suffix))
+                {
+                    start = Math.Max(0, totalLength - suffix);
+                    end = totalLength - 1;
+                    isRange = true;
+                }
+            }
+            else
+            {
+                var parts = rangeVal.Split('-');
+                if (long.TryParse(parts[0], out var s))
+                {
+                    start = s;
+                    isRange = true;
+                }
+                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]) && long.TryParse(parts[1], out var e))
+                {
+                    end = Math.Min(e, totalLength - 1);
+                    isRange = true;
+                }
+            }
+        }
+
+        if (isRange && (start > end || start >= totalLength || start < 0))
+        {
+            ctx.Response.StatusCode = 416;
+            ctx.Response.Headers.Add("Content-Range", $"bytes */{totalLength}");
+            ctx.Response.Close();
+            return;
+        }
+
+        long contentLength = end - start + 1;
+        ctx.Response.StatusCode = isRange ? (int)HttpStatusCode.PartialContent : (int)HttpStatusCode.OK;
+        ctx.Response.ContentType = contentType;
+        ctx.Response.Headers.Add("Accept-Ranges", "bytes");
+        ctx.Response.Headers.Add("Access-Control-Allow-Origin", "*");
+        if (isRange)
+        {
+            ctx.Response.Headers.Add("Content-Range", $"bytes {start}-{end}/{totalLength}");
+        }
+        ctx.Response.ContentLength64 = contentLength;
+
+        if (isHead)
+        {
+            ctx.Response.Close();
+            return;
+        }
+
+        using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, useAsync: true);
+        if (start > 0)
+        {
+            fs.Seek(start, SeekOrigin.Begin);
+        }
+
+        var buffer = new byte[64 * 1024];
+        long remaining = contentLength;
+        while (remaining > 0)
+        {
+            int toRead = (int)Math.Min(buffer.Length, remaining);
+            int read = await fs.ReadAsync(buffer.AsMemory(0, toRead)).ConfigureAwait(false);
+            if (read <= 0) break;
+            await ctx.Response.OutputStream.WriteAsync(buffer.AsMemory(0, read)).ConfigureAwait(false);
+            remaining -= read;
+        }
+        ctx.Response.Close();
     }
 
     public void Dispose()

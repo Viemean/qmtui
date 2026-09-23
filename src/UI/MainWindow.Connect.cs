@@ -79,6 +79,33 @@ public sealed partial class MainWindow
                             }
                         }
 
+                        // 本地流直通回环绕过 (Loopback Bypass)：
+                        // 若 overrideUrl 指向本机的 /stream/local?path=...，直接解析为本地物理文件播放，消除本机 HTTP 代理开销
+                        if (!string.IsNullOrEmpty(overrideUrl) && overrideUrl.Contains("/stream/local"))
+                        {
+                            var qIdx = overrideUrl.IndexOf("path=", StringComparison.OrdinalIgnoreCase);
+                            if (qIdx >= 0)
+                            {
+                                try
+                                {
+                                    var pathPart = overrideUrl[(qIdx + 5)..].Split('&')[0];
+                                    var localPath = Uri.UnescapeDataString(pathPart);
+                                    if (File.Exists(localPath))
+                                    {
+                                        overrideUrl = localPath;
+                                        song.LocalFilePath = localPath;
+                                    }
+                                    else if (overrideUrl.Contains($":{_connectServer.ActualPort}/stream/local"))
+                                    {
+                                        AppLogger.Warn("MainWindow.Connect", $"Detected loopback stream for missing PC file: {localPath}, clearing overrideUrl to request mobile stream proxy");
+                                        overrideUrl = null;
+                                        song = song with { MediaMid = song.Mid };
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+
                         await PlaySongAsync(song, startPosition: cmd.StartPositionMs / 1000.0, overridePlayUrl: overrideUrl).ConfigureAwait(false);
                         BroadcastConnectPlayerState();
                         BroadcastConnectQueueState();
@@ -306,18 +333,22 @@ public sealed partial class MainWindow
                     return _currentCoverFilePath;
                 }
 
+                var cleanMid = mid.StartsWith("pc_local_", StringComparison.OrdinalIgnoreCase)
+                    ? "local_" + mid["pc_local_".Length..]
+                    : mid;
+
                 var queueSongs = PlaybackQueueService.Instance.ActiveSongs;
-                var song = queueSongs.FirstOrDefault(s => s.Mid == mid);
+                var song = queueSongs.FirstOrDefault(s => s.Mid == mid || s.Mid == cleanMid);
 
                 if (song == null)
                 {
                     var localSongs = LocalMusicService.GetCachedSongs();
-                    song = localSongs.FirstOrDefault(s => s.Mid == mid);
+                    song = localSongs.FirstOrDefault(s => s.Mid == mid || s.Mid == cleanMid);
                 }
 
-                if (song == null && mid.StartsWith("local_", StringComparison.OrdinalIgnoreCase))
+                if (song == null && cleanMid.StartsWith("local_", StringComparison.OrdinalIgnoreCase))
                 {
-                    var hashSuffix = mid["local_".Length..];
+                    var hashSuffix = cleanMid["local_".Length..];
                     var localSongs = LocalMusicService.GetCachedSongs();
                     song = localSongs.FirstOrDefault(s => LocalMusicService.ComputeMd5(s.LocalFilePath ?? "").StartsWith(hashSuffix, StringComparison.OrdinalIgnoreCase));
                 }
