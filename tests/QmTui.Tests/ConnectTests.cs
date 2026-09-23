@@ -1,4 +1,5 @@
 using System.Text.Json;
+using QmTui.Connect.Discovery;
 using QmTui.Connect.Models;
 using QmTui.Connect.Storage;
 using QmTui.Models;
@@ -391,5 +392,46 @@ public class ConnectTests
         Assert.Equal(5, deserialized.AvailableTiers?.Count);
         Assert.Equal("Master", deserialized.AvailableTiers?[4]);
         Assert.Equal(50, deserialized.LyricOffsetMs);
+    }
+
+    [Fact]
+    public void ConnectMdns_DnsSdPacket_IsMarkedAsResponse()
+    {
+        var packet = ConnectMdnsService.BuildCompleteDnsSdPacket("Melodist-TV-1234", "192.168.1.100", 8765, "dev-1", "TV", "tok", "123456");
+        Assert.NotNull(packet);
+        Assert.True(packet.Length > 12);
+
+        // QR bit must be set to 1 (Response)
+        Assert.True((packet[2] & 0x80) != 0);
+
+        // Must reject own response packet as query to prevent multicast feedback storm
+        Assert.False(ConnectMdnsService.ShouldHandleQuery(packet, "Melodist-TV-1234"));
+    }
+
+    [Fact]
+    public void ConnectMdns_ShouldHandleQuery_ValidatesDnsHeader()
+    {
+        // Reject short packet
+        Assert.False(ConnectMdnsService.ShouldHandleQuery(new byte[11], "Melodist-TV-1234"));
+
+        // Reject response packet (QR=1)
+        byte[] responsePacket = new byte[30];
+        responsePacket[2] = 0x84; // QR=1
+        responsePacket[4] = 0x00; responsePacket[5] = 0x01; // QDCOUNT=1
+        Assert.False(ConnectMdnsService.ShouldHandleQuery(responsePacket, "Melodist-TV-1234"));
+
+        // Reject packet with zero questions (QDCOUNT=0)
+        byte[] zeroQdPacket = new byte[30];
+        zeroQdPacket[2] = 0x00; // QR=0
+        zeroQdPacket[4] = 0x00; zeroQdPacket[5] = 0x00; // QDCOUNT=0
+        Assert.False(ConnectMdnsService.ShouldHandleQuery(zeroQdPacket, "Melodist-TV-1234"));
+
+        // Reject query for unrelated service
+        var unrelatedBytes = System.Text.Encoding.ASCII.GetBytes("\0\0\0\0\0\x01\0\0\0\0\0\0_googlecast._tcp.local");
+        Assert.False(ConnectMdnsService.ShouldHandleQuery(unrelatedBytes, "Melodist-TV-1234"));
+
+        // Accept query for melodist-connect service
+        var validBytes = System.Text.Encoding.ASCII.GetBytes("\0\0\0\0\0\x01\0\0\0\0\0\0_melodist-connect._tcp.local");
+        Assert.True(ConnectMdnsService.ShouldHandleQuery(validBytes, "Melodist-TV-1234"));
     }
 }

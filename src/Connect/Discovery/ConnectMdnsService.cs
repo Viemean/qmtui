@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -15,7 +14,6 @@ public sealed class ConnectMdnsService : IDisposable
     private readonly int _port;
     private CancellationTokenSource? _cts;
     private UdpClient? _udpClient;
-    private Process? _avahiProcess;
 
     public ConnectMdnsService(ConnectStorage storage, int port = 8765)
     {
@@ -83,10 +81,7 @@ public sealed class ConnectMdnsService : IDisposable
         var suffix = _storage.LocalDeviceId[^Math.Min(4, _storage.LocalDeviceId.Length)..];
         var instanceName = $"Melodist-TV-{suffix}";
 
-        // 1. 优先尝试拉起 Linux 本地 avahi-publish-service 进行系统级 mDNS 发布
-        TryStartAvahiPublish(instanceName, localIp);
-
-        // 2. 启动原生 UDP 组播 5353 监听与周期性宣告
+        // 启动原生 UDP 组播 5353 监听与按需响应
         Task.Run(async () =>
         {
             try
@@ -94,6 +89,13 @@ public sealed class ConnectMdnsService : IDisposable
                 var multicastAddress = IPAddress.Parse("224.0.0.251");
                 _udpClient = new UdpClient();
                 _udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                _udpClient.MulticastLoopback = false;
+                try
+                {
+                    _udpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback, false);
+                }
+                catch { }
+
                 try
                 {
                     _udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, 5353));
@@ -106,19 +108,41 @@ public sealed class ConnectMdnsService : IDisposable
 
                 AppLogger.Info("ConnectMdns", $"mDNS service discovery active for {instanceName} on {localIp}:{_port}");
 
-                // 启动周期性主动宣告协程 (每 4 秒向组播组推送一次)
+                // 启动宣告（RFC 6762 规范：启动时发送 2 次，间隔 1 秒）
                 _ = Task.Run(async () =>
                 {
-                    while (!_cts.Token.IsCancellationRequested)
+                    var multicastEp = new IPEndPoint(multicastAddress, 5353);
+                    for (int i = 0; i < 2 && !_cts.Token.IsCancellationRequested; i++)
                     {
                         try
                         {
                             var packet = BuildCompleteDnsSdPacket(instanceName, localIp, _port, _storage.LocalDeviceId, _storage.LocalDeviceName, _storage.LocalToken, _storage.CurrentPinCode);
-                            _udpClient?.SendAsync(packet, packet.Length, new IPEndPoint(multicastAddress, 5353));
+                            if (_udpClient != null)
+                            {
+                                await _udpClient.SendAsync(packet, packet.Length, multicastEp).ConfigureAwait(false);
+                            }
                         }
-                        catch {}
+                        catch { }
 
-                        await Task.Delay(4000, _cts.Token).ConfigureAwait(false);
+                        if (i == 0)
+                        {
+                            await Task.Delay(1000, _cts.Token).ConfigureAwait(false);
+                        }
+                    }
+
+                    // 之后采用低频保活广播（每 60 秒一次），避免频繁唤醒 CPU 与网络套接字
+                    while (!_cts.Token.IsCancellationRequested)
+                    {
+                        await Task.Delay(60000, _cts.Token).ConfigureAwait(false);
+                        try
+                        {
+                            var packet = BuildCompleteDnsSdPacket(instanceName, localIp, _port, _storage.LocalDeviceId, _storage.LocalDeviceName, _storage.LocalToken, _storage.CurrentPinCode);
+                            if (_udpClient != null)
+                            {
+                                await _udpClient.SendAsync(packet, packet.Length, multicastEp).ConfigureAwait(false);
+                            }
+                        }
+                        catch { }
                     }
                 }, _cts.Token);
 
@@ -128,7 +152,7 @@ public sealed class ConnectMdnsService : IDisposable
                     try
                     {
                         var result = await _udpClient.ReceiveAsync(_cts.Token).ConfigureAwait(false);
-                        HandleMdnsQuery(result.Buffer, result.RemoteEndPoint, instanceName, localIp);
+                        _ = HandleMdnsQueryAsync(result.Buffer, result.RemoteEndPoint, instanceName, localIp, multicastAddress);
                     }
                     catch (OperationCanceledException)
                     {
@@ -147,110 +171,28 @@ public sealed class ConnectMdnsService : IDisposable
         }, _cts.Token);
     }
 
-    private static readonly EventHandler ProcessExitHandler = (_, _) => KillOrphanedAvahiProcesses();
-
-    static ConnectMdnsService()
+    internal static bool ShouldHandleQuery(byte[] data, string instanceName)
     {
-        AppDomain.CurrentDomain.ProcessExit += ProcessExitHandler;
-    }
+        if (data.Length < 12) return false;
 
-    private static void KillOrphanedAvahiProcesses()
-    {
-        if (!OperatingSystem.IsLinux()) return;
-        try
-        {
-            using var p = Process.Start(new ProcessStartInfo
-            {
-                FileName = "pkill",
-                Arguments = "-f \"avahi-publish-service.*_melodist-connect\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
-            p?.WaitForExit(500);
-        }
-        catch { }
-    }
+        // RFC 6762 Section 6: 响应报文 (QR == 1) 严禁响应，防止回环风暴
+        if ((data[2] & 0x80) != 0) return false;
 
-    private static bool IsAvahiDaemonRunning()
-    {
-        if (!OperatingSystem.IsLinux()) return false;
-        try
-        {
-            return File.Exists("/run/avahi-daemon/socket") || File.Exists("/var/run/avahi-daemon/socket");
-        }
-        catch
-        {
-            return false;
-        }
-    }
+        // 仅处理标准查询 (OpCode == 0)
+        if ((data[2] & 0x78) != 0) return false;
 
-    private void TryStartAvahiPublish(string instanceName, string localIp)
-    {
-        try
-        {
-            StopAvahiPublish();
-            KillOrphanedAvahiProcesses();
+        // 问题记录数必须大于 0
+        ushort qdCount = (ushort)((data[4] << 8) | data[5]);
+        if (qdCount == 0) return false;
 
-            if (!IsAvahiDaemonRunning())
-            {
-                AppLogger.Debug("ConnectMdns", "avahi-daemon socket not found, skipping avahi-publish-service.");
-                return;
-            }
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = "avahi-publish-service",
-                Arguments = $"\"{instanceName}\" \"_melodist-connect._tcp\" {_port} \"id={_storage.LocalDeviceId}\" \"name={_storage.LocalDeviceName}\" \"token={_storage.LocalToken}\" \"pin={_storage.CurrentPinCode}\" \"host={localIp}\"",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            _avahiProcess = Process.Start(psi);
-            if (_avahiProcess != null)
-            {
-                _avahiProcess.EnableRaisingEvents = true;
-                _avahiProcess.Exited += (_, _) =>
-                {
-                    AppLogger.Debug("ConnectMdns", "avahi-publish-service exited.");
-                };
-            }
-            AppLogger.Info("ConnectMdns", $"Spawned avahi-publish-service for {instanceName}");
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("ConnectMdns", $"avahi-publish-service not available: {ex.Message}");
-        }
-    }
-
-    private void StopAvahiPublish()
-    {
-        try
-        {
-            if (_avahiProcess != null)
-            {
-                if (!_avahiProcess.HasExited)
-                {
-                    _avahiProcess.Kill(entireProcessTree: true);
-                    _avahiProcess.WaitForExit(500);
-                }
-                _avahiProcess.Dispose();
-            }
-        }
-        catch { }
-        finally
-        {
-            _avahiProcess = null;
-        }
-    }
-
-    private void HandleMdnsQuery(byte[] data, IPEndPoint remoteEp, string instanceName, string localIp)
-    {
-        if (data.Length < 12) return;
         var queryText = Encoding.ASCII.GetString(data);
-        if (!queryText.Contains("melodist-connect", StringComparison.OrdinalIgnoreCase) &&
-            !queryText.Contains(instanceName, StringComparison.OrdinalIgnoreCase))
+        return queryText.Contains("melodist-connect", StringComparison.OrdinalIgnoreCase) ||
+               queryText.Contains(instanceName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task HandleMdnsQueryAsync(byte[] data, IPEndPoint remoteEp, string instanceName, string localIp, IPAddress multicastAddress)
+    {
+        if (!ShouldHandleQuery(data, instanceName))
         {
             return;
         }
@@ -258,7 +200,14 @@ public sealed class ConnectMdnsService : IDisposable
         try
         {
             var response = BuildCompleteDnsSdPacket(instanceName, localIp, _port, _storage.LocalDeviceId, _storage.LocalDeviceName, _storage.LocalToken, _storage.CurrentPinCode);
-            _udpClient?.SendAsync(response, response.Length, new IPEndPoint(IPAddress.Parse("224.0.0.251"), 5353));
+            var targetEp = remoteEp.Port == 5353
+                ? new IPEndPoint(multicastAddress, 5353)
+                : remoteEp;
+
+            if (_udpClient != null)
+            {
+                await _udpClient.SendAsync(response, response.Length, targetEp).ConfigureAwait(false);
+            }
         }
         catch (Exception ex)
         {
@@ -266,7 +215,7 @@ public sealed class ConnectMdnsService : IDisposable
         }
     }
 
-    private static byte[] BuildCompleteDnsSdPacket(
+    internal static byte[] BuildCompleteDnsSdPacket(
         string instanceName,
         string hostIp,
         int port,
@@ -394,8 +343,6 @@ public sealed class ConnectMdnsService : IDisposable
 
     public void Stop()
     {
-        StopAvahiPublish();
-        KillOrphanedAvahiProcesses();
         _cts?.Cancel();
         _cts = null;
         try
