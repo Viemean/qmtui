@@ -43,11 +43,46 @@ public sealed partial class MainWindow
                     try
                     {
                         var song = cmd.Song.ToDomainSong();
+                        if (!string.IsNullOrEmpty(song.LocalFilePath) &&
+                            !song.LocalFilePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                            !song.LocalFilePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                            !File.Exists(song.LocalFilePath))
+                        {
+                            song.LocalFilePath = null;
+                        }
+
                         if (cmd.Queue != null && cmd.Queue.Count > 0)
                         {
-                            var domainQueue = cmd.Queue.Select(q => q.ToDomainSong()).ToList();
+                            var domainQueue = cmd.Queue.Select(q =>
+                            {
+                                var s = q.ToDomainSong();
+                                if (!string.IsNullOrEmpty(s.LocalFilePath) &&
+                                    !s.LocalFilePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                                    !s.LocalFilePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                                    !File.Exists(s.LocalFilePath))
+                                {
+                                    s.LocalFilePath = null;
+                                }
+                                return s;
+                            }).ToList();
+
                             var validIdx = Math.Clamp(cmd.Index, 0, Math.Max(0, domainQueue.Count - 1));
-                            PlaybackQueueService.Instance.SetQueue(domainQueue, validIdx);
+
+                            const int MaxRemoteQueueSize = 300;
+                            if (domainQueue.Count > MaxRemoteQueueSize)
+                            {
+                                int half = MaxRemoteQueueSize / 2;
+                                int start = Math.Max(0, validIdx - half);
+                                int end = Math.Min(domainQueue.Count, start + MaxRemoteQueueSize);
+                                int actualStart = Math.Max(0, end - MaxRemoteQueueSize);
+                                var windowed = domainQueue.GetRange(actualStart, end - actualStart);
+                                var windowedIdx = Math.Clamp(validIdx - actualStart, 0, Math.Max(0, windowed.Count - 1));
+                                PlaybackQueueService.Instance.SetQueue(windowed, windowedIdx);
+                            }
+                            else
+                            {
+                                PlaybackQueueService.Instance.SetQueue(domainQueue, validIdx);
+                            }
                         }
 
                         if (!string.IsNullOrEmpty(cmd.QualityTier))
