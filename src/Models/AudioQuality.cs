@@ -171,9 +171,9 @@ public static class AudioQualityHelper
     public static IReadOnlyList<AudioQualityTier> SelectionOrder { get; } =
     [
         AudioQualityTier.Master,
-        AudioQualityTier.Premium,
         AudioQualityTier.Atmos,
         AudioQualityTier.Dolby,
+        AudioQualityTier.Premium,
         AudioQualityTier.HiRes,
         AudioQualityTier.SQ,
         AudioQualityTier.HQ,
@@ -191,8 +191,13 @@ public static class AudioQualityHelper
 
     public static IReadOnlyList<AudioQualityTier> GetFallbackTiers(AudioQualityTier tier) => tier switch
     {
-        AudioQualityTier.Master => [AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
-        AudioQualityTier.Premium or AudioQualityTier.Atmos or AudioQualityTier.Dolby =>
+        AudioQualityTier.Master =>
+            [AudioQualityTier.Atmos, AudioQualityTier.Dolby, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+        AudioQualityTier.Atmos =>
+            [AudioQualityTier.Dolby, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+        AudioQualityTier.Dolby =>
+            [AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+        AudioQualityTier.Premium =>
             [AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
         AudioQualityTier.HiRes => [AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
         AudioQualityTier.SQ => [AudioQualityTier.HQ, AudioQualityTier.Standard],
