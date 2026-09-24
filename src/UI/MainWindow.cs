@@ -29,6 +29,7 @@ public sealed partial class MainWindow : Window
     private readonly TextField _searchField;
     private readonly FrameView _sidebarFrame;
     private readonly ListView _sidebarList;
+    private readonly MiniCoverView _miniCoverView;
     private readonly SongListView _songListView;
     private readonly FrameView _lyricFrame;
     private readonly ListView _lyricListView;
@@ -415,7 +416,7 @@ public sealed partial class MainWindow : Window
             X = 0,
             Y = 1,
             Width = 14,
-            Height = Dim.Fill(5),
+            Height = 13,
             CanFocus = true,
             TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop
         };
@@ -490,6 +491,17 @@ public sealed partial class MainWindow : Window
             }
         };
         Add(_sidebarFrame);
+
+        // 2.1 左侧下半部分常驻直角正方形迷你封面视窗
+        _miniCoverView = new MiniCoverView
+        {
+            X = 0,
+            Y = Pos.Bottom(_sidebarFrame),
+            Width = 14,
+            Height = 8
+        };
+        _miniCoverView.CoverClicked += ToggleNowPlayingView;
+        Add(_miniCoverView);
 
         // 3. 中央歌曲列表视窗（解耦封装）
         _songListView = new SongListView
@@ -1149,6 +1161,7 @@ public sealed partial class MainWindow : Window
         // 窗口整体尺寸改变时同步更新沉浸式播放界面的封面或详情页写真
         ViewportChanged += (s, e) =>
         {
+            UpdateSidebarLayout();
             if (_isNowPlayingViewActive)
             {
                 _nowPlayingView.OnWindowResized();
@@ -1282,6 +1295,34 @@ public sealed partial class MainWindow : Window
         }
 
         RestorePlaybackState();
+        UpdateSidebarLayout();
+    }
+
+    public void UpdateSidebarLayout()
+    {
+        if (_isNowPlayingViewActive || _isAodMode) return;
+
+        int totalHeight = Viewport.Height > 0 ? Viewport.Height : (Application.Driver?.Rows ?? 25);
+        int bottomReserve = _isImmersiveMode ? 0 : 5;
+        int topOffset = _isImmersiveMode ? 0 : 1;
+        int availableHeight = totalHeight - topOffset - bottomReserve;
+
+        const int coverBoxHeight = 8; // 边框 2 行 + 6 行 1:1 正方形满幅小封面（12列宽） = 8 行严丝合缝贴合
+        bool canShowCover = availableHeight >= (12 + coverBoxHeight) && TerminalImageHelper.IsImageSupported;
+        if (canShowCover)
+        {
+            _sidebarFrame.Height = Dim.Fill(bottomReserve + coverBoxHeight);
+            _miniCoverView.Visible = true;
+            _miniCoverView.Y = Pos.Bottom(_sidebarFrame);
+            _miniCoverView.Height = coverBoxHeight;
+            _miniCoverView.TriggerRenderDelayed();
+        }
+        else
+        {
+            _sidebarFrame.Height = Dim.Fill(bottomReserve);
+            _miniCoverView.Visible = false;
+            _miniCoverView.ClearCover();
+        }
     }
 
     private void RestorePlaybackState()
@@ -1333,6 +1374,7 @@ public sealed partial class MainWindow : Window
 
                 // 预加载恢复曲目的全屏信息、封面与歌词
                 _nowPlayingView.SetSong(lastSong, AudioQualityHelper.GetBadge(_actualQualityTier));
+                _miniCoverView.SetSong(lastSong, AudioQualityHelper.GetBadge(_actualQualityTier));
                 _ = Task.Run(async () =>
                 {
                     try
@@ -1342,7 +1384,11 @@ public sealed partial class MainWindow : Window
                         {
                             _currentCoverFilePath = cover;
                             _mprisService.UpdateCover(cover);
-                            Application.Invoke(() => _nowPlayingView.UpdateCover(cover));
+                            Application.Invoke(() =>
+                            {
+                                _nowPlayingView.UpdateCover(cover);
+                                _miniCoverView.UpdateCover(cover);
+                            });
                         }
 
                         List<LyricLine> lyrics;

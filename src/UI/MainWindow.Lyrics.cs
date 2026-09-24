@@ -540,6 +540,7 @@ public sealed partial class MainWindow
                             Application.Invoke(() =>
                             {
                                 _nowPlayingView.UpdateCover(cov);
+                                _miniCoverView.UpdateCover(cov);
                                 BroadcastConnectPlayerState();
                             });
                         }

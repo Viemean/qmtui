@@ -50,8 +50,6 @@ public sealed partial class MainWindow
         var fillHeight = enable ? Dim.Fill(0) : Dim.Fill(5);
 
         _sidebarFrame.Y = topY;
-        _sidebarFrame.Height = fillHeight;
-
         _songListView.Y = topY;
         _songListView.Height = fillHeight;
 
@@ -61,6 +59,8 @@ public sealed partial class MainWindow
         _sidebarTitleLabel.Y = topY;
         _songListTitleLabel.Y = topY;
         _lyricTitleLabel.Y = topY;
+
+        UpdateSidebarLayout();
 
         UpdateImmersiveButtonHighlight();
 
@@ -248,6 +248,8 @@ public sealed partial class MainWindow
     {
         _isNowPlayingViewActive = true;
         _sidebarFrame.Visible = false;
+        _miniCoverView.Visible = false;
+        _miniCoverView.ClearCover();
         _songListView.Visible = false;
         _lyricFrame.Visible = false;
         _searchLabel.Visible = false;
@@ -280,6 +282,7 @@ public sealed partial class MainWindow
         _nowPlayingView.OnDeactivated();
 
         _sidebarFrame.Visible = true;
+        UpdateSidebarLayout();
         _songListView.Visible = true;
         _lyricFrame.Visible = true;
         _searchLabel.Visible = !_isImmersiveMode;
@@ -322,6 +325,8 @@ public sealed partial class MainWindow
         _sidebarTitleLabel.Visible = false;
         _songListTitleLabel.Visible = false;
         _lyricTitleLabel.Visible = false;
+        _miniCoverView.Visible = false;
+        _miniCoverView.ClearCover();
 
         // 若处于沉浸式大封面播放或写真详情，显式调用注销并清空终端 Kitty 图像协议缓冲区
         if (_nowPlayingView.Visible)
@@ -365,6 +370,7 @@ public sealed partial class MainWindow
         else
         {
             _sidebarFrame.Visible = true;
+            UpdateSidebarLayout();
             _songListView.Visible = true;
             _lyricFrame.Visible = true;
             _searchLabel.Visible = !_isImmersiveMode;

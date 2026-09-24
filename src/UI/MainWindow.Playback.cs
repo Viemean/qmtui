@@ -453,6 +453,7 @@ public sealed partial class MainWindow
                         Application.Invoke(() =>
                         {
                             _nowPlayingView.UpdateCover(cover);
+                            _miniCoverView.UpdateCover(cover);
                             BroadcastConnectPlayerState();
                         });
                     }
@@ -486,9 +487,11 @@ public sealed partial class MainWindow
                 if (IsStale()) return;
                 UpdatePlayerStatus();
                 _nowPlayingView.SetSong(song, AudioQualityHelper.GetBadge(_actualQualityTier));
+                _miniCoverView.SetSong(song, AudioQualityHelper.GetBadge(_actualQualityTier));
                 if (!string.IsNullOrEmpty(_currentCoverFilePath))
                 {
                     _nowPlayingView.UpdateCover(_currentCoverFilePath);
+                    _miniCoverView.UpdateCover(_currentCoverFilePath);
                 }
                 _nowPlayingView.SetLyrics(_currentLyrics, _showTranslation);
                 _nowPlayingView.SetLyricMatchedState(IsCurrentSongLyricMatched(song));
