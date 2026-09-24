@@ -461,6 +461,8 @@ public sealed partial class LoginService
     public static Task<bool> EnsureMusicKeyAsync(CancellationToken ct = default) =>
         EnsureMusicKeyAsync(false, ct);
 
+    private static readonly SemaphoreSlim s_refreshMutex = new(1, 1);
+
     /// <summary>
     /// 确保存在有效的 musickey，若缺失或强制刷新则自动执行 OAuth2/RefreshToken 续期
     /// </summary>
@@ -471,25 +473,38 @@ public sealed partial class LoginService
             return true;
         }
 
-        // 1. 若存有 psrf_qqopenid 与 psrf_qqaccess_token，尝试通过官方 QQLogin 接口带 forceRefreshToken 续期
-        if (UserSession.Current.Cookies.TryGetValue("psrf_qqopenid", out var openid) && !string.IsNullOrEmpty(openid) &&
-            UserSession.Current.Cookies.TryGetValue("psrf_qqaccess_token", out var accessToken) && !string.IsNullOrEmpty(accessToken))
+        await s_refreshMutex.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting token refresh via QQConnectLogin.LoginServer...");
-            if (await RefreshQQLoginTokenAsync(openid, accessToken, ct).ConfigureAwait(false))
+            if (!forceRefresh && UserSession.Current.Cookies.TryGetValue("qm_keyst", out var keyAfterLock) && !string.IsNullOrEmpty(keyAfterLock))
             {
                 return true;
             }
-        }
 
-        // 2. 若存有 p_skey，自动走 OAuth2 重授权换票流程
-        if (UserSession.Current.Cookies.TryGetValue("p_skey", out var pskey) && !string.IsNullOrEmpty(pskey))
+            // 1. 若存有 psrf_qqopenid 与 psrf_qqaccess_token，尝试通过官方 QQLogin 接口带 forceRefreshToken 续期
+            if (UserSession.Current.Cookies.TryGetValue("psrf_qqopenid", out var openid) && !string.IsNullOrEmpty(openid) &&
+                UserSession.Current.Cookies.TryGetValue("psrf_qqaccess_token", out var accessToken) && !string.IsNullOrEmpty(accessToken))
+            {
+                AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting token refresh via QQConnectLogin.LoginServer...");
+                if (await RefreshQQLoginTokenAsync(openid, accessToken, ct).ConfigureAwait(false))
+                {
+                    return true;
+                }
+            }
+
+            // 2. 若存有 p_skey，自动走 OAuth2 重授权换票流程
+            if (UserSession.Current.Cookies.TryGetValue("p_skey", out var pskey) && !string.IsNullOrEmpty(pskey))
+            {
+                AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting automatic OAuth2 exchange via p_skey...");
+                return await ExchangeMusicKeyByOAuthAsync(UserSession.Current.Cookies, ct).ConfigureAwait(false);
+            }
+
+            return false;
+        }
+        finally
         {
-            AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting automatic OAuth2 exchange via p_skey...");
-            return await ExchangeMusicKeyByOAuthAsync(UserSession.Current.Cookies, ct).ConfigureAwait(false);
+            s_refreshMutex.Release();
         }
-
-        return false;
     }
 
     /// <summary>
@@ -504,6 +519,7 @@ public sealed partial class LoginService
 
             using var loginReq = new HttpRequestMessage(HttpMethod.Post, musicLoginUrl);
             loginReq.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+            loginReq.Headers.TryAddWithoutValidation("Origin", "https://y.qq.com");
             var cookieHeader = UserSession.Current.GetCookieHeader();
             if (!string.IsNullOrEmpty(cookieHeader))
             {
