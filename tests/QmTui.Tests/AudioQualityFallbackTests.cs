@@ -9,10 +9,25 @@ public class AudioQualityFallbackTests
     public void Master_ShouldFallbackSequentially()
     {
         var fallbacks = AudioQualityHelper.GetFallbackTiers(AudioQualityTier.Master);
-        Assert.Contains(AudioQualityTier.HiRes, fallbacks);
-        Assert.Contains(AudioQualityTier.SQ, fallbacks);
-        Assert.Contains(AudioQualityTier.HQ, fallbacks);
-        Assert.Contains(AudioQualityTier.Standard, fallbacks);
+        Assert.Equal(
+            [AudioQualityTier.Atmos, AudioQualityTier.Dolby, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+            fallbacks);
+    }
+
+    [Fact]
+    public void AtmosAndDolbyAndPremium_ShouldFallbackStepByStep()
+    {
+        Assert.Equal(
+            [AudioQualityTier.Dolby, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+            AudioQualityHelper.GetFallbackTiers(AudioQualityTier.Atmos));
+
+        Assert.Equal(
+            [AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+            AudioQualityHelper.GetFallbackTiers(AudioQualityTier.Dolby));
+
+        Assert.Equal(
+            [AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+            AudioQualityHelper.GetFallbackTiers(AudioQualityTier.Premium));
     }
 
     [Fact]
@@ -136,7 +151,47 @@ public class AudioQualityFallbackTests
     }
 
     [Fact]
-    public void ParseProbedQualities_HiResWithSizeNew11_ResolvesAsAvailable()
+    public void ParseProbedQualities_HiResWithSizeHires_ResolvesAsAvailable()
+    {
+        var requests = new (string Key, AudioQualityTier Tier, string Prefix, string Extension)[]
+        {
+            ("req_hires", AudioQualityTier.HiRes, "RS01", ".flac")
+        };
+
+        var json = """
+        {
+            "songinfo": {
+                "data": {
+                    "track_info": {
+                        "interval": 200,
+                        "file": {
+                            "size_hires": 48000000
+                        }
+                    }
+                }
+            },
+            "req_hires": {
+                "data": {
+                    "sip": ["https://isure.stream.qqmusic.qq.com/"],
+                    "midurlinfo": [
+                        { "purl": "RS010039MnYb0qxYhV.flac?vkey=test", "result": 0 }
+                    ]
+                }
+            }
+        }
+        """;
+
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var options = QmTui.Api.MusicApi.ParseProbedQualities(doc.RootElement, requests);
+
+        var hiResOpt = options.FirstOrDefault(o => o.Tier == AudioQualityTier.HiRes);
+        Assert.NotNull(hiResOpt);
+        Assert.True(hiResOpt.Available);
+        Assert.Equal("https://isure.stream.qqmusic.qq.com/RS010039MnYb0qxYhV.flac?vkey=test", hiResOpt.PlayUrl);
+    }
+
+    [Fact]
+    public void ParseProbedQualities_SizeNew11Only_DoesNotActivateHiRes()
     {
         var requests = new (string Key, AudioQualityTier Tier, string Prefix, string Extension)[]
         {
@@ -171,8 +226,7 @@ public class AudioQualityFallbackTests
 
         var hiResOpt = options.FirstOrDefault(o => o.Tier == AudioQualityTier.HiRes);
         Assert.NotNull(hiResOpt);
-        Assert.True(hiResOpt.Available);
-        Assert.Equal("https://isure.stream.qqmusic.qq.com/RS010039MnYb0qxYhV.flac?vkey=test", hiResOpt.PlayUrl);
+        Assert.False(hiResOpt.Available);
     }
 
     [Fact]

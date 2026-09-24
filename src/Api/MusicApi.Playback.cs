@@ -32,7 +32,7 @@ public sealed partial class MusicApi
         var requests = AudioQualityHelper.ProbeRequests;
         var requestJson = new StringBuilder(1536);
         requestJson.Append("{\"comm\":{\"uin\":\"").Append(JsonEncodedText.Encode(uin))
-            .Append("\",\"format\":\"json\",\"ct\":19,\"cv\":1,\"authst\":\"")
+            .Append("\",\"format\":\"json\",\"ct\":28,\"cv\":1,\"authst\":\"")
             .Append(JsonEncodedText.Encode(authst)).Append("\"},")
             .Append("\"songinfo\":{\"module\":\"music.pf_song_detail_svr\",\"method\":\"get_song_detail_yqq\",\"param\":{\"song_mid\":\"")
             .Append(JsonEncodedText.Encode(songMid)).Append("\"}}");
@@ -70,8 +70,8 @@ public sealed partial class MusicApi
 
             if (canRetryWithRenew && UserSession.Current.IsLoggedIn)
             {
-                var hasVipSource = options.Any(o => o.Tier != AudioQualityTier.Standard && !string.IsNullOrEmpty(o.BitrateInfo));
-                var hasVipUrl = options.Any(o => o.Tier != AudioQualityTier.Standard && o.Available);
+                var hasVipSource = options.Any(o => o.Tier > AudioQualityTier.HQ && o.FileSizeBytes > 0);
+                var hasVipUrl = options.Any(o => o.Tier > AudioQualityTier.HQ && o.Available);
                 if (hasVipSource && !hasVipUrl)
                 {
                     AppLogger.Info("MusicApi", "ProbeSongQualities: VIP audio tracks exist but no valid VIP URL obtained, attempting token renewal...");
@@ -132,7 +132,6 @@ public sealed partial class MusicApi
                 hiresRaw = ReadJsonInt64(fileObj, "size_hires");
                 if (hiresRaw == 0) hiresRaw = ReadJsonInt64(fileObj, "size_96flac");
                 if (hiresRaw == 0) hiresRaw = ReadJsonInt64(fileObj, "size_24bit");
-                if (hiresRaw == 0) hiresRaw = GetArrayValue(sizeNew, 11);
 
                 flacSize = ReadJsonInt64(fileObj, "size_flac");
                 if (flacSize == 0) flacSize = GetArrayValue(sizeNew, 12);
@@ -507,7 +506,7 @@ public sealed partial class MusicApi
             var uin = string.IsNullOrEmpty(UserSession.Current.Uin) ? "0" : UserSession.Current.Uin;
             var authst = UserSession.Current.MusicKey ?? "";
             var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
-            var payload = $"{{\"comm\":{{\"uin\":\"{uin}\",\"format\":\"json\",\"ct\":19,\"cv\":1,\"authst\":\"{authst}\",\"tmeAppID\":\"qqmusic\"}}," +
+            var payload = $"{{\"comm\":{{\"uin\":\"{uin}\",\"format\":\"json\",\"ct\":28,\"cv\":1,\"authst\":\"{authst}\",\"tmeAppID\":\"qqmusic\"}}," +
                 $"\"songinfo\":{{\"module\":\"music.pf_song_detail_svr\",\"method\":\"get_song_detail_yqq\",\"param\":{{\"song_mid\":\"{songMid}\"}}}}}}";
 
             using var req = new HttpRequestMessage(HttpMethod.Post, url);
@@ -557,7 +556,7 @@ public sealed partial class MusicApi
             var uin = string.IsNullOrEmpty(UserSession.Current.Uin) ? "0" : UserSession.Current.Uin;
             var authst = UserSession.Current.MusicKey ?? "";
             var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
-            var payload = $"{{\"comm\":{{\"uin\":\"{uin}\",\"format\":\"json\",\"ct\":19,\"cv\":1,\"authst\":\"{authst}\",\"tmeAppID\":\"qqmusic\"}}," +
+            var payload = $"{{\"comm\":{{\"uin\":\"{uin}\",\"format\":\"json\",\"ct\":28,\"cv\":1,\"authst\":\"{authst}\",\"tmeAppID\":\"qqmusic\"}}," +
                 $"\"songinfo\":{{\"module\":\"music.pf_song_detail_svr\",\"method\":\"get_song_detail_yqq\",\"param\":{{\"song_mid\":\"{songMid}\"}}}}}}";
 
             using var req = new HttpRequestMessage(HttpMethod.Post, url);
