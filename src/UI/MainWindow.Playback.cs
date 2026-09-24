@@ -184,7 +184,22 @@ public sealed partial class MainWindow
             }
             else
             {
-                _controlBar.UpdateQuality(AudioQualityHelper.GetBadge(_preferredQualityTier));
+                // 若该歌曲已命中预取缓存，直接对齐已解析的实际音质；否则不提前刷上偏好音质，待直链定档后一次性精准展示真实档位
+                var cacheKey = $"{song.Mid}_{(int)_preferredQualityTier}";
+                AudioQualityTier? knownTier = null;
+                lock (s_prefetchLock)
+                {
+                    if (s_prefetchedPlayUrls.TryGetValue(cacheKey, out var p) && p.ExpireAt > DateTimeOffset.UtcNow)
+                    {
+                        knownTier = p.ActualTier;
+                    }
+                }
+
+                if (knownTier.HasValue)
+                {
+                    _actualQualityTier = knownTier.Value;
+                    _controlBar.UpdateQuality(AudioQualityHelper.GetBadge(_actualQualityTier));
+                }
             }
             _lyricListView.SetSource(new ObservableCollection<string> { "正在加载歌词..." });
             try { _lyricListView.SelectedItem = 0; } catch {}
