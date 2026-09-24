@@ -1461,7 +1461,8 @@ public sealed partial class MainWindow : Window
     {
         var prevModal = _activeModalDialog;
         _activeModalDialog = dlg;
-        TerminalImageHelper.ClearImages();
+        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdNowPlaying);
+        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
         try
         {
             Application.Run(dlg);
@@ -1477,6 +1478,10 @@ public sealed partial class MainWindow : Window
             else if (_currentViewMode == ViewMode.ArtistDetail && _artistAlbumDetailView.Visible)
             {
                 _artistAlbumDetailView.TriggerImageRenderDelayed();
+            }
+            else if (_miniCoverView.Visible)
+            {
+                _miniCoverView.TriggerRenderDelayed();
             }
         }
     }

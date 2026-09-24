@@ -157,11 +157,6 @@ public sealed class MiniCoverView : FrameView
             return;
         }
 
-        if (Application.TopRunnableView != null && !(Application.TopRunnableView is MainWindow))
-        {
-            return;
-        }
-
         try
         {
             var origin = FrameToScreen();
