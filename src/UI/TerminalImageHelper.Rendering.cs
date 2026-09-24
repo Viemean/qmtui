@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
@@ -162,9 +163,8 @@ public static partial class TerminalImageHelper
             }
             cancellationToken.ThrowIfCancellationRequested();
 
-            float radius = MathF.Max(6.0f, width * 0.017f);
-            ApplyGeometricRoundedCorners(pixelData, width, height, radius);
-            cancellationToken.ThrowIfCancellationRequested();
+            // 施加平滑抗锯齿微圆角裁切（保底 7px 微圆角）
+            ApplyAntialiasedRoundedCorners(pixelData, width, height);
 
             await using (var outStream = File.Create(tmpPng))
             {
@@ -251,120 +251,106 @@ public static partial class TerminalImageHelper
         return dst;
     }
 
-    private static void ApplyGeometricRoundedCorners(byte[] data, int w, int h, float radius)
+    /// <summary>
+    /// 对 4 通道 RGBA 像素执行多级金字塔 2x2 面积平均抗锯齿降采样，彻底消灭欠采样高频混叠与线稿断线锯齿
+    /// </summary>
+    private static (int width, int height, byte[] pixelData) DownsamplePyramidAreaAverage(byte[] src, int srcW, int srcH, int targetMaxDimension)
     {
-        if (w <= 0 || h <= 0 || radius <= 0f) return;
-
-        float maxRadius = MathF.Min(w, h) / 2.0f;
-        radius = Math.Clamp(radius, 1.0f, maxRadius);
-        int rLimit = (int)MathF.Ceiling(radius + 1.0f);
-
-        // 1. Top-Left
-        float cxTL = radius;
-        float cyTL = radius;
-        int maxRTL = Math.Min(rLimit, w);
-        int maxBTL = Math.Min(rLimit, h);
-        for (int y = 0; y < maxBTL; y++)
+        if (srcW <= targetMaxDimension && srcH <= targetMaxDimension)
         {
-            float dy = y - cyTL;
-            if (dy >= 0) continue;
-            for (int x = 0; x < maxRTL; x++)
-            {
-                float dx = x - cxTL;
-                if (dx >= 0) continue;
-                float dist = MathF.Sqrt(dx * dx + dy * dy);
-                int idx = (y * w + x) * 4 + 3;
-                if (dist > radius + 0.5f)
-                {
-                    data[idx] = 0;
-                }
-                else if (dist > radius - 0.5f)
-                {
-                    float factor = radius + 0.5f - dist;
-                    data[idx] = (byte)(data[idx] * Math.Clamp(factor, 0f, 1f));
-                }
-            }
+            return (srcW, srcH, src);
         }
 
-        // 2. Top-Right
-        float cxTR = (w - 1) - radius;
-        float cyTR = radius;
-        int minLTR = Math.Max(0, w - rLimit);
-        for (int y = 0; y < maxBTL; y++)
-        {
-            float dy = y - cyTR;
-            if (dy >= 0) continue;
-            for (int x = minLTR; x < w; x++)
-            {
-                float dx = x - cxTR;
-                if (dx <= 0) continue;
-                float dist = MathF.Sqrt(dx * dx + dy * dy);
-                int idx = (y * w + x) * 4 + 3;
-                if (dist > radius + 0.5f)
-                {
-                    data[idx] = 0;
-                }
-                else if (dist > radius - 0.5f)
-                {
-                    float factor = radius + 0.5f - dist;
-                    data[idx] = (byte)(data[idx] * Math.Clamp(factor, 0f, 1f));
-                }
-            }
-        }
+        int curW = srcW;
+        int curH = srcH;
+        byte[] curData = src;
+        bool isRented = false;
 
-        // 3. Bottom-Left
-        float cxBL = radius;
-        float cyBL = (h - 1) - radius;
-        int minTBL = Math.Max(0, h - rLimit);
-        for (int y = minTBL; y < h; y++)
+        try
         {
-            float dy = y - cyBL;
-            if (dy <= 0) continue;
-            for (int x = 0; x < maxRTL; x++)
+            // 第一阶段：逐级半数 2x2 面积严格平均积分（纯整数位移运算）
+            while (curW / 2 >= targetMaxDimension && curH / 2 >= targetMaxDimension)
             {
-                float dx = x - cxBL;
-                if (dx >= 0) continue;
-                float dist = MathF.Sqrt(dx * dx + dy * dy);
-                int idx = (y * w + x) * 4 + 3;
-                if (dist > radius + 0.5f)
-                {
-                    data[idx] = 0;
-                }
-                else if (dist > radius - 0.5f)
-                {
-                    float factor = radius + 0.5f - dist;
-                    data[idx] = (byte)(data[idx] * Math.Clamp(factor, 0f, 1f));
-                }
-            }
-        }
+                int nextW = curW / 2;
+                int nextH = curH / 2;
+                byte[] nextData = ArrayPool<byte>.Shared.Rent(nextW * nextH * 4);
 
-        // 4. Bottom-Right
-        float cxBR = (w - 1) - radius;
-        float cyBR = (h - 1) - radius;
-        for (int y = minTBL; y < h; y++)
-        {
-            float dy = y - cyBR;
-            if (dy <= 0) continue;
-            for (int x = minLTR; x < w; x++)
-            {
-                float dx = x - cxBR;
-                if (dx <= 0) continue;
-                float dist = MathF.Sqrt(dx * dx + dy * dy);
-                int idx = (y * w + x) * 4 + 3;
-                if (dist > radius + 0.5f)
+                for (int y = 0; y < nextH; y++)
                 {
-                    data[idx] = 0;
+                    int srcRow0 = (y * 2) * curW * 4;
+                    int srcRow1 = (y * 2 + 1) * curW * 4;
+                    int dstRow = y * nextW * 4;
+
+                    for (int x = 0; x < nextW; x++)
+                    {
+                        int srcX0 = x * 2 * 4;
+                        int srcX1 = (x * 2 + 1) * 4;
+                        int dstX = x * 4;
+
+                        int i00 = srcRow0 + srcX0;
+                        int i01 = srcRow0 + srcX1;
+                        int i10 = srcRow1 + srcX0;
+                        int i11 = srcRow1 + srcX1;
+
+                        for (int c = 0; c < 4; c++)
+                        {
+                            int sum = curData[i00 + c] + curData[i01 + c] + curData[i10 + c] + curData[i11 + c] + 2;
+                            nextData[dstRow + dstX + c] = (byte)(sum >> 2);
+                        }
+                    }
                 }
-                else if (dist > radius - 0.5f)
+
+                if (isRented)
                 {
-                    float factor = radius + 0.5f - dist;
-                    data[idx] = (byte)(data[idx] * Math.Clamp(factor, 0f, 1f));
+                    ArrayPool<byte>.Shared.Return(curData);
                 }
+
+                curData = nextData;
+                curW = nextW;
+                curH = nextH;
+                isRented = true;
             }
+
+            // 第二阶段：若尺寸仍大于目标，采用双线性插值精确平滑微调至目标尺寸
+            if (curW > targetMaxDimension || curH > targetMaxDimension)
+            {
+                float scale = Math.Min((float)targetMaxDimension / curW, (float)targetMaxDimension / curH);
+                int finalW = Math.Max(1, (int)MathF.Round(curW * scale));
+                int finalH = Math.Max(1, (int)MathF.Round(curH * scale));
+
+                byte[] finalData = ResizeBilinear(curData, curW, curH, finalW, finalH);
+                if (isRented)
+                {
+                    ArrayPool<byte>.Shared.Return(curData);
+                }
+                return (finalW, finalH, finalData);
+            }
+
+            if (isRented)
+            {
+                byte[] clone = new byte[curW * curH * 4];
+                Array.Copy(curData, clone, clone.Length);
+                ArrayPool<byte>.Shared.Return(curData);
+                return (curW, curH, clone);
+            }
+
+            return (curW, curH, curData);
+        }
+        catch
+        {
+            if (isRented)
+            {
+                ArrayPool<byte>.Shared.Return(curData);
+            }
+            return (srcW, srcH, src);
         }
     }
 
-    private readonly record struct ImageCacheKey(string FilePath, int Cols, int Rows, long LastWriteTicks);
+    public const uint ImageIdMiniCover = 1;
+    public const uint ImageIdNowPlaying = 2;
+    public const uint ImageIdArtistDetail = 3;
+
+    private readonly record struct ImageCacheKey(string FilePath, int Cols, int Rows, long LastWriteTicks, uint ImageId = 0);
 
     private static readonly Lock s_cacheLock = new();
     private const int MaxMemoryCacheEntries = 4;
@@ -377,18 +363,19 @@ public static partial class TerminalImageHelper
     /// <param name="filePath">本地图像文件绝对路径</param>
     /// <param name="col">屏幕 1-based 列坐标</param>
     /// <param name="row">屏幕 1-based 行坐标</param>
-    /// <param name="cols">占据列宽</param>
-    /// <param name="rows">占据行高</param>
-    public static void RenderKittyImage(string filePath, int col, int row, int cols, int rows)
+    /// <param name="cols">占据列宽（若 rows 为 0，终端将按原图物理宽高比自适应行数）</param>
+    /// <param name="rows">占据行高（若为 0，则基于 cols 严格保持 1:1 原画比例，杜绝拉伸变形）</param>
+    /// <param name="imageId">可选 Kitty 图像 ID（0 为未指定，将触发全局清屏；>0 为精准 ID 覆盖）</param>
+    public static void RenderKittyImage(string filePath, int col, int row, int cols, int rows, uint imageId = 0)
     {
-        if (!IsImageSupported || string.IsNullOrEmpty(filePath) || cols <= 0 || rows <= 0) return;
+        if (!IsImageSupported || string.IsNullOrEmpty(filePath) || (cols <= 0 && rows <= 0)) return;
 
         try
         {
             var fi = new FileInfo(filePath);
             if (!fi.Exists || fi.Length == 0) return;
 
-            var key = new ImageCacheKey(filePath, cols, rows, fi.LastWriteTimeUtc.Ticks);
+            var key = new ImageCacheKey(filePath, cols, rows, fi.LastWriteTimeUtc.Ticks, imageId);
             byte[]? cachedPayload = null;
 
             lock (s_cacheLock)
@@ -404,12 +391,46 @@ public static partial class TerminalImageHelper
             if (cachedPayload == null)
             {
                 byte[] fileBytes = File.ReadAllBytes(filePath);
+
+                // 根据目标网格尺寸计算超采样物理像素目标（消除混叠锯齿，保留细腻视网膜质感）
+                int targetPixelDim = cols > 0 ? Math.Clamp(cols * 24, 200, 720) : (rows > 0 ? Math.Clamp(rows * 48, 200, 720) : 600);
+                var decoded = DecodeImageRgba(fileBytes, IsValidWebpFile(filePath));
+                if (decoded != null)
+                {
+                    int currentW = decoded.Value.width;
+                    int currentH = decoded.Value.height;
+                    byte[] currentPixels = decoded.Value.pixelData;
+
+                    if (currentW > targetPixelDim * 1.25 || currentH > targetPixelDim * 1.25)
+                    {
+                        var (smoothW, smoothH, smoothPixels) = DownsamplePyramidAreaAverage(
+                            currentPixels, currentW, currentH, targetPixelDim);
+                        currentW = smoothW;
+                        currentH = smoothH;
+                        currentPixels = smoothPixels;
+                    }
+
+                    // 施加平滑抗锯齿微圆角裁切（保底 7px 微圆角，与图二质感完全一致）
+                    ApplyAntialiasedRoundedCorners(currentPixels, currentW, currentH);
+
+                    using var downsampledMs = new MemoryStream();
+                    var imgWriter = new StbImageWriteSharp.ImageWriter();
+                    imgWriter.WritePng(currentPixels, currentW, currentH, StbImageWriteSharp.ColorComponents.RedGreenBlueAlpha, downsampledMs);
+                    fileBytes = downsampledMs.ToArray();
+                }
+
                 string base64 = Convert.ToBase64String(fileBytes);
 
                 using var ms = new MemoryStream();
                 using var writer = new StreamWriter(ms, Encoding.ASCII);
 
-                // Kitty escape sequence: f=100 (PNG), a=T (transmit and display), c=cols, r=rows
+                // Kitty escape sequence: f=100 (PNG), a=T (transmit and display)
+                // 若仅指定 cols (rows <= 0)，终端自动依据当前字体实际像素尺寸严格保持 1:1 原画宽高比
+                string sizePart;
+                if (cols > 0 && rows > 0) sizePart = $"c={cols},r={rows},";
+                else if (cols > 0) sizePart = $"c={cols},";
+                else sizePart = $"r={rows},";
+
                 int chunkSize = 4096;
                 for (int offset = 0; offset < base64.Length; offset += chunkSize)
                 {
@@ -420,7 +441,8 @@ public static partial class TerminalImageHelper
                     if (offset == 0)
                     {
                         int m = isLast ? 0 : 1;
-                        writer.Write($"\x1b_Ga=T,q=2,f=100,c={cols},r={rows},m={m};{chunk}\x1b\\");
+                        string idPart = imageId > 0 ? $"i={imageId}," : "";
+                        writer.Write($"\x1b_Ga=T,{idPart}q=2,f=100,{sizePart}m={m};{chunk}\x1b\\");
                     }
                     else
                     {
@@ -452,12 +474,19 @@ public static partial class TerminalImageHelper
                 }
             }
 
-            ClearImages();
+            if (imageId > 0)
+            {
+                DeleteKittyImage(imageId);
+            }
+            else
+            {
+                ClearImages();
+            }
 
             // 移动光标至指定行列（1-indexed）
             var moveCursorBytes = Encoding.ASCII.GetBytes($"\x1b[{row};{col}H");
             WriteRawBytesToTerminal(moveCursorBytes, cachedPayload);
-            AppLogger.Info("TerminalImageHelper", $"RenderKittyImage sent {cachedPayload.Length} bytes at ({col}, {row}) size {cols}x{rows} (cached)");
+            AppLogger.Info("TerminalImageHelper", $"RenderKittyImage sent {cachedPayload.Length} bytes at ({col}, {row}) size {cols}x{rows} (cached, id={imageId})");
         }
         catch (Exception ex)
         {
@@ -533,6 +562,83 @@ public static partial class TerminalImageHelper
         catch (Exception ex)
         {
             AppLogger.Debug("TerminalImage", $"ClearImages failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 对 32 位 RGBA 像素执行无黑边抗锯齿微圆角裁切（四角平滑 Alpha 渐变，零额外大内存分配）
+    /// </summary>
+    internal static void ApplyAntialiasedRoundedCorners(byte[] rgba, int width, int height, float? customRadius = null)
+    {
+        if (rgba == null || width <= 4 || height <= 4) return;
+
+        // 自适应微圆角：以短边约 1.5% 为基准，小图保底 7px（与图二一致），大图自适应至 16px
+        float radius = customRadius ?? Math.Clamp(Math.Min(width, height) * 0.016f, 7f, 16f);
+        int rInt = (int)MathF.Ceiling(radius);
+        if (rInt <= 0 || rInt * 2 > width || rInt * 2 > height) return;
+
+        float rInner = radius - 0.5f;
+        float rOuter = radius + 0.5f;
+        float rInnerSq = rInner * rInner;
+        float rOuterSq = rOuter * rOuter;
+
+        for (int y = 0; y < rInt; y++)
+        {
+            float dy = radius - (y + 0.5f);
+            int rowTopIdx = y * width * 4;
+            int rowBottomIdx = (height - 1 - y) * width * 4;
+
+            for (int x = 0; x < rInt; x++)
+            {
+                float dx = radius - (x + 0.5f);
+                float distSq = dx * dx + dy * dy;
+
+                if (distSq <= rInnerSq)
+                {
+                    continue;
+                }
+
+                if (distSq >= rOuterSq)
+                {
+                    rgba[rowTopIdx + x * 4 + 3] = 0;
+                    rgba[rowTopIdx + (width - 1 - x) * 4 + 3] = 0;
+                    rgba[rowBottomIdx + x * 4 + 3] = 0;
+                    rgba[rowBottomIdx + (width - 1 - x) * 4 + 3] = 0;
+                    continue;
+                }
+
+                float dist = MathF.Sqrt(distSq);
+                float alphaFactor = Math.Clamp(radius + 0.5f - dist, 0f, 1f);
+
+                int tl = rowTopIdx + x * 4 + 3;
+                rgba[tl] = (byte)MathF.Round(rgba[tl] * alphaFactor);
+
+                int tr = rowTopIdx + (width - 1 - x) * 4 + 3;
+                rgba[tr] = (byte)MathF.Round(rgba[tr] * alphaFactor);
+
+                int bl = rowBottomIdx + x * 4 + 3;
+                rgba[bl] = (byte)MathF.Round(rgba[bl] * alphaFactor);
+
+                int br = rowBottomIdx + (width - 1 - x) * 4 + 3;
+                rgba[br] = (byte)MathF.Round(rgba[br] * alphaFactor);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 清除终端中指定 ID 的 Kitty 图像
+    /// </summary>
+    public static void DeleteKittyImage(uint imageId)
+    {
+        if (!IsImageSupported || imageId == 0) return;
+        try
+        {
+            byte[] cmd = Encoding.ASCII.GetBytes($"\x1b_Ga=d,d=i,i={imageId},q=2\x1b\\");
+            WriteRawBytesToTerminal(cmd);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("TerminalImage", $"DeleteKittyImage failed: {ex.Message}");
         }
     }
 }

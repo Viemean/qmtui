@@ -18,7 +18,7 @@ namespace QmTui.UI;
 public static partial class TerminalImageHelper
 {
     private const long MaxValidPngCacheBytes = 4000 * 1024; // 4MB
-    public const int CurrentCoverVersion = 2;
+    public const int CurrentCoverVersion = 5;
     public const int TargetCoverDimension = 1200;
 
     private static readonly string s_versionFile = Path.Combine(CacheManager.CoversDir, "cover_versions.json");
