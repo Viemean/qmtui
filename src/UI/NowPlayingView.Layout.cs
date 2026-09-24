@@ -59,8 +59,8 @@ public sealed partial class NowPlayingView
         try
         {
             var origin = _coverContainer.FrameToScreen();
-            int col = Math.Max(1, origin.X);
-            int row = Math.Max(1, origin.Y);
+            int col = Math.Max(1, origin.X + 1);
+            int row = Math.Max(1, origin.Y + 1);
             int containerCols = Math.Max(10, _coverContainer.Viewport.Width);
             int containerRows = Math.Max(6, _coverContainer.Viewport.Height);
 
@@ -79,7 +79,7 @@ public sealed partial class NowPlayingView
             int renderCol = col + colOffset;
             int renderRow = Math.Max(1, row + rowOffset);
 
-            TerminalImageHelper.RenderKittyImage(_coverFilePath, renderCol, renderRow, targetCols, targetRows);
+            TerminalImageHelper.RenderKittyImage(_coverFilePath, renderCol, renderRow, targetCols, rows: 0, TerminalImageHelper.ImageIdNowPlaying);
 
             // 严格对齐：底部信息容器 X 坐标与封面起始列完全相同（colOffset），保持绝对左对齐
             UpdateSongInfoLayout(colOffset, targetCols, rowOffset + targetRows + 1);
