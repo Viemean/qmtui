@@ -228,7 +228,7 @@ public sealed partial class MainWindow
             });
             _connectServer.NextRequested += () => Application.Invoke(async () =>
             {
-                if (RadioService.Instance.HasActiveRadio)
+                if (IsRadioModeActive)
                 {
                     await PlayNextRadioTrackAsync().ConfigureAwait(false);
                 }

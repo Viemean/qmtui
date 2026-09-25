@@ -179,6 +179,7 @@ public sealed partial class MainWindow : Window
 
     // 猜你喜欢（个性电台流模式）服务实例
     private readonly RadioService _radioService = RadioService.Instance;
+    private bool IsRadioModeActive => _radioService.IsCurrentSongInRadio(_activeSong) || _currentViewMode == ViewMode.GuessRecommend;
 
     // 终端窗口前后台焦点状态与 ANSI 1004 Focus Reporting 过滤状态机
     public static bool IsTerminalWindowFocused { get; private set; } = true;
@@ -947,9 +948,13 @@ public sealed partial class MainWindow : Window
         _controlBar.TabNavigationRequested += forward => SwitchNextFocusWindow(forward);
         _controlBar.PrevClicked += async () =>
         {
-            if (_currentViewMode != ViewMode.GuessRecommend)
+            if (!IsRadioModeActive)
             {
                 await PlayPrevInCurrentListAsync();
+            }
+            else
+            {
+                _controlBar.UpdateStatus("[电台模式] 电台模式不支持上一首");
             }
         };
         _controlBar.PlayPauseClicked += async () =>
@@ -958,7 +963,7 @@ public sealed partial class MainWindow : Window
         };
         _controlBar.NextClicked += async () =>
         {
-            if (_currentViewMode == ViewMode.GuessRecommend)
+            if (IsRadioModeActive)
             {
                 await PlayNextRadioTrackAsync();
             }
@@ -1205,7 +1210,7 @@ public sealed partial class MainWindow : Window
         {
             Application.Invoke(async () =>
             {
-                if (_currentViewMode == ViewMode.GuessRecommend)
+                if (IsRadioModeActive)
                 {
                     // 电台模式：单曲播放结束后自动平滑跳至下一首
                     await PlayNextRadioTrackAsync();

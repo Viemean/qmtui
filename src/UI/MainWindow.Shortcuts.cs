@@ -545,7 +545,7 @@ public sealed partial class MainWindow
         if (c == 'J')
         {
             k.Handled = true;
-            if (_currentViewMode != ViewMode.GuessRecommend)
+            if (!IsRadioModeActive)
             {
                 await PlayPrevInCurrentListAsync();
             }
@@ -559,7 +559,7 @@ public sealed partial class MainWindow
         if (c == 'L')
         {
             k.Handled = true;
-            if (_currentViewMode == ViewMode.GuessRecommend)
+            if (IsRadioModeActive)
             {
                 await PlayNextRadioTrackAsync();
             }
@@ -787,7 +787,7 @@ public sealed partial class MainWindow
         {
             Application.Invoke(async () =>
             {
-                if (_currentViewMode == ViewMode.GuessRecommend)
+                if (IsRadioModeActive)
                 {
                     await PlayNextRadioTrackAsync();
                 }
@@ -803,7 +803,7 @@ public sealed partial class MainWindow
         {
             Application.Invoke(async () =>
             {
-                if (_currentViewMode != ViewMode.GuessRecommend)
+                if (!IsRadioModeActive)
                 {
                     await PlayPrevInCurrentListAsync();
                 }

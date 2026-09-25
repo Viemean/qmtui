@@ -226,6 +226,20 @@ public sealed class RadioService
     }
 
     /// <summary>
+    /// 清空电台队列状态（当切换至非电台歌曲播放时使用）
+    /// </summary>
+    public void Clear()
+    {
+        lock (_lock)
+        {
+            _queue.Clear();
+            _currentIndex = 0;
+            _playedCount = 0;
+            _isPrefetching = false;
+        }
+    }
+
+    /// <summary>
     /// 重置电台队列状态（供测试与特定生命周期复位使用）
     /// </summary>
     internal void ResetForTest(IEnumerable<Song>? initialSongs = null, int startIndex = 0, int playedCount = 0)

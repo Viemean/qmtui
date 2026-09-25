@@ -108,6 +108,10 @@ public sealed partial class MainWindow
         }
 
         _activeSong = song;
+        if (!_radioService.IsCurrentSongInRadio(song))
+        {
+            _radioService.Clear();
+        }
         PlaybackQueueService.Instance.SyncCurrentSong(song);
         _songListView.SetPlayingSong(song.Mid);
 
@@ -540,7 +544,7 @@ public sealed partial class MainWindow
                     if (IsStale()) return;
                     if (_activeSong?.Mid == song.Mid)
                     {
-                        if (_currentViewMode == ViewMode.GuessRecommend)
+                        if (IsRadioModeActive)
                         {
                             await PlayNextRadioTrackAsync();
                         }
@@ -868,7 +872,7 @@ public sealed partial class MainWindow
             await Task.Delay(2500).ConfigureAwait(false);
 
             Song? nextSong = null;
-            if (_currentViewMode == ViewMode.GuessRecommend)
+            if (IsRadioModeActive)
             {
                 nextSong = _radioService.PeekNextRadioTrack();
             }

@@ -108,7 +108,10 @@ public sealed partial class MainWindow
         await PlaySongAsync(nextSong);
         Application.Invoke(() =>
         {
-            _songListView.SetRadioCard(nextSong, AudioQualityHelper.GetBadge(_actualQualityTier), _radioService.PlayedCount);
+            if (_currentViewMode == ViewMode.GuessRecommend)
+            {
+                _songListView.SetRadioCard(nextSong, AudioQualityHelper.GetBadge(_actualQualityTier), _radioService.PlayedCount);
+            }
             _controlBar.UpdateStatus($"[电台切歌] 猜你喜欢第 {_radioService.PlayedCount:D2} 首: 《{nextSong.Title}》 - {nextSong.Artist}");
         });
     }
