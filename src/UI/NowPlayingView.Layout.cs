@@ -68,7 +68,7 @@ public sealed partial class NowPlayingView
             int availableRowsForCover = Math.Max(4, containerRows - 5);
             int maxRowsByHeight = Math.Max(4, (int)(availableRowsForCover * 0.92));
             int maxRowsByWidth = Math.Max(4, (int)((containerCols * 0.85) / 2));
-            int targetRows = Math.Max(4, Math.Min(maxRowsByHeight, maxRowsByWidth));
+            int targetRows = Math.Max(4, (int)(Math.Min(maxRowsByHeight, maxRowsByWidth) * 0.80));
             int targetCols = targetRows * 2;
 
             // 水平居中
