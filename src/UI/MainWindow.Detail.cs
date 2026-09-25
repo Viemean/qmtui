@@ -142,7 +142,7 @@ public sealed partial class MainWindow
             _currentSingerMid = artist.Mid;
             _currentSingerName = artist.Name;
 
-            TerminalImageHelper.ClearImages();
+            TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
             _lyricListView.Visible = false;
             _lyricTransBtn.Visible = false;
             _lyricImmersiveBtn.Visible = false;
@@ -627,7 +627,7 @@ public sealed partial class MainWindow
         PushCurrentNavigationSnapshot();
         _currentViewMode = ViewMode.AlbumDetail;
 
-        TerminalImageHelper.ClearImages();
+        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
         _lyricListView.Visible = false;
         _lyricTransBtn.Visible = false;
         _lyricImmersiveBtn.Visible = false;
@@ -768,7 +768,11 @@ public sealed partial class MainWindow
         _lyricImmersiveBtn.Visible = true;
         UpdateLyricMatchButtonHighlight();
         UpdateLyricTitle("歌词");
-        TerminalImageHelper.ClearImages();
+        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
+        if (_miniCoverView.Visible)
+        {
+            _miniCoverView.TriggerRenderDelayed();
+        }
         RefreshLyricListView();
         SetNeedsDraw();
     }

@@ -1166,9 +1166,16 @@ public sealed partial class MainWindow : Window
             {
                 _nowPlayingView.OnWindowResized();
             }
-            else if (_artistAlbumDetailView.Visible)
+            else
             {
-                _artistAlbumDetailView.OnWindowResized();
+                if (_artistAlbumDetailView.Visible)
+                {
+                    _artistAlbumDetailView.OnWindowResized();
+                }
+                if (_miniCoverView.Visible)
+                {
+                    _miniCoverView.OnWindowResized();
+                }
             }
         };
 
@@ -1475,13 +1482,16 @@ public sealed partial class MainWindow : Window
             {
                 _nowPlayingView.RestoreCoverAfterDialog();
             }
-            else if (_currentViewMode == ViewMode.ArtistDetail && _artistAlbumDetailView.Visible)
+            else
             {
-                _artistAlbumDetailView.TriggerImageRenderDelayed();
-            }
-            else if (_miniCoverView.Visible)
-            {
-                _miniCoverView.TriggerRenderDelayed();
+                if (_artistAlbumDetailView.Visible)
+                {
+                    _artistAlbumDetailView.TriggerImageRenderDelayed();
+                }
+                if (_miniCoverView.Visible)
+                {
+                    _miniCoverView.TriggerRenderDelayed();
+                }
             }
         }
     }

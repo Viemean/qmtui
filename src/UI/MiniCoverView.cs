@@ -54,6 +54,18 @@ public sealed class MiniCoverView : FrameView
                 m.Handled = true;
             }
         };
+
+        VisibleChanged += (s, e) =>
+        {
+            if (Visible)
+            {
+                TriggerRenderDelayed();
+            }
+            else
+            {
+                ClearCover();
+            }
+        };
     }
 
     public void SetSong(Song? song, string? qualityBadge)

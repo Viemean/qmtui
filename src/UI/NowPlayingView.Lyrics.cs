@@ -94,7 +94,7 @@ public sealed partial class NowPlayingView
             _albumLink.SetText("");
             _songInfoContainer.Visible = false;
             _matchLyricBtn.Visible = false;
-            TerminalImageHelper.ClearImages();
+            TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdNowPlaying);
             return;
         }
 
@@ -341,13 +341,13 @@ public sealed partial class NowPlayingView
             _resizeTimerToken = null;
         }
         StopImmersiveTimer();
-        TerminalImageHelper.ClearImages();
+        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdNowPlaying);
     }
 
     public void OnWindowResized()
     {
         if (!Visible) return;
-        TerminalImageHelper.ClearImages();
+        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdNowPlaying);
         if (_resizeTimerToken != null)
         {
             Application.RemoveTimeout(_resizeTimerToken);

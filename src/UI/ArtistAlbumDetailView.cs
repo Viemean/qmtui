@@ -240,13 +240,13 @@ public sealed class ArtistAlbumDetailView : View
             Application.RemoveTimeout(_resizeTimerToken);
             _resizeTimerToken = null;
         }
-        TerminalImageHelper.ClearImages();
+        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
     }
 
     public void OnWindowResized()
     {
         if (!Visible) return;
-        TerminalImageHelper.ClearImages();
+        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
         TriggerImageRenderDelayed();
     }
 
@@ -329,7 +329,7 @@ public sealed class ArtistAlbumDetailView : View
             int renderCol = col + colOffset;
             int renderRow = Math.Max(1, row + rowOffset);
 
-            TerminalImageHelper.RenderKittyImage(_currentImagePath, renderCol, renderRow, targetCols, targetRows);
+            TerminalImageHelper.RenderKittyImage(_currentImagePath, renderCol, renderRow, targetCols, targetRows, TerminalImageHelper.ImageIdArtistDetail);
         }
         catch
         {
