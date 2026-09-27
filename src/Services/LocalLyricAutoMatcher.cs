@@ -66,9 +66,7 @@ public static class LocalLyricAutoMatcher
     /// </summary>
     public static bool NeedsMatching(Song song, List<LyricLine> currentLyrics)
     {
-        bool isPlaceholder = currentLyrics.Count == 0 ||
-            (currentLyrics.Count == 1 && (currentLyrics[0].Text.Contains("暂无歌词") || string.IsNullOrWhiteSpace(currentLyrics[0].Text)));
-        if (isPlaceholder) return true;
+        if (LyricParser.IsPlaceholderLyrics(currentLyrics)) return true;
 
         // 若已有内嵌歌词且已有翻译，跳过
         if (currentLyrics.Exists(l => !string.IsNullOrWhiteSpace(l.Trans))) return false;
@@ -191,17 +189,18 @@ public static class LocalLyricAutoMatcher
                 officialLyrics = await MusicApi.GetLyricsAsync(matchedSong.Mid, cancellationToken).ConfigureAwait(false);
             }
 
-            if (officialLyrics == null || officialLyrics.Count == 0 ||
-                (officialLyrics.Count == 1 && officialLyrics[0].Text.Contains("暂无歌词")))
+            if (officialLyrics == null || officialLyrics.Count == 0 || LyricParser.IsPlaceholderLyrics(officialLyrics))
             {
+                AppLogger.Info("LocalLyricAutoMatcher", "官方歌词为空或属于纯音乐/占位歌词，放弃匹配结果");
                 return null;
             }
 
-            // 防负优化检查：若原歌词已有内容，而官方歌词没有提供双语翻译，则保留原歌词（用户强制匹配时不拦截）
+            // 防负优化检查：若原歌词已有有效非占位内容，而官方歌词没有提供双语翻译，则保留原歌词（用户强制匹配时不拦截）
+            bool currentIsPlaceholder = LyricParser.IsPlaceholderLyrics(currentLyrics);
             bool newHasTrans = officialLyrics.Exists(l => !string.IsNullOrWhiteSpace(l.Trans));
-            if (!forceMatch && currentLyrics.Count > 1 && !newHasTrans)
+            if (!forceMatch && currentLyrics.Count > 0 && !currentIsPlaceholder && !newHasTrans)
             {
-                AppLogger.Info("LocalLyricAutoMatcher", "官方歌词未包含翻译，保留现有歌词");
+                AppLogger.Info("LocalLyricAutoMatcher", "官方歌词未包含翻译，保留现有有效歌词");
                 return null;
             }
 

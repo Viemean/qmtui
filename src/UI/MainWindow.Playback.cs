@@ -493,7 +493,7 @@ public sealed partial class MainWindow
             bool isLocalOrWebDav = song.IsLocal || song.IsWebDav;
             if (isLocalOrWebDav && !IsCurrentSongLyricMatched(song) && LocalLyricAutoMatcher.NeedsMatching(song, _currentLyrics))
             {
-                bool isNoLyrics = _currentLyrics.Count == 0 || (_currentLyrics.Count == 1 && _currentLyrics[0].Text == "暂无歌词");
+                bool isNoLyrics = LyricParser.IsPlaceholderLyrics(_currentLyrics);
                 _ = Task.Run(async () =>
                 {
                     if (IsStale()) return;

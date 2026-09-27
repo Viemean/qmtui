@@ -465,7 +465,7 @@ public sealed partial class MainWindow
             if (!acrResult.HasValue) return;
 
             var (bestMatch, onlineLyrics) = acrResult.Value;
-            if (onlineLyrics == null || onlineLyrics.Count == 0 || (onlineLyrics.Count == 1 && onlineLyrics[0].Text == "暂无歌词"))
+            if (onlineLyrics == null || onlineLyrics.Count == 0 || LyricParser.IsPlaceholderLyrics(onlineLyrics))
             {
                 return;
             }

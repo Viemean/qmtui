@@ -252,6 +252,45 @@ public static partial class LyricParser
         return false;
     }
 
+    private static readonly string[] s_placeholderKeywords =
+    [
+        "纯音乐",
+        "没有填词",
+        "暂无歌词",
+        "请您欣赏",
+        "请欣赏",
+        "instrumental",
+        "no lyrics"
+    ];
+
+    /// <summary>
+    /// 判断歌词是否为纯音乐、暂无歌词等无效占位内容
+    /// </summary>
+    public static bool IsPlaceholderLyrics(IEnumerable<LyricLine>? lyrics)
+    {
+        if (lyrics == null) return true;
+
+        var validLines = lyrics
+            .Where(l => !IsMetaInfoLine(l.Timestamp, l.Text) && !string.IsNullOrWhiteSpace(l.Text))
+            .ToList();
+
+        if (validLines.Count == 0) return true;
+
+        if (validLines.Count <= 2)
+        {
+            var combined = string.Join(" ", validLines.Select(l => l.Text));
+            foreach (var kw in s_placeholderKeywords)
+            {
+                if (combined.Contains(kw, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// 判断当前歌词列表中是否包含有效翻译
     /// </summary>

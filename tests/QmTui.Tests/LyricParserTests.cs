@@ -80,4 +80,20 @@ public class LyricParserTests
         var decoded = LyricParser.DecodeBase64("This is not base64!!!");
         Assert.Equal("", decoded);
     }
+
+    [Fact]
+    public void IsPlaceholderLyrics_CorrectlyIdentifiesPlaceholders()
+    {
+        var instrumental = LyricParser.ParseSingleLrc("[00:00.00]此歌曲为没有填词的纯音乐，请您欣赏");
+        Assert.True(LyricParser.IsPlaceholderLyrics(instrumental));
+
+        var noLyrics = LyricParser.ParseSingleLrc("[00:00.00]暂无歌词");
+        Assert.True(LyricParser.IsPlaceholderLyrics(noLyrics));
+
+        var emptyList = new List<QmTui.Models.LyricLine>();
+        Assert.True(LyricParser.IsPlaceholderLyrics(emptyList));
+
+        var normalLrc = LyricParser.ParseSingleLrc("[00:01.00]Hello world\n[00:05.00]Second line of song");
+        Assert.False(LyricParser.IsPlaceholderLyrics(normalLrc));
+    }
 }
