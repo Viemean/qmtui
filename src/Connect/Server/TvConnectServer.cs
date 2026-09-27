@@ -92,6 +92,7 @@ public sealed class TvConnectServer : IDisposable
     public event Action<ToggleFavoriteCommand>? ToggleFavoriteRequested;
     public event Action<LyricsScrollPayload>? SyncLyricsScrollRequested;
     public event Action<LyricsSyncPayload>? SyncLyricsRequested;
+    public event Action<SyncQueueChunkCommand>? SyncQueueChunkRequested;
 
     // HTTP 静态资源反向提供
     public Func<string?>? CurrentCoverPathProvider { get; set; }
@@ -474,6 +475,15 @@ public sealed class TvConnectServer : IDisposable
                 {
                     var payload = msg.DecodeData(ConnectJsonContext.Default.LyricsSyncPayload);
                     if (payload != null) SyncLyricsRequested?.Invoke(payload);
+                }
+                catch { }
+                break;
+
+            case ConnectActions.CmdSyncQueueChunk:
+                try
+                {
+                    var cmd = msg.DecodeData(ConnectJsonContext.Default.SyncQueueChunkCommand);
+                    if (cmd != null) SyncQueueChunkRequested?.Invoke(cmd);
                 }
                 catch { }
                 break;

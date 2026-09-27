@@ -117,6 +117,7 @@ public static class ConnectActions
     public const string CmdToggleFavorite = "cmd_toggle_favorite";
     public const string CmdSyncLyricsScroll = "cmd_sync_lyrics_scroll";
     public const string CmdSyncLyrics = "cmd_sync_lyrics";
+    public const string CmdSyncQueueChunk = "cmd_sync_queue_chunk";
 
     public const string EventPlayState = "event_play_state";
     public const string EventQueueState = "event_queue_state";
@@ -402,6 +403,14 @@ public sealed record QueueStateEvent(
     [property: JsonPropertyName("currentIndex")] int CurrentIndex = -1
 );
 
+public sealed record SyncQueueChunkCommand(
+    [property: JsonPropertyName("syncId")] string SyncId,
+    [property: JsonPropertyName("chunkIndex")] int ChunkIndex,
+    [property: JsonPropertyName("totalChunks")] int TotalChunks,
+    [property: JsonPropertyName("songs")] List<ConnectSong> Songs,
+    [property: JsonPropertyName("targetMid")] string? TargetMid = null
+);
+
 public sealed record QrPairData(
     [property: JsonPropertyName("version")] int Version,
     [property: JsonPropertyName("deviceId")] string DeviceId,
@@ -437,6 +446,7 @@ public sealed record QrPairData(
 [JsonSerializable(typeof(LyricsSyncPayload))]
 [JsonSerializable(typeof(PlayerStateEvent))]
 [JsonSerializable(typeof(QueueStateEvent))]
+[JsonSerializable(typeof(SyncQueueChunkCommand))]
 [JsonSerializable(typeof(QrPairData))]
 [JsonSerializable(typeof(ConnectSong))]
 [JsonSerializable(typeof(List<ConnectSong>))]

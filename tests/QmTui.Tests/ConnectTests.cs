@@ -84,6 +84,35 @@ public class ConnectTests
     }
 
     [Fact]
+    public void SyncQueueChunkCommand_Serialization_Roundtrip()
+    {
+        var song = new ConnectSong(
+            SongId: 2001,
+            SongMid: "chunk_mid_1",
+            Name: "Chunk Song",
+            Singer: "Chunk Artist"
+        );
+        var cmd = new SyncQueueChunkCommand(
+            SyncId: "sync-uuid-123",
+            ChunkIndex: 0,
+            TotalChunks: 2,
+            Songs: [song],
+            TargetMid: "chunk_mid_1"
+        );
+
+        var json = JsonSerializer.Serialize(cmd, ConnectJsonContext.Default.SyncQueueChunkCommand);
+        var deserialized = JsonSerializer.Deserialize(json, ConnectJsonContext.Default.SyncQueueChunkCommand);
+
+        Assert.NotNull(deserialized);
+        Assert.Equal("sync-uuid-123", deserialized.SyncId);
+        Assert.Equal(0, deserialized.ChunkIndex);
+        Assert.Equal(2, deserialized.TotalChunks);
+        Assert.Single(deserialized.Songs);
+        Assert.Equal("chunk_mid_1", deserialized.Songs[0].SongMid);
+        Assert.Equal("chunk_mid_1", deserialized.TargetMid);
+    }
+
+    [Fact]
     public void PairRequestPayload_Serialization_Roundtrip()
     {
         var dev = new ConnectDevice(

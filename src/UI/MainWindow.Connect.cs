@@ -16,6 +16,8 @@ public sealed partial class MainWindow
     private TvConnectServer? _connectServer;
     private ConnectMdnsService? _connectMdns;
     private string? _lastRemoteSyncedSongMid;
+    private string? _currentQueueSyncId;
+    private readonly Dictionary<int, List<Song>> _queueSyncChunks = new();
 
     private void SetupConnectService()
     {
@@ -42,6 +44,9 @@ public sealed partial class MainWindow
                 {
                     try
                     {
+                        _currentQueueSyncId = null;
+                        _queueSyncChunks.Clear();
+
                         var song = cmd.Song.ToDomainSong();
                         if (!string.IsNullOrEmpty(song.LocalFilePath) &&
                             !song.LocalFilePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
@@ -67,22 +72,7 @@ public sealed partial class MainWindow
                             }).ToList();
 
                             var validIdx = Math.Clamp(cmd.Index, 0, Math.Max(0, domainQueue.Count - 1));
-
-                            const int MaxRemoteQueueSize = 300;
-                            if (domainQueue.Count > MaxRemoteQueueSize)
-                            {
-                                int half = MaxRemoteQueueSize / 2;
-                                int start = Math.Max(0, validIdx - half);
-                                int end = Math.Min(domainQueue.Count, start + MaxRemoteQueueSize);
-                                int actualStart = Math.Max(0, end - MaxRemoteQueueSize);
-                                var windowed = domainQueue.GetRange(actualStart, end - actualStart);
-                                var windowedIdx = Math.Clamp(validIdx - actualStart, 0, Math.Max(0, windowed.Count - 1));
-                                PlaybackQueueService.Instance.SetQueue(windowed, windowedIdx);
-                            }
-                            else
-                            {
-                                PlaybackQueueService.Instance.SetQueue(domainQueue, validIdx);
-                            }
+                            PlaybackQueueService.Instance.SetQueue(domainQueue, validIdx);
                         }
 
                         if (!string.IsNullOrEmpty(cmd.QualityTier))
@@ -148,6 +138,64 @@ public sealed partial class MainWindow
                     catch (Exception ex)
                     {
                         AppLogger.Error("MainWindow.Connect", "PlaySongRequested error", ex);
+                    }
+                });
+            };
+
+            _connectServer.SyncQueueChunkRequested += cmd =>
+            {
+                Application.Invoke(() =>
+                {
+                    try
+                    {
+                        if (_currentQueueSyncId != cmd.SyncId)
+                        {
+                            _currentQueueSyncId = cmd.SyncId;
+                            _queueSyncChunks.Clear();
+                        }
+
+                        var chunkSongs = cmd.Songs?.Select(q =>
+                        {
+                            var s = q.ToDomainSong();
+                            if (!string.IsNullOrEmpty(s.LocalFilePath) &&
+                                !s.LocalFilePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                                !s.LocalFilePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                                !File.Exists(s.LocalFilePath))
+                            {
+                                s.LocalFilePath = null;
+                            }
+                            return s;
+                        }).ToList() ?? [];
+
+                        _queueSyncChunks[cmd.ChunkIndex] = chunkSongs;
+
+                        if (_queueSyncChunks.Count == cmd.TotalChunks)
+                        {
+                            var fullList = new List<Song>();
+                            for (int i = 0; i < cmd.TotalChunks; i++)
+                            {
+                                if (_queueSyncChunks.TryGetValue(i, out var list))
+                                {
+                                    fullList.AddRange(list);
+                                }
+                            }
+                            _currentQueueSyncId = null;
+                            _queueSyncChunks.Clear();
+
+                            if (fullList.Count > 0)
+                            {
+                                var targetMid = cmd.TargetMid ?? _activeSong?.Mid;
+                                int newIdx = !string.IsNullOrEmpty(targetMid)
+                                    ? Math.Max(0, fullList.FindIndex(s => s.Mid == targetMid))
+                                    : 0;
+                                PlaybackQueueService.Instance.SetQueue(fullList, newIdx);
+                                BroadcastConnectQueueState();
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Error("MainWindow.Connect", "SyncQueueChunkRequested error", ex);
                     }
                 });
             };
