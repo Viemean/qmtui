@@ -17,6 +17,7 @@ public class ClipboardServiceTests
     [Fact]
     public void TextField_PasteFromClipboard_InsertsText()
     {
+        ClipboardService.SetText("test_clip");
         var tf = new TextField { Text = "hello world" };
         tf.InsertionPoint = 5;
 
