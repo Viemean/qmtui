@@ -693,9 +693,10 @@ public sealed partial class MusicApi
         await LoginService.EnsureMusicKeyAsync(ct).ConfigureAwait(false);
 
         var escapedName = JsonEncodedText.Encode(name.Trim()).ToString();
+        var comm = BuildAppCommJson();
         var payload = $$"""
         {
-          "comm": { "ct": 24, "cv": 0 },
+          "comm": {{comm}},
           "createNewPlayList": {
             "module": "music.musicasset.PlaylistBaseWrite",
             "method": "AddPlaylist",
@@ -712,9 +713,9 @@ public sealed partial class MusicApi
 
         try
         {
-            AppLogger.Info("MusicApi", $"CreatePlaylistAsync requesting: name={name}");
-            var json = await PostAg1Async(payload, ct).ConfigureAwait(false);
-            AppLogger.Info("MusicApi", $"CreatePlaylistAsync response: {json}");
+            AppLogger.Info("MusicApi", $"CreatePlaylistAsync (App-CGI) requesting: name={name}");
+            var json = await PostAppMusicuAsync(payload, ct).ConfigureAwait(false);
+            AppLogger.Info("MusicApi", $"CreatePlaylistAsync (App-CGI) response: {json}");
 
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
@@ -756,7 +757,7 @@ public sealed partial class MusicApi
         }
         catch (Exception ex)
         {
-            AppLogger.Error("MusicApi", $"CreatePlaylistAsync exception for name={name}", ex);
+            AppLogger.Error("MusicApi", $"CreatePlaylistAsync (App-CGI) exception for name={name}", ex);
             return (false, 0, ex.Message);
         }
     }
@@ -775,13 +776,14 @@ public sealed partial class MusicApi
 
         try
         {
+            var comm = BuildAppCommJson();
             if (!playlist.IsFav)
             {
                 // 自建歌单删除 (music.musicasset.PlaylistBaseWrite/DelPlaylist)
                 long dirId = playlist.DirId;
                 var payload = $$"""
                 {
-                  "comm": { "ct": 24, "cv": 0 },
+                  "comm": {{comm}},
                   "deletePlayList": {
                     "module": "music.musicasset.PlaylistBaseWrite",
                     "method": "DelPlaylist",
@@ -792,9 +794,9 @@ public sealed partial class MusicApi
                 }
                 """;
 
-                AppLogger.Info("MusicApi", $"DeletePlaylistAsync (created) requesting: dirId={dirId}");
-                var json = await PostAg1Async(payload, ct).ConfigureAwait(false);
-                AppLogger.Info("MusicApi", $"DeletePlaylistAsync (created) response: {json}");
+                AppLogger.Info("MusicApi", $"DeletePlaylistAsync (App-CGI/created) requesting: dirId={dirId}");
+                var json = await PostAppMusicuAsync(payload, ct).ConfigureAwait(false);
+                AppLogger.Info("MusicApi", $"DeletePlaylistAsync (App-CGI/created) response: {json}");
 
                 using var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.TryGetProperty("deletePlayList", out var delObj) &&
@@ -810,7 +812,7 @@ public sealed partial class MusicApi
                 long dissId = playlist.Tid > 0 ? playlist.Tid : playlist.DirId;
                 var payload = $$"""
                 {
-                  "comm": { "ct": 24, "cv": 0 },
+                  "comm": {{comm}},
                   "deleteFavPlayList": {
                     "module": "music.musicasset.PlaylistFavWrite",
                     "method": "CancelFavPlaylist",
@@ -821,9 +823,9 @@ public sealed partial class MusicApi
                 }
                 """;
 
-                AppLogger.Info("MusicApi", $"DeletePlaylistAsync (fav) requesting: dissId={dissId}");
-                var json = await PostAg1Async(payload, ct).ConfigureAwait(false);
-                AppLogger.Info("MusicApi", $"DeletePlaylistAsync (fav) response: {json}");
+                AppLogger.Info("MusicApi", $"DeletePlaylistAsync (App-CGI/fav) requesting: dissId={dissId}");
+                var json = await PostAppMusicuAsync(payload, ct).ConfigureAwait(false);
+                AppLogger.Info("MusicApi", $"DeletePlaylistAsync (App-CGI/fav) response: {json}");
 
                 using var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.TryGetProperty("deleteFavPlayList", out var favObj) &&
@@ -836,7 +838,7 @@ public sealed partial class MusicApi
         }
         catch (Exception ex)
         {
-            AppLogger.Error("MusicApi", $"DeletePlaylistAsync exception for playlist {playlist.Title}", ex);
+            AppLogger.Error("MusicApi", $"DeletePlaylistAsync (App-CGI) exception for playlist {playlist.Title}", ex);
             return false;
         }
     }
