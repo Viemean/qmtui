@@ -141,6 +141,7 @@ public sealed partial class MainWindow : Window
     private List<Playlist> _cachedPlaylists = [];
     private bool _isViewingPlaylistsList;
     private int _isAddToPlaylistOpen;
+    private readonly HashSet<string> _favoritePendingSongKeys = new();
 
     private Album? _currentDrilldownAlbum;
     private AlbumDetail? _currentAlbumDetail;

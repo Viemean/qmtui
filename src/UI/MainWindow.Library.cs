@@ -338,34 +338,53 @@ public sealed partial class MainWindow
             return;
         }
 
-        bool isFav = IsSongFavorite(song);
-
-        if (isFav)
+        string songKey = !string.IsNullOrEmpty(song.Mid) ? song.Mid : song.Id.ToString();
+        lock (_favoritePendingSongKeys)
         {
-            _controlBar.UpdateStatus($"[正在取消收藏] 正在将《{song.Title}》从我的喜欢中移除...");
-            var ok = await MusicApi.RemoveSongFromFavoriteAsync(song);
-            if (ok)
+            if (!_favoritePendingSongKeys.Add(songKey))
             {
-                ApplySongFavoriteState(song, false);
-                _controlBar.UpdateStatus($"[取消收藏成功] 已将《{song.Title}》从我的喜欢中移除");
-            }
-            else
-            {
-                _controlBar.UpdateStatus($"[操作失败] 从我的喜欢移除《{song.Title}》失败");
+                return;
             }
         }
-        else
+
+        try
         {
-            _controlBar.UpdateStatus($"[正在收藏] 正在将《{song.Title}》添加至我的喜欢...");
-            var ok = await MusicApi.AddSongToFavoriteAsync(song);
-            if (ok)
+            bool isFav = IsSongFavorite(song);
+
+            if (isFav)
             {
-                ApplySongFavoriteState(song, true);
-                _controlBar.UpdateStatus($"[收藏成功] 已将《{song.Title}》添加至我的喜欢");
+                _controlBar.UpdateStatus($"[正在取消收藏] 正在将《{song.Title}》从我的喜欢中移除...");
+                var ok = await MusicApi.RemoveSongFromFavoriteAsync(song);
+                if (ok)
+                {
+                    ApplySongFavoriteState(song, false);
+                    _controlBar.UpdateStatus($"[取消收藏成功] 已将《{song.Title}》从我的喜欢中移除");
+                }
+                else
+                {
+                    _controlBar.UpdateStatus($"[操作失败] 从我的喜欢移除《{song.Title}》失败");
+                }
             }
             else
             {
-                _controlBar.UpdateStatus($"[操作失败] 添加《{song.Title}》至我的喜欢失败");
+                _controlBar.UpdateStatus($"[正在收藏] 正在将《{song.Title}》添加至我的喜欢...");
+                var ok = await MusicApi.AddSongToFavoriteAsync(song);
+                if (ok)
+                {
+                    ApplySongFavoriteState(song, true);
+                    _controlBar.UpdateStatus($"[收藏成功] 已将《{song.Title}》添加至我的喜欢");
+                }
+                else
+                {
+                    _controlBar.UpdateStatus($"[操作失败] 添加《{song.Title}》至我的喜欢失败");
+                }
+            }
+        }
+        finally
+        {
+            lock (_favoritePendingSongKeys)
+            {
+                _favoritePendingSongKeys.Remove(songKey);
             }
         }
     }

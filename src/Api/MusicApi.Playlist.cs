@@ -456,6 +456,13 @@ public sealed partial class MusicApi
                     }
                 }
 
+                if (code == 2001 && canRetryWithRenew)
+                {
+                    AppLogger.Info("MusicApi", $"AddSongToPlaylistAsync returned code 2001 (index sync delay), retrying in 800ms...");
+                    await Task.Delay(800, ct).ConfigureAwait(false);
+                    return await AddSongToPlaylistInternalAsync(dirId, songId, canRetryWithRenew: false, ct).ConfigureAwait(false);
+                }
+
                 AppLogger.Warn("MusicApi", $"AddSongToPlaylistAsync (AG-1) returned non-zero code: {code}");
             }
             return false;
@@ -518,6 +525,13 @@ public sealed partial class MusicApi
                     {
                         return await RemoveSongFromPlaylistInternalAsync(dirId, songId, canRetryWithRenew: false, ct).ConfigureAwait(false);
                     }
+                }
+
+                if (code == 2001 && canRetryWithRenew)
+                {
+                    AppLogger.Info("MusicApi", $"RemoveSongFromPlaylistAsync returned code 2001 (index sync delay), retrying in 800ms...");
+                    await Task.Delay(800, ct).ConfigureAwait(false);
+                    return await RemoveSongFromPlaylistInternalAsync(dirId, songId, canRetryWithRenew: false, ct).ConfigureAwait(false);
                 }
 
                 AppLogger.Warn("MusicApi", $"RemoveSongFromPlaylistAsync (AG-1) returned non-zero code: {code}");
