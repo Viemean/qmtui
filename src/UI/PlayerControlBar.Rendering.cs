@@ -12,8 +12,8 @@ namespace QmTui.UI;
 
 public sealed partial class PlayerControlBar
 {
-    private static readonly int[] Row0Controls = [1, 12, 7, 8, 10];
-    private static readonly int[] Row1Controls = [0, 2, 3, 4, 5, 6];
+    private static readonly int[] Row0Controls = [1, 12, 2, 8, 7];
+    private static readonly int[] Row1Controls = [0, 3, 4, 5, 6, 10];
 
     private void NavigatePreviousControl()
     {
@@ -221,14 +221,14 @@ public sealed partial class PlayerControlBar
 
     public void UpdatePlaybackMode(PlaybackMode mode)
     {
-        _modeBtn.Text = $"[O] {mode.GetBadge()}";
+        _modeBtn.Text = $"[O] {mode.GetBadge()}  ";
         SetNeedsLayout();
     }
 
     public void SetFavoriteStatus(bool isFavorite)
     {
         _isFavorite = isFavorite;
-        _favBtn.Text = isFavorite ? "[S] 已收藏" : "[S] 收藏";
+        _favBtn.Text = isFavorite ? "[S] 已收藏" : "[S] 收藏  ";
         if (isFavorite)
         {
             _favBtn.SetScheme(MikuTheme.FavoriteActive);
@@ -330,33 +330,69 @@ public sealed partial class PlayerControlBar
 
     private void UpdateQualityPosition()
     {
-        int qualityWidth = Math.Max(6, GetDisplayWidth(_qualityBtn.Text) + 4);
-        int anchorOffset = _isLocalMode ? 8 : 17;
-        int qualityAnchor = anchorOffset + qualityWidth + 1;
-        _qualityBtn.X = Pos.AnchorEnd(qualityAnchor);
+        int qualityWidth = Math.Max(8, GetDisplayWidth(_qualityBtn.Text) + 4);
+        _qualityBtn.Width = qualityWidth;
+        _qualityBtn.X = Pos.AnchorEnd(qualityWidth);
+        _qualityBtn.Y = 0;
 
-        int addWidth = 0;
-        if (_addBtn != null)
-        {
-            addWidth = GetDisplayWidth(_addBtn.Text);
-            _addBtn.X = Pos.AnchorEnd(qualityAnchor + 1 + addWidth);
-            _addBtn.Y = 0;
-        }
+        _volumeBtn.Width = 8;
+        _volumeBtn.X = Pos.AnchorEnd(qualityWidth);
+        _volumeBtn.Y = 1;
 
-        int favWidth = 0;
-        if (_favBtn != null)
+        int col4Anchor = qualityWidth + 1 + 10;
+        _nextBtn.Width = 10;
+        _nextBtn.X = Pos.AnchorEnd(col4Anchor);
+        _nextBtn.Y = 1;
+
+        int col3Anchor = col4Anchor + 1 + 8;
+        _playPauseBtn.Width = 8;
+        _playPauseBtn.X = Pos.AnchorEnd(col3Anchor);
+        _playPauseBtn.Y = 1;
+
+        int col2Anchor = col3Anchor + 1 + 10;
+        _prevBtn.Width = 10;
+        _prevBtn.X = Pos.AnchorEnd(col2Anchor);
+        _prevBtn.Y = 1;
+
+        int col1Anchor = col2Anchor + 1 + 10;
+        _modeBtn.Width = 10;
+        _modeBtn.X = Pos.AnchorEnd(col1Anchor);
+        _modeBtn.Y = 1;
+
+        if (!_isLocalMode)
         {
-            favWidth = GetDisplayWidth(_favBtn.Text);
-            _favBtn.X = Pos.AnchorEnd(qualityAnchor + 1 + addWidth + 1 + favWidth);
-            _favBtn.Y = 0;
+            if (_downloadBtn != null)
+            {
+                _downloadBtn.Width = 10;
+                _downloadBtn.X = Pos.AnchorEnd(col4Anchor);
+                _downloadBtn.Y = 0;
+            }
+
+            if (_shareBtn != null)
+            {
+                _shareBtn.Width = 8;
+                _shareBtn.X = Pos.AnchorEnd(col3Anchor);
+                _shareBtn.Y = 0;
+            }
+
+            if (_addBtn != null)
+            {
+                _addBtn.Width = 10;
+                _addBtn.X = Pos.AnchorEnd(col2Anchor);
+                _addBtn.Y = 0;
+            }
+
+            if (_favBtn != null)
+            {
+                _favBtn.Width = 10;
+                _favBtn.X = Pos.AnchorEnd(col1Anchor);
+                _favBtn.Y = 0;
+            }
         }
 
         if (_nowPlayingLabel != null)
         {
-            int buttonsWidth = (!_isLocalMode && _favBtn != null && _addBtn != null)
-                ? (addWidth + 1 + favWidth + 1)
-                : 0;
-            int rightMargin = qualityAnchor + buttonsWidth + 2;
+            int rightMargin = (_isLocalMode ? qualityWidth : col1Anchor) + 2;
             _nowPlayingLabel.Width = Dim.Fill(rightMargin);
         }
     }
