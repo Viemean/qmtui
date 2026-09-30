@@ -12,7 +12,7 @@ namespace QmTui.UI;
 
 public sealed partial class PlayerControlBar
 {
-    private static readonly int[] Row0Controls = [1, 12, 7, 8, 9, 10, 11];
+    private static readonly int[] Row0Controls = [1, 12, 7, 8, 10];
     private static readonly int[] Row1Controls = [0, 2, 3, 4, 5, 6];
 
     private void NavigatePreviousControl()
@@ -116,14 +116,8 @@ public sealed partial class PlayerControlBar
             case 8: // 转存
                 if (!_isLocalMode) DownloadClicked?.Invoke();
                 break;
-            case 9: // 音量 -
-                VolumeAdjustRequested?.Invoke(-10);
-                break;
             case 10: // 音量值 (静音)
                 VolumeMuteToggled?.Invoke();
-                break;
-            case 11: // 音量 +
-                VolumeAdjustRequested?.Invoke(10);
                 break;
         }
     }
@@ -149,9 +143,7 @@ public sealed partial class PlayerControlBar
         _nextBtn.SetScheme((isFocused && _focusedControlIndex == 6) ? focusScheme : normalScheme);
         _qualityBtn.SetScheme((isFocused && _focusedControlIndex == 7) ? focusScheme : normalScheme);
         _downloadBtn.SetScheme((isFocused && _focusedControlIndex == 8) ? focusScheme : normalScheme);
-        _volumeDecBtn.SetScheme((isFocused && _focusedControlIndex == 9) ? focusScheme : normalScheme);
         _volumeBtn.SetScheme((isFocused && _focusedControlIndex == 10) ? focusScheme : normalScheme);
-        _volumeIncBtn.SetScheme((isFocused && _focusedControlIndex == 11) ? focusScheme : normalScheme);
 
         RenderProgressLabel();
         SetNeedsDraw();
@@ -339,7 +331,7 @@ public sealed partial class PlayerControlBar
     private void UpdateQualityPosition()
     {
         int qualityWidth = Math.Max(6, GetDisplayWidth(_qualityBtn.Text) + 4);
-        int anchorOffset = _isLocalMode ? 19 : 28;
+        int anchorOffset = _isLocalMode ? 8 : 17;
         int qualityAnchor = anchorOffset + qualityWidth + 1;
         _qualityBtn.X = Pos.AnchorEnd(qualityAnchor);
 

@@ -21,9 +21,7 @@ public sealed partial class PlayerControlBar : FrameView
     private readonly Button _qualityBtn;
     private readonly Button _downloadBtn;
     private readonly Button _modeBtn;
-    private readonly Button _volumeDecBtn;
     private readonly Button _volumeBtn;
-    private readonly Button _volumeIncBtn;
     private readonly Button _prevBtn;
     private readonly Button _playPauseBtn;
     private readonly Button _nextBtn;
@@ -147,30 +145,12 @@ public sealed partial class PlayerControlBar : FrameView
         };
 
         // 2. 第 0 行右侧控制区：
-        // 音质按钮 [ SQ ] -> 音量减 [ - ] -> 音量数值 [ 100% ] -> 音量加 [ + ]（无需任何多余文字）
-
-        _volumeIncBtn = new Button
-        {
-            Text = "+",
-            X = Pos.AnchorEnd(5),
-            Y = 0,
-            CanFocus = false,
-            ShadowStyle = ShadowStyles.None
-        };
-        _volumeIncBtn.TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop;
-        _volumeIncBtn.KeyBindings.Remove(Key.Space);
-        _volumeIncBtn.Accepting += (s, e) =>
-        {
-            _focusedControlIndex = 11;
-            UpdateControlHighlight();
-            VolumeAdjustRequested?.Invoke(10);
-        };
-        Add(_volumeIncBtn);
+        // 音质按钮 [ SQ ] -> 转存 -> 音量数值 [ 100% ]
 
         _volumeBtn = new Button
         {
             Text = "80%",
-            X = Pos.AnchorEnd(13),
+            X = Pos.AnchorEnd(8),
             Y = 0,
             CanFocus = false,
             ShadowStyle = ShadowStyles.None
@@ -217,29 +197,11 @@ public sealed partial class PlayerControlBar : FrameView
         };
         Add(_volumeBtn);
 
-        _volumeDecBtn = new Button
-        {
-            Text = "-",
-            X = Pos.AnchorEnd(19),
-            Y = 0,
-            CanFocus = false,
-            ShadowStyle = ShadowStyles.None
-        };
-        _volumeDecBtn.TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop;
-        _volumeDecBtn.KeyBindings.Remove(Key.Space);
-        _volumeDecBtn.Accepting += (s, e) =>
-        {
-            _focusedControlIndex = 9;
-            UpdateControlHighlight();
-            VolumeAdjustRequested?.Invoke(-10);
-        };
-        Add(_volumeDecBtn);
-
-        // 转存按钮 [ 转存 ] - 放置在第 0 行音量减左侧（间距 1 格）
+        // 转存按钮 [ 转存 ] - 放置在第 0 行音量数值左侧（间距 1 格）
         _downloadBtn = new Button
         {
             Text = "转存",
-            X = Pos.AnchorEnd(28),
+            X = Pos.AnchorEnd(17),
             Y = 0,
             CanFocus = false,
             ShadowStyle = ShadowStyles.None
@@ -261,7 +223,7 @@ public sealed partial class PlayerControlBar : FrameView
         _qualityBtn = new Button
         {
             Text = "SQ",
-            X = Pos.AnchorEnd(35),
+            X = Pos.AnchorEnd(24),
             Y = 0,
             CanFocus = false,
             ShadowStyle = ShadowStyles.None
@@ -572,5 +534,4 @@ public sealed partial class PlayerControlBar : FrameView
             return;
         }
     }
-
 }
