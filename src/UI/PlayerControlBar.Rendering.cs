@@ -117,7 +117,7 @@ public sealed partial class PlayerControlBar
                 if (!_isLocalMode) DownloadClicked?.Invoke();
                 break;
             case 10: // 音量值 (静音)
-                VolumeMuteToggled?.Invoke();
+                HandleVolumeMuteClick();
                 break;
         }
     }

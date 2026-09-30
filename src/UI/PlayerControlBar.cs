@@ -161,7 +161,7 @@ public sealed partial class PlayerControlBar : FrameView
         {
             _focusedControlIndex = 10;
             UpdateControlHighlight();
-            VolumeMuteToggled?.Invoke();
+            HandleVolumeMuteClick();
         };
         _volumeBtn.MouseEvent += (s, m) =>
         {
@@ -180,18 +180,11 @@ public sealed partial class PlayerControlBar : FrameView
                 m.Handled = true;
             }
             else if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked) ||
-                     m.Flags.HasFlag(MouseFlags.LeftButtonPressed) ||
-                     m.Flags.HasFlag(MouseFlags.MiddleButtonClicked) ||
-                     m.Flags.HasFlag(MouseFlags.MiddleButtonPressed))
+                     m.Flags.HasFlag(MouseFlags.MiddleButtonClicked))
             {
                 _focusedControlIndex = 10;
                 UpdateControlHighlight();
-                var now = Environment.TickCount64;
-                if (now - _lastMuteClickTicks > 250)
-                {
-                    _lastMuteClickTicks = now;
-                    VolumeMuteToggled?.Invoke();
-                }
+                HandleVolumeMuteClick();
                 m.Handled = true;
             }
         };
@@ -533,5 +526,16 @@ public sealed partial class PlayerControlBar : FrameView
             ActivateCurrentControl();
             return;
         }
+    }
+
+    private void HandleVolumeMuteClick()
+    {
+        var now = Environment.TickCount64;
+        if (now - _lastMuteClickTicks < 300)
+        {
+            return;
+        }
+        _lastMuteClickTicks = now;
+        VolumeMuteToggled?.Invoke();
     }
 }
