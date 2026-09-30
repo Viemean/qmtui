@@ -366,7 +366,7 @@ public sealed partial class PlayerControlBar : FrameView
 
         _nextBtn = new Button
         {
-            Text = "[L] 下一首",
+            Text = "下一首 [L]",
             Width = 10,
             NoDecorations = true,
             X = Pos.AnchorEnd(19),
