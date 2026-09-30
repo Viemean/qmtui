@@ -179,8 +179,7 @@ public sealed partial class PlayerControlBar : FrameView
                 VolumeAdjustRequested?.Invoke(-5);
                 m.Handled = true;
             }
-            else if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked) ||
-                     m.Flags.HasFlag(MouseFlags.MiddleButtonClicked))
+            else if (m.Flags.HasFlag(MouseFlags.MiddleButtonClicked))
             {
                 _focusedControlIndex = 10;
                 UpdateControlHighlight();
