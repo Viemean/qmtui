@@ -78,14 +78,6 @@ public sealed class CreatePlaylistDialog : Dialog
         };
         confirmBtn.SetScheme(new Scheme { Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, Color.None) });
         confirmBtn.Accepting += (s, e) => Submit();
-        confirmBtn.MouseEvent += (s, m) =>
-        {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
-            {
-                Submit();
-                m.Handled = true;
-            }
-        };
 
         var cancelBtn = new Button
         {
@@ -97,14 +89,6 @@ public sealed class CreatePlaylistDialog : Dialog
         };
         cancelBtn.SetScheme(new Scheme { Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None) });
         cancelBtn.Accepting += (s, e) => Application.RequestStop(this);
-        cancelBtn.MouseEvent += (s, m) =>
-        {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
-            {
-                Application.RequestStop(this);
-                m.Handled = true;
-            }
-        };
 
         Add(confirmBtn, cancelBtn);
 

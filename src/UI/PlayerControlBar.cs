@@ -266,19 +266,6 @@ public sealed partial class PlayerControlBar : FrameView
                 FavoriteClicked?.Invoke();
             }
         };
-        _favBtn.MouseEvent += (s, m) =>
-        {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
-            {
-                _focusedControlIndex = 1;
-                UpdateControlHighlight();
-                if (!_isLocalMode)
-                {
-                    FavoriteClicked?.Invoke();
-                }
-                m.Handled = true;
-            }
-        };
         Add(_favBtn);
 
         // 添加到歌单按钮 - 放置在收藏按钮右边（第 0 行）
@@ -301,19 +288,6 @@ public sealed partial class PlayerControlBar : FrameView
             if (!_isLocalMode)
             {
                 AddToPlaylistClicked?.Invoke();
-            }
-        };
-        _addBtn.MouseEvent += (s, m) =>
-        {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
-            {
-                _focusedControlIndex = 12;
-                UpdateControlHighlight();
-                if (!_isLocalMode)
-                {
-                    AddToPlaylistClicked?.Invoke();
-                }
-                m.Handled = true;
             }
         };
         Add(_addBtn);

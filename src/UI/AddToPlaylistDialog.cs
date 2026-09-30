@@ -95,14 +95,6 @@ public sealed class AddToPlaylistDialog : Dialog
         };
         confirmBtn.SetScheme(buttonScheme);
         confirmBtn.Accepting += (s, e) => ConfirmSelection();
-        confirmBtn.MouseEvent += (s, m) =>
-        {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
-            {
-                ConfirmSelection();
-                m.Handled = true;
-            }
-        };
 
         var createBtn = new Button
         {
@@ -116,14 +108,6 @@ public sealed class AddToPlaylistDialog : Dialog
         };
         createBtn.SetScheme(buttonScheme);
         createBtn.Accepting += async (s, e) => await OpenCreatePlaylistDialogAsync();
-        createBtn.MouseEvent += async (s, m) =>
-        {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
-            {
-                await OpenCreatePlaylistDialogAsync();
-                m.Handled = true;
-            }
-        };
 
         var deleteBtn = new Button
         {
@@ -137,14 +121,6 @@ public sealed class AddToPlaylistDialog : Dialog
         };
         deleteBtn.SetScheme(buttonScheme);
         deleteBtn.Accepting += async (s, e) => await HandleDeleteSelectedPlaylistAsync();
-        deleteBtn.MouseEvent += async (s, m) =>
-        {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
-            {
-                await HandleDeleteSelectedPlaylistAsync();
-                m.Handled = true;
-            }
-        };
 
         var cancelBtn = new Button
         {
@@ -160,14 +136,6 @@ public sealed class AddToPlaylistDialog : Dialog
         cancelBtn.KeyBindings.Remove(Key.Space);
         cancelBtn.KeyBindings.Remove(Key.Esc);
         cancelBtn.Accepting += (s, e) => Application.RequestStop(this);
-        cancelBtn.MouseEvent += (s, m) =>
-        {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
-            {
-                Application.RequestStop(this);
-                m.Handled = true;
-            }
-        };
 
         // 左右方向键在底部按钮之间自由选择流转，向上键跳回列表
         confirmBtn.KeyDown += (s, k) =>
