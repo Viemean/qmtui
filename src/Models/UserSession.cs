@@ -15,6 +15,7 @@ public sealed class UserSession
     public string Uin { get; set; } = "";
     public string Nick { get; set; } = "";
     public bool IsVip { get; set; }
+    public bool IsSvip { get; set; }
     public string MusicKey { get; set; } = "";
     public string EncryptedUin { get; set; } = "";
     public string AvatarUrl { get; set; } = "";
@@ -43,6 +44,7 @@ public sealed class UserSession
             if (root.TryGetProperty("uin", out var u)) session.Uin = u.GetString() ?? "";
             if (root.TryGetProperty("nick", out var n)) session.Nick = n.GetString() ?? "";
             if (root.TryGetProperty("is_vip", out var v)) session.IsVip = v.GetBoolean();
+            if (root.TryGetProperty("is_svip", out var sv)) session.IsSvip = sv.GetBoolean();
             if (root.TryGetProperty("music_key", out var k)) session.MusicKey = k.GetString() ?? "";
             if (root.TryGetProperty("preferred_quality", out var q)) session.PreferredQuality = q.GetString() ?? "SQ";
             if (root.TryGetProperty("encrypted_uin", out var eu)) session.EncryptedUin = eu.GetString() ?? "";
@@ -159,6 +161,7 @@ public sealed class UserSession
                 $"\"uin\":\"{JsonEscape(Uin)}\"," +
                 $"\"nick\":\"{JsonEscape(Nick)}\"," +
                 $"\"is_vip\":{(IsVip ? "true" : "false")}," +
+                $"\"is_svip\":{(IsSvip ? "true" : "false")}," +
                 $"\"music_key\":\"{JsonEscape(MusicKey)}\"," +
                 $"\"preferred_quality\":\"{JsonEscape(PreferredQuality)}\"," +
                 $"\"encrypted_uin\":\"{JsonEscape(EncryptedUin)}\"," +
@@ -243,6 +246,7 @@ public sealed class UserSession
         Uin = "";
         Nick = "";
         IsVip = false;
+        IsSvip = false;
         MusicKey = "";
         EncryptedUin = "";
         AvatarUrl = "";

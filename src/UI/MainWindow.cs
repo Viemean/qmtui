@@ -1593,11 +1593,17 @@ public sealed partial class MainWindow : Window
         if (UserSession.Current.IsLoggedIn)
         {
             var name = string.IsNullOrEmpty(UserSession.Current.Nick) ? UserSession.Current.Uin : UserSession.Current.Nick;
-            var vip = UserSession.Current.IsVip
-                ? UserSession.Current.VipLevel > 0 ? $" 绿钻LV{UserSession.Current.VipLevel}" : " 绿钻"
-                : "";
-            var musicLevel = UserSession.Current.MusicLevel > 0 ? $" 乐力{UserSession.Current.MusicLevel}" : "";
-            return $"[U] {name}{vip}{musicLevel}";
+            if (UserSession.Current.IsSvip)
+            {
+                var lvl = UserSession.Current.VipLevel > 0 ? $" V{UserSession.Current.VipLevel}" : "";
+                return $"[U] {name} SVIP{lvl}";
+            }
+            if (UserSession.Current.IsVip)
+            {
+                var lvl = UserSession.Current.VipLevel > 0 ? $" V{UserSession.Current.VipLevel}" : "";
+                return $"[U] {name} 绿钻{lvl}";
+            }
+            return $"[U] {name}";
         }
         return "[U] 登录";
     }

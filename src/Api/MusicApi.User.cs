@@ -60,7 +60,10 @@ public sealed partial class MusicApi
                 if (vipData.TryGetProperty("identity", out var identity))
                 {
                     hasVipIdentity = true;
-                    var isVip = ReadInt(identity, "vip") > 0 || ReadInt(identity, "HugeVip") > 0 || ReadInt(vipData, "svip") > 0;
+                    var isHugeVip = ReadInt(identity, "HugeVip") > 0;
+                    var isSvip = isHugeVip || ReadInt(vipData, "svip") > 0;
+                    var isVip = isSvip || ReadInt(identity, "vip") > 0;
+                    UserSession.Current.IsSvip = isSvip;
                     UserSession.Current.IsVip = isVip;
                     UserSession.Current.VipLevel = ReadInt(identity, "level");
                     UserSession.Current.VipExpireAt = ReadString(identity, "HugeVipEnd");
