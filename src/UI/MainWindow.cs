@@ -1041,7 +1041,7 @@ public sealed partial class MainWindow : Window
         // 顶部三大窗格置顶常驻高亮标题（即使未获焦暗化边框线条，标题文本始终保持翡翠薄荷绿高亮）
         _sidebarTitleLabel = new Label
         {
-            Text = "┤导航├",
+            Text = " 导航 ",
             X = 1,
             Y = 1,
             CanFocus = false,
@@ -1059,7 +1059,7 @@ public sealed partial class MainWindow : Window
 
         _songListTitleLabel = new Label
         {
-            Text = "┤歌曲列表 (就绪)├",
+            Text = " 歌曲列表 (就绪) ",
             X = Pos.Right(_sidebarFrame) + 1,
             Y = 1,
             CanFocus = false,
@@ -1078,14 +1078,14 @@ public sealed partial class MainWindow : Window
         {
             Application.Invoke(() =>
             {
-                _songListTitleLabel.Text = $"┤{title}├";
+                _songListTitleLabel.Text = $" {title} ";
                 _songListTitleLabel.SetNeedsDraw();
             });
         };
 
         _lyricTitleLabel = new Label
         {
-            Text = "┤歌词├",
+            Text = " 歌词 ",
             X = Pos.Right(_songListView) + 1,
             Y = 1,
             CanFocus = false,
@@ -1859,7 +1859,7 @@ public sealed partial class MainWindow : Window
     {
         Application.Invoke(() =>
         {
-            _lyricTitleLabel.Text = string.IsNullOrEmpty(text) ? "┤歌词├" : $"┤{text}├";
+            _lyricTitleLabel.Text = string.IsNullOrEmpty(text) ? " 歌词 " : $" {text} ";
             _lyricTitleLabel.SetNeedsDraw();
             _lyricFrame.SetNeedsDraw();
         });

@@ -33,7 +33,7 @@ public sealed class MiniCoverView : FrameView
 
         _placeholderLabel = new Label
         {
-            Text = "┤唱片├",
+            Text = " 唱片 ",
             X = Pos.Center(),
             Y = Pos.Center(),
             CanFocus = false,
@@ -75,14 +75,14 @@ public sealed class MiniCoverView : FrameView
         if (song == null)
         {
             _currentCoverPath = null;
-            _placeholderLabel.Text = "┤唱片├";
+            _placeholderLabel.Text = " 唱片 ";
             _placeholderLabel.Visible = true;
             ClearCover();
             SetNeedsDraw();
         }
         else
         {
-            _placeholderLabel.Text = "┤读取中├";
+            _placeholderLabel.Text = " 读取中 ";
             SetNeedsDraw();
         }
     }
