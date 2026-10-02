@@ -17,7 +17,7 @@ public sealed partial class MusicApi
 
     private static async Task<List<QualityOption>> ProbeSongQualitiesInternalAsync(string songMid, string mediaMid, bool canRetryWithRenew, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(mediaMid)) mediaMid = songMid;
+        if (string.IsNullOrEmpty(mediaMid) || mediaMid.Contains("://") || mediaMid.Contains('/')) mediaMid = songMid;
 
         await LoginService.EnsureMusicKeyAsync(false, ct).ConfigureAwait(false);
 

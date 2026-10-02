@@ -294,11 +294,18 @@ public sealed partial class MainWindow
             _connectServer.SetVolumeRequested += vol => Application.Invoke(() => AdjustVolumeDirect((int)Math.Round(vol * 100)));
             _connectServer.SwitchTierRequested += tierStr =>
             {
-                Application.Invoke(async () =>
+                _ = Task.Run(async () =>
                 {
-                    var tier = AudioQualityHelper.Parse(tierStr);
-                    await SwitchQualityTierAsync(tier).ConfigureAwait(false);
-                    BroadcastConnectPlayerState();
+                    try
+                    {
+                        var tier = AudioQualityHelper.Parse(tierStr);
+                        await SwitchQualityTierAsync(tier).ConfigureAwait(false);
+                        BroadcastConnectPlayerState();
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Error("MainWindow.Connect", $"SwitchTierRequested error for tier {tierStr}", ex);
+                    }
                 });
             };
             _connectServer.CycleLoopModeRequested += payload => Application.Invoke(() =>

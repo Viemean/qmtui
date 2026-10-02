@@ -121,7 +121,7 @@ public static class AudioQualityHelper
         if (name.Contains("杜比", StringComparison.OrdinalIgnoreCase) || name.Contains("Dolby", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Dolby;
         if (name.Contains("全景声", StringComparison.OrdinalIgnoreCase) || name.Contains("Atmos", StringComparison.OrdinalIgnoreCase) || name.Contains("5.1", StringComparison.OrdinalIgnoreCase) || name.Contains("7.1", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Atmos;
         if (name.Contains("臻品", StringComparison.OrdinalIgnoreCase) || name.Contains("Premium", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Premium;
-        if (name.Contains("Hi-Res", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.HiRes;
+        if (name.Contains("Hi-Res", StringComparison.OrdinalIgnoreCase) || name.Contains("HiRes", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.HiRes;
         if (name.Contains("SQ", StringComparison.OrdinalIgnoreCase) || name.Contains("flac", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.SQ;
         if (name.Contains("HQ", StringComparison.OrdinalIgnoreCase) || name.Contains("320", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.HQ;
         return AudioQualityTier.Standard;

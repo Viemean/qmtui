@@ -197,7 +197,7 @@ public sealed record ConnectSong(
             Artist: string.IsNullOrEmpty(Singer) ? "未知歌手" : Singer,
             Album: string.IsNullOrEmpty(Album) ? "" : Album,
             Duration: DurationSeconds,
-            MediaMid: string.IsNullOrEmpty(MediaMid) ? mid : MediaMid,
+            MediaMid: string.IsNullOrEmpty(MediaMid) || MediaMid.Contains("://") || MediaMid.Contains('/') ? mid : MediaMid,
             Id: SongId,
             AlbumMid: string.IsNullOrEmpty(AlbumMid) ? "" : AlbumMid
         )

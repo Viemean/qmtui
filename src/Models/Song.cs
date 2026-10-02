@@ -16,7 +16,7 @@ public record Song(
     public long Id { get; set; } = Id;
     public int Duration { get; set; } = Duration;
     public string AlbumMid { get; set; } = AlbumMid;
-    public string EffectiveMediaMid => string.IsNullOrEmpty(MediaMid) ? Mid : MediaMid;
+    public string EffectiveMediaMid => string.IsNullOrEmpty(MediaMid) || MediaMid.Contains("://") || MediaMid.Contains('/') ? Mid : MediaMid;
     public string FormattedDuration => $"{Duration / 60:D2}:{Duration % 60:D2}";
     public string? PlayUrl { get; set; }
     public string Quality { get; set; } = "标准 128k";
