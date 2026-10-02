@@ -323,9 +323,9 @@ public sealed partial class MainWindow
                             }
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // 忽略切歌过渡期的瞬态索引竞争
+                        AppLogger.Debug("MainWindow.Lyrics", $"Transient lyric scroll race ignored: {ex.Message}");
                     }
                 }
                 _lyricScrollBar?.UpdateMetrics(sourceCount, _lyricListView.Viewport.Height, _lyricListView.Viewport.Y);
@@ -373,7 +373,10 @@ public sealed partial class MainWindow
                         }
                         _lyricScrollBar?.UpdateMetrics(sourceCount, _lyricListView.Viewport.Height, _lyricListView.Viewport.Y);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("MainWindow.Lyrics", $"Transient scroll lyric line race ignored: {ex.Message}");
+                    }
                 }
             }
         }

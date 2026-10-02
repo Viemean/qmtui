@@ -380,7 +380,10 @@ public sealed class TvConnectServer : IDisposable
                     var cmd = msg.DecodeData(ConnectJsonContext.Default.PlaySongCommand);
                     if (cmd != null) PlaySongRequested?.Invoke(cmd);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"CmdPlaySong error: {ex.Message}");
+                }
                 break;
 
             case ConnectActions.CmdEnqueueNext:
@@ -389,7 +392,10 @@ public sealed class TvConnectServer : IDisposable
                     var cmd = msg.DecodeData(ConnectJsonContext.Default.EnqueueNextCommand);
                     if (cmd != null) EnqueueNextRequested?.Invoke(cmd);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"CmdEnqueueNext error: {ex.Message}");
+                }
                 break;
 
             case ConnectActions.CmdPause:
@@ -414,7 +420,10 @@ public sealed class TvConnectServer : IDisposable
                     var cmd = msg.DecodeData(ConnectJsonContext.Default.SeekCommand);
                     if (cmd != null) SeekRequested?.Invoke(cmd.PositionMs);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"CmdSeek error: {ex.Message}");
+                }
                 break;
 
             case ConnectActions.CmdSetVolume:
@@ -423,7 +432,10 @@ public sealed class TvConnectServer : IDisposable
                     var cmd = msg.DecodeData(ConnectJsonContext.Default.SetVolumeCommand);
                     if (cmd != null) SetVolumeRequested?.Invoke(cmd.Volume);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"CmdSetVolume error: {ex.Message}");
+                }
                 break;
 
             case ConnectActions.CmdSwitchTier:
@@ -432,7 +444,10 @@ public sealed class TvConnectServer : IDisposable
                     var cmd = msg.DecodeData(ConnectJsonContext.Default.SwitchTierCommand);
                     if (cmd != null) SwitchTierRequested?.Invoke(cmd.Tier);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"CmdSwitchTier error: {ex.Message}");
+                }
                 break;
 
             case ConnectActions.CmdTriggerAod:
@@ -458,7 +473,10 @@ public sealed class TvConnectServer : IDisposable
                     var cmd = msg.DecodeData(ConnectJsonContext.Default.ToggleFavoriteCommand);
                     if (cmd != null) ToggleFavoriteRequested?.Invoke(cmd);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"CmdToggleFavorite error: {ex.Message}");
+                }
                 break;
 
             case ConnectActions.CmdSyncLyricsScroll:
@@ -467,7 +485,10 @@ public sealed class TvConnectServer : IDisposable
                     var cmd = msg.DecodeData(ConnectJsonContext.Default.LyricsScrollPayload);
                     if (cmd != null) SyncLyricsScrollRequested?.Invoke(cmd);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"CmdSyncLyricsScroll error: {ex.Message}");
+                }
                 break;
 
             case ConnectActions.CmdSyncLyrics:
@@ -476,7 +497,10 @@ public sealed class TvConnectServer : IDisposable
                     var payload = msg.DecodeData(ConnectJsonContext.Default.LyricsSyncPayload);
                     if (payload != null) SyncLyricsRequested?.Invoke(payload);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"CmdSyncLyrics error: {ex.Message}");
+                }
                 break;
 
             case ConnectActions.CmdSyncQueueChunk:
@@ -485,7 +509,10 @@ public sealed class TvConnectServer : IDisposable
                     var cmd = msg.DecodeData(ConnectJsonContext.Default.SyncQueueChunkCommand);
                     if (cmd != null) SyncQueueChunkRequested?.Invoke(cmd);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"CmdSyncQueueChunk error: {ex.Message}");
+                }
                 break;
         }
     }

@@ -288,7 +288,10 @@ public static partial class WebDavService
                                 File.WriteAllText(lrcPath, embeddedLyrics, Encoding.UTF8);
                                 CacheManager.RecordAccess($"webdav/{Path.GetFileName(lrcPath)}", new FileInfo(lrcPath).Length);
                             }
-                            catch {}
+                            catch (Exception ex)
+                            {
+                                AppLogger.Debug("WebDavService", $"Cache WebDAV embedded lyric failed: {ex.Message}");
+                            }
                         }
                         return true;
                     }

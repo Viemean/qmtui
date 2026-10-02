@@ -370,7 +370,10 @@ public sealed partial class WebPlaybackServer : IDisposable
                                 using var doc = JsonDocument.Parse(bodyPart);
                                 if (doc.RootElement.TryGetProperty("position", out var pProp)) targetPos = pProp.GetDouble();
                             }
-                            catch {}
+                            catch (Exception ex)
+                            {
+                                AppLogger.Debug("WebPlaybackServer", $"Parse seek json failed: {ex.Message}");
+                            }
                         }
                         SeekRequested?.Invoke(targetPos);
                         await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);

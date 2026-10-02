@@ -55,7 +55,10 @@ public static partial class WebDavService
                 Directory.CreateDirectory(s_cacheDir);
             }
         }
-        catch {}
+        catch (Exception ex)
+        {
+            AppLogger.Debug("WebDavService", $"EnsureConfigDir failed: {ex.Message}");
+        }
     }
 
     public static void LoadConfig()

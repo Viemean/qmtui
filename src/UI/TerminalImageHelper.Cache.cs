@@ -297,7 +297,10 @@ public static partial class TerminalImageHelper
                 {
                     File.Move(tempHighRes, localFile, overwrite: true);
                 }
-                catch {}
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TerminalImage", $"Move highres cover failed for {albumMid}: {ex.Message}");
+                }
             }
             try { if (File.Exists(tempHighRes)) File.Delete(tempHighRes); } catch {}
         }

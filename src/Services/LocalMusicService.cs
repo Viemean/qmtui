@@ -330,9 +330,9 @@ public static class LocalMusicService
                 ScanDirectoryRecursive(subDir, results);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // 权限受限或读取异常忽略
+            AppLogger.Debug("LocalMusicService", $"ScanDirectoryRecursive error at {dir.FullName}: {ex.Message}");
         }
     }
 
