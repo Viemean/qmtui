@@ -127,7 +127,7 @@ public sealed partial class MainWindow
                     _lyricListView.Viewport.Height
                 );
             }
-            catch {}
+            catch { }
         }
         _lyricScrollBar?.UpdateMetrics(displayLines.Count, _lyricListView.Viewport.Height, _lyricListView.Viewport.Y);
     }
@@ -766,8 +766,8 @@ public sealed partial class MainWindow
         if (!_isCommentViewActive) return;
 
         int count = _songCommentView.TotalCommentCount;
-        _lyricTitleLabel.Text = count > 0 
-            ? $" 评论 ({SongCommentView.FormatCount(count)}) " 
+        _lyricTitleLabel.Text = count > 0
+            ? $" 评论 ({SongCommentView.FormatCount(count)}) "
             : " 评论 ";
         _lyricFrame.SetNeedsDraw();
     }

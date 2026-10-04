@@ -247,7 +247,7 @@ public sealed class WebPlayer : IPlayer
         {
             _virtualTickerCts?.Cancel();
         }
-        catch {}
+        catch { }
         _virtualTickerCts = null;
     }
 

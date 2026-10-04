@@ -45,7 +45,7 @@ public sealed partial class WebPlaybackServer
                     sseClient.Channel.Writer.TryWrite(": ping\r\n\r\n");
                 }
             }
-            catch {}
+            catch { }
         }, heartbeatCts.Token);
 
         try
@@ -68,7 +68,7 @@ public sealed partial class WebPlaybackServer
         }
         finally
         {
-            try { heartbeatCts.Cancel(); } catch {}
+            try { heartbeatCts.Cancel(); } catch { }
             int remainingClients;
             lock (_sseLock)
             {

@@ -68,7 +68,7 @@ public sealed partial class WebPlaybackServer : IDisposable
                 return endPoint.Address.ToString();
             }
         }
-        catch {}
+        catch { }
 
         try
         {
@@ -113,7 +113,7 @@ public sealed partial class WebPlaybackServer : IDisposable
                 return fallbackIp;
             }
         }
-        catch {}
+        catch { }
 
         return null;
     }
@@ -159,7 +159,7 @@ public sealed partial class WebPlaybackServer : IDisposable
             try
             {
                 _listener = new TcpListener(IPAddress.Any, preferredPort);
-                try { _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true); } catch {}
+                try { _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true); } catch { }
                 _listener.Start(128);
                 Port = preferredPort;
                 AppLogger.Info("WebPlaybackServer", $"Started Web playback server on preferred port {Port}");
@@ -170,7 +170,7 @@ public sealed partial class WebPlaybackServer : IDisposable
                 try
                 {
                     _listener = new TcpListener(IPAddress.Any, 0);
-                    try { _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true); } catch {}
+                    try { _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true); } catch { }
                     _listener.Start(128);
                     Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
                     AppLogger.Info("WebPlaybackServer", $"Started Web playback server on dynamic port {Port}");
@@ -231,7 +231,7 @@ public sealed partial class WebPlaybackServer : IDisposable
             client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
             client.LingerState = new LingerOption(enable: false, seconds: 0);
         }
-        catch {}
+        catch { }
 
         bool keepAliveForSse = false;
         var stream = client.GetStream();
@@ -317,99 +317,99 @@ public sealed partial class WebPlaybackServer : IDisposable
                     await SendResponseAsync(stream, 404, "Not Found", "text/plain", "Not Found", ct).ConfigureAwait(false);
                 }
             }
-                else if (method == "POST")
+            else if (method == "POST")
+            {
+                if (path == "/api/action")
                 {
-                    if (path == "/api/action")
-                    {
-                        HandleApiAction(bodyPart);
-                        await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
-                    }
-                    else if (path == "/api/toggle")
-                    {
-                        TogglePlayRequested?.Invoke();
-                        await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
-                    }
-                    else if (path == "/api/favorite")
-                    {
-                        ToggleFavoriteRequested?.Invoke();
-                        await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
-                    }
-                    else if (path == "/api/mode")
-                    {
-                        ToggleModeRequested?.Invoke();
-                        await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
-                    }
-                    else if (path == "/api/quality")
-                    {
-                        ToggleQualityRequested?.Invoke();
-                        await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
-                    }
-                    else if (path == "/api/next")
-                    {
-                        NextRequested?.Invoke();
-                        await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
-                    }
-                    else if (path == "/api/previous" || path == "/api/prev")
-                    {
-                        PreviousRequested?.Invoke();
-                        await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
-                    }
-                    else if (path == "/api/seek")
-                    {
-                        double targetPos = 0;
-                        var queryIndex = rawPath.IndexOf("pos=", StringComparison.OrdinalIgnoreCase);
-                        if (queryIndex >= 0)
-                        {
-                            var posStr = rawPath[(queryIndex + 4)..].Split('&')[0];
-                            double.TryParse(posStr, System.Globalization.CultureInfo.InvariantCulture, out targetPos);
-                        }
-                        else if (!string.IsNullOrWhiteSpace(bodyPart) && bodyPart.Contains("position"))
-                        {
-                            try
-                            {
-                                using var doc = JsonDocument.Parse(bodyPart);
-                                if (doc.RootElement.TryGetProperty("position", out var pProp)) targetPos = pProp.GetDouble();
-                            }
-                            catch (Exception ex)
-                            {
-                                AppLogger.Debug("WebPlaybackServer", $"Parse seek json failed: {ex.Message}");
-                            }
-                        }
-                        SeekRequested?.Invoke(targetPos);
-                        await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
-                    }
-                    else if (path == "/api/progress")
-                    {
-                        HandleApiProgress(bodyPart);
-                        await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        await SendResponseAsync(stream, 404, "Not Found", "text/plain", "Not Found", ct).ConfigureAwait(false);
-                    }
+                    HandleApiAction(bodyPart);
+                    await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
                 }
-                else if (method == "OPTIONS")
+                else if (path == "/api/toggle")
                 {
-                    await SendCorsHeadersAsync(stream, ct).ConfigureAwait(false);
+                    TogglePlayRequested?.Invoke();
+                    await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
+                }
+                else if (path == "/api/favorite")
+                {
+                    ToggleFavoriteRequested?.Invoke();
+                    await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
+                }
+                else if (path == "/api/mode")
+                {
+                    ToggleModeRequested?.Invoke();
+                    await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
+                }
+                else if (path == "/api/quality")
+                {
+                    ToggleQualityRequested?.Invoke();
+                    await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
+                }
+                else if (path == "/api/next")
+                {
+                    NextRequested?.Invoke();
+                    await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
+                }
+                else if (path == "/api/previous" || path == "/api/prev")
+                {
+                    PreviousRequested?.Invoke();
+                    await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
+                }
+                else if (path == "/api/seek")
+                {
+                    double targetPos = 0;
+                    var queryIndex = rawPath.IndexOf("pos=", StringComparison.OrdinalIgnoreCase);
+                    if (queryIndex >= 0)
+                    {
+                        var posStr = rawPath[(queryIndex + 4)..].Split('&')[0];
+                        double.TryParse(posStr, System.Globalization.CultureInfo.InvariantCulture, out targetPos);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(bodyPart) && bodyPart.Contains("position"))
+                    {
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(bodyPart);
+                            if (doc.RootElement.TryGetProperty("position", out var pProp)) targetPos = pProp.GetDouble();
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Debug("WebPlaybackServer", $"Parse seek json failed: {ex.Message}");
+                        }
+                    }
+                    SeekRequested?.Invoke(targetPos);
+                    await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
+                }
+                else if (path == "/api/progress")
+                {
+                    HandleApiProgress(bodyPart);
+                    await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}", ct).ConfigureAwait(false);
                 }
                 else
                 {
-                    await SendResponseAsync(stream, 405, "Method Not Allowed", "text/plain", "Method Not Allowed", ct).ConfigureAwait(false);
+                    await SendResponseAsync(stream, 404, "Not Found", "text/plain", "Not Found", ct).ConfigureAwait(false);
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            else if (method == "OPTIONS")
             {
-                AppLogger.Debug("WebPlaybackServer", $"Client socket handling finished: {ex.Message}");
+                await SendCorsHeadersAsync(stream, ct).ConfigureAwait(false);
             }
-            finally
+            else
             {
-                if (!keepAliveForSse)
-                {
-                    try { stream.Dispose(); } catch {}
-                    try { client.Dispose(); } catch {}
-                }
+                await SendResponseAsync(stream, 405, "Method Not Allowed", "text/plain", "Method Not Allowed", ct).ConfigureAwait(false);
             }
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            AppLogger.Debug("WebPlaybackServer", $"Client socket handling finished: {ex.Message}");
+        }
+        finally
+        {
+            if (!keepAliveForSse)
+            {
+                try { stream.Dispose(); } catch { }
+                try { client.Dispose(); } catch { }
+            }
+        }
+    }
 
     private async Task HandleCoverRequestAsync(NetworkStream stream, string rawPath, CancellationToken ct)
     {
@@ -463,7 +463,7 @@ public sealed partial class WebPlaybackServer : IDisposable
             {
                 byte[] bytes = await File.ReadAllBytesAsync(coverFile, ct).ConfigureAwait(false);
                 string contentType = coverFile.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg";
-                
+
                 string headers = $"HTTP/1.1 200 OK\r\n" +
                                  $"Content-Type: {contentType}\r\n" +
                                  $"Content-Length: {bytes.Length}\r\n" +
@@ -693,19 +693,19 @@ public sealed partial class WebPlaybackServer : IDisposable
                 IsPlaying = false;
                 BroadcastState("stop");
             }
-            catch {}
+            catch { }
 
             try
             {
                 _cts?.Cancel();
             }
-            catch {}
+            catch { }
 
             lock (_sseLock)
             {
                 foreach (var client in _sseClients)
                 {
-                    try { client.Dispose(); } catch {}
+                    try { client.Dispose(); } catch { }
                 }
                 _sseClients.Clear();
             }

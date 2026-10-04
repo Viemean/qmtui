@@ -26,394 +26,394 @@ public sealed partial class MainWindow
 {
     private async Task HandleGlobalKeyDownAsync(Key k)
     {
-            // 0. 若当前处于任何模态弹窗中，Esc 键无条件同步响应关闭，不进入 ANSI 1004 异步延迟队列
-            var activeModal = _activeModalDialog ?? (Application.TopRunnableView != null && Application.TopRunnableView != this ? Application.TopRunnableView as IRunnable : null);
-            if (activeModal != null)
-            {
-                if (k == Key.Esc)
-                {
-                    k.Handled = true;
-                    IsTerminalWindowFocused = true;
-                    if (activeModal is LoginDialog loginDlg)
-                    {
-                        loginDlg.CloseSelf();
-                    }
-                    else if (activeModal is IRunnable runnable)
-                    {
-                        Application.RequestStop(runnable);
-                    }
-                    else
-                    {
-                        Application.RequestStop();
-                    }
-                    return;
-                }
-            }
-
-            // 0.5. ANSI 1004 Focus Reporting 状态机与失焦/后台按键拦截
-            // ESC 键可能是独立物理按压，也可能是 \x1b[O (Focus Out) 或 \x1b[I (Focus In) 的前导字符
+        // 0. 若当前处于任何模态弹窗中，Esc 键无条件同步响应关闭，不进入 ANSI 1004 异步延迟队列
+        var activeModal = _activeModalDialog ?? (Application.TopRunnableView != null && Application.TopRunnableView != this ? Application.TopRunnableView as IRunnable : null);
+        if (activeModal != null)
+        {
             if (k == Key.Esc)
             {
                 k.Handled = true;
-                _lastEscRcvTick = Environment.TickCount64;
-                _sawBracketAfterEsc = false;
-
-                int currentEscId = Interlocked.Increment(ref _escSequenceCounter);
-                _ = Task.Run(async () =>
+                IsTerminalWindowFocused = true;
+                if (activeModal is LoginDialog loginDlg)
                 {
-                    await Task.Delay(25);
-                    if (Volatile.Read(ref _escSequenceCounter) == currentEscId && !_sawBracketAfterEsc)
+                    loginDlg.CloseSelf();
+                }
+                else if (activeModal is IRunnable runnable)
+                {
+                    Application.RequestStop(runnable);
+                }
+                else
+                {
+                    Application.RequestStop();
+                }
+                return;
+            }
+        }
+
+        // 0.5. ANSI 1004 Focus Reporting 状态机与失焦/后台按键拦截
+        // ESC 键可能是独立物理按压，也可能是 \x1b[O (Focus Out) 或 \x1b[I (Focus In) 的前导字符
+        if (k == Key.Esc)
+        {
+            k.Handled = true;
+            _lastEscRcvTick = Environment.TickCount64;
+            _sawBracketAfterEsc = false;
+
+            int currentEscId = Interlocked.Increment(ref _escSequenceCounter);
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(25);
+                if (Volatile.Read(ref _escSequenceCounter) == currentEscId && !_sawBracketAfterEsc)
+                {
+                    Application.Invoke(async () =>
                     {
-                        Application.Invoke(async () =>
+                        // 1. 若当前处于任何弹窗（Dialog/Window/Modal）中，立即单次关闭该弹窗退出（不受终端失焦状态阻断）
+                        var modal = _activeModalDialog ?? (Application.TopRunnableView != null && Application.TopRunnableView != this ? Application.TopRunnableView as IRunnable : null);
+                        if (modal != null)
                         {
-                            // 1. 若当前处于任何弹窗（Dialog/Window/Modal）中，立即单次关闭该弹窗退出（不受终端失焦状态阻断）
-                            var modal = _activeModalDialog ?? (Application.TopRunnableView != null && Application.TopRunnableView != this ? Application.TopRunnableView as IRunnable : null);
-                            if (modal != null)
+                            IsTerminalWindowFocused = true;
+                            if (modal is LoginDialog loginDlg)
                             {
-                                IsTerminalWindowFocused = true;
-                                if (modal is LoginDialog loginDlg)
-                                {
-                                    loginDlg.CloseSelf();
-                                }
-                                else if (modal is IRunnable runnable)
-                                {
-                                    Application.RequestStop(runnable);
-                                }
-                                else
-                                {
-                                    Application.RequestStop();
-                                }
-                                return;
+                                loginDlg.CloseSelf();
                             }
-
-                            if (!IsTerminalWindowFocused)
+                            else if (modal is IRunnable runnable)
                             {
-                                return;
+                                Application.RequestStop(runnable);
                             }
-
-                            // 1.5. 列表即时查找浮窗处于显示状态时，按 Esc 优先收起
-                            if (_quickSearchBar.Visible)
+                            else
                             {
-                                _quickSearchBar.Dismiss();
-                                return;
+                                Application.RequestStop();
                             }
+                            return;
+                        }
 
-                            // 2. 搜索框处于激活状态时，按 Esc 退出搜索模式恢复焦点
-                            if (_isSearchActive || _searchField.HasFocus)
-                            {
-                                _isSearchActive = false;
-                                _searchField.CanFocus = false;
-                                _songListView?.SetFocusToList();
-                                Application.Invoke(UpdateFrameBorderHighlights);
-                                return;
-                            }
+                        if (!IsTerminalWindowFocused)
+                        {
+                            return;
+                        }
 
-                            // 3. 主界面真实 Esc 处理
-                            await HandleRealEscapeKeyAsync();
-                        });
-                    }
-                });
-                return;
-            }
+                        // 1.5. 列表即时查找浮窗处于显示状态时，按 Esc 优先收起
+                        if (_quickSearchBar.Visible)
+                        {
+                            _quickSearchBar.Dismiss();
+                            return;
+                        }
 
-            // 检查是否紧随 Esc 之后的 '['
-            if (Environment.TickCount64 - _lastEscRcvTick < 100 && k.AsRune.Value == '[')
+                        // 2. 搜索框处于激活状态时，按 Esc 退出搜索模式恢复焦点
+                        if (_isSearchActive || _searchField.HasFocus)
+                        {
+                            _isSearchActive = false;
+                            _searchField.CanFocus = false;
+                            _songListView?.SetFocusToList();
+                            Application.Invoke(UpdateFrameBorderHighlights);
+                            return;
+                        }
+
+                        // 3. 主界面真实 Esc 处理
+                        await HandleRealEscapeKeyAsync();
+                    });
+                }
+            });
+            return;
+        }
+
+        // 检查是否紧随 Esc 之后的 '['
+        if (Environment.TickCount64 - _lastEscRcvTick < 100 && k.AsRune.Value == '[')
+        {
+            _sawBracketAfterEsc = true;
+            k.Handled = true;
+            return;
+        }
+
+        // 检查是否紧随 Esc [ 之后的 Focus 字符 ('O' 为 Focus Out, 'I' 为 Focus In)
+        if (_sawBracketAfterEsc && Environment.TickCount64 - _lastEscRcvTick < 150)
+        {
+            _sawBracketAfterEsc = false;
+            k.Handled = true;
+            char fc = char.ToUpperInvariant((char)k.AsRune.Value);
+            if (fc == 'O')
             {
-                _sawBracketAfterEsc = true;
+                IsTerminalWindowFocused = false;
+            }
+            else if (fc == 'I')
+            {
+                IsTerminalWindowFocused = true;
+            }
+            return;
+        }
+
+        // 终端窗口失焦（被桌面其它窗口覆盖或处于后台）时，丢弃所有后续按键，不响应任何操作
+        if (!IsTerminalWindowFocused)
+        {
+            k.Handled = true;
+            return;
+        }
+
+        _lastUserActivityTick = Environment.TickCount64;
+        TriggerImmersiveActivity();
+
+        // 1. 若当前处于播放列表抽屉弹窗（QueueDrawerDialog）中，顶层直连分发快捷键，避免子控件字符搜索吞噬
+        if (Application.TopRunnableView is QueueDrawerDialog queueDrawer)
+        {
+            bool isE = k == Key.E || k == Key.E.WithShift ||
+                       k.AsRune.Value == 'e' || k.AsRune.Value == 'E' ||
+                       k.ToString().Equals("e", StringComparison.OrdinalIgnoreCase) ||
+                       k.ToString().Equals("Key.E", StringComparison.OrdinalIgnoreCase);
+            if (isE)
+            {
                 k.Handled = true;
+                Application.RequestStop(queueDrawer);
                 return;
             }
 
-            // 检查是否紧随 Esc [ 之后的 Focus 字符 ('O' 为 Focus Out, 'I' 为 Focus In)
-            if (_sawBracketAfterEsc && Environment.TickCount64 - _lastEscRcvTick < 150)
-            {
-                _sawBracketAfterEsc = false;
-                k.Handled = true;
-                char fc = char.ToUpperInvariant((char)k.AsRune.Value);
-                if (fc == 'O')
-                {
-                    IsTerminalWindowFocused = false;
-                }
-                else if (fc == 'I')
-                {
-                    IsTerminalWindowFocused = true;
-                }
-                return;
-            }
-
-            // 终端窗口失焦（被桌面其它窗口覆盖或处于后台）时，丢弃所有后续按键，不响应任何操作
-            if (!IsTerminalWindowFocused)
+            bool isD = k == Key.DeleteChar || k == Key.D || k == Key.D.WithShift ||
+                       k.AsRune.Value == 'd' || k.AsRune.Value == 'D' ||
+                       k.ToString().Equals("d", StringComparison.OrdinalIgnoreCase) ||
+                       k.ToString().Equals("Key.D", StringComparison.OrdinalIgnoreCase);
+            if (isD)
             {
                 k.Handled = true;
+                queueDrawer.RemoveCurrentSelectedItem();
                 return;
             }
 
-            _lastUserActivityTick = Environment.TickCount64;
-            TriggerImmersiveActivity();
-
-            // 1. 若当前处于播放列表抽屉弹窗（QueueDrawerDialog）中，顶层直连分发快捷键，避免子控件字符搜索吞噬
-            if (Application.TopRunnableView is QueueDrawerDialog queueDrawer)
+            bool isC = k == Key.C || k == Key.C.WithShift ||
+                       k.AsRune.Value == 'c' || k.AsRune.Value == 'C' ||
+                       k.ToString().Equals("c", StringComparison.OrdinalIgnoreCase) ||
+                       k.ToString().Equals("Key.C", StringComparison.OrdinalIgnoreCase);
+            if (isC)
             {
-                bool isE = k == Key.E || k == Key.E.WithShift ||
-                           k.AsRune.Value == 'e' || k.AsRune.Value == 'E' ||
-                           k.ToString().Equals("e", StringComparison.OrdinalIgnoreCase) ||
-                           k.ToString().Equals("Key.E", StringComparison.OrdinalIgnoreCase);
-                if (isE)
-                {
-                    k.Handled = true;
-                    Application.RequestStop(queueDrawer);
-                    return;
-                }
-
-                bool isD = k == Key.DeleteChar || k == Key.D || k == Key.D.WithShift ||
-                           k.AsRune.Value == 'd' || k.AsRune.Value == 'D' ||
-                           k.ToString().Equals("d", StringComparison.OrdinalIgnoreCase) ||
-                           k.ToString().Equals("Key.D", StringComparison.OrdinalIgnoreCase);
-                if (isD)
-                {
-                    k.Handled = true;
-                    queueDrawer.RemoveCurrentSelectedItem();
-                    return;
-                }
-
-                bool isC = k == Key.C || k == Key.C.WithShift ||
-                           k.AsRune.Value == 'c' || k.AsRune.Value == 'C' ||
-                           k.ToString().Equals("c", StringComparison.OrdinalIgnoreCase) ||
-                           k.ToString().Equals("Key.C", StringComparison.OrdinalIgnoreCase);
-                if (isC)
-                {
-                    k.Handled = true;
-                    queueDrawer.ClearUpcomingSongs();
-                    return;
-                }
-
-                if (k == Key.Enter || k.AsRune.Value == '\r' || k.AsRune.Value == '\n')
-                {
-                    k.Handled = true;
-                    queueDrawer.PlayCurrentSelectedItem();
-                    return;
-                }
-
-                return;
-            }
-
-            // 1.5 若当前处于添加到歌单弹窗（AddToPlaylistDialog）中，按 Esc 或再次按 A 立即关闭
-            var addDlg = (_activeModalDialog as AddToPlaylistDialog) ?? (Application.TopRunnableView as AddToPlaylistDialog);
-            if (addDlg != null)
-            {
-                bool isClose = k == Key.Esc || k == Key.A || k == Key.A.WithShift ||
-                               k.AsRune.Value == 'a' || k.AsRune.Value == 'A' ||
-                               k.ToString().Equals("a", StringComparison.OrdinalIgnoreCase) ||
-                               k.ToString().Equals("Key.A", StringComparison.OrdinalIgnoreCase);
-                if (isClose)
-                {
-                    k.Handled = true;
-                    Application.RequestStop(addDlg);
-                    return;
-                }
-            }
-
-            // 若当前处于其它弹窗（Dialog/Modal）中，不拦截按键，交由弹窗处理
-            if (_activeModalDialog != null || (Application.TopRunnableView != null && Application.TopRunnableView != this))
-            {
-                return;
-            }
-
-            // 2. 若当前获焦控件是文本输入控件（且非主搜索框），直接放行
-            var focused = Application.Navigation?.GetFocused();
-            if (focused is TextField tf && tf != _searchField)
-            {
-                return;
-            }
-
-            // 2.5. AOD 后台息屏模式：任意键唤醒恢复主界面（按 Q/q 仍触发确认退出）
-            if (_isAodMode)
-            {
-                if (k.AsRune.Value == 'q' || k.AsRune.Value == 'Q')
-                {
-                    k.Handled = true;
-                    ShowExitConfirmDialog();
-                    return;
-                }
-
                 k.Handled = true;
-                ExitAodMode();
+                queueDrawer.ClearUpcomingSongs();
                 return;
             }
 
-            // 3. 搜索框处于激活打字状态：全部交由 _searchField.KeyDown 独立处理，避免双重并发触发
-            if (_searchField.HasFocus && _isSearchActive)
+            if (k == Key.Enter || k.AsRune.Value == '\r' || k.AsRune.Value == '\n')
             {
-                return;
-            }
-
-            // 4. 全局 Tab 与 Shift+Tab 流转
-            if (k == Key.Tab || k.AsRune.Value == '\t' || k.ToString().Contains("Tab"))
-            {
-                var curFocused = Application.Navigation?.GetFocused();
-                AppLogger.Force("MainWindow", $"Global Tab pressed: isShift={k.IsShift}, _isNowPlayingViewActive={_isNowPlayingViewActive}, focusedView={curFocused?.GetType().Name ?? "null"}");
                 k.Handled = true;
-                _isSearchActive = false;
-                _searchField.CanFocus = false;
-                if (_isNowPlayingViewActive)
-                {
-                    _nowPlayingView.HandleTabNavigation(!k.IsShift);
-                    return;
-                }
-                SwitchNextFocusWindow(!k.IsShift);
+                queueDrawer.PlayCurrentSelectedItem();
                 return;
             }
 
-            // 5. 焦点丢失/悬空时的安全自愈兜底（按方向键或回车立即将焦点恢复至中央歌曲列表）
-            if (!_isNowPlayingViewActive && GetFocusedWindowIndex(focused) == -1 && (k == Key.CursorUp || k == Key.CursorDown || k == Key.CursorLeft || k == Key.CursorRight || k == Key.Enter))
-            {
-                _songListView.SetFocusToList();
-                Application.Invoke(UpdateFrameBorderHighlights);
-            }
+            return;
+        }
 
-            // 6. 只有未在搜索框内打字时，按 F3、'/' 或 Ctrl+V 才作为激活搜索框的快捷键（大播放界面下禁止唤出搜索）
-            if (k == Key.F3 || k.AsRune.Value == '/' || k == Key.V.WithCtrl)
+        // 1.5 若当前处于添加到歌单弹窗（AddToPlaylistDialog）中，按 Esc 或再次按 A 立即关闭
+        var addDlg = (_activeModalDialog as AddToPlaylistDialog) ?? (Application.TopRunnableView as AddToPlaylistDialog);
+        if (addDlg != null)
+        {
+            bool isClose = k == Key.Esc || k == Key.A || k == Key.A.WithShift ||
+                           k.AsRune.Value == 'a' || k.AsRune.Value == 'A' ||
+                           k.ToString().Equals("a", StringComparison.OrdinalIgnoreCase) ||
+                           k.ToString().Equals("Key.A", StringComparison.OrdinalIgnoreCase);
+            if (isClose)
             {
-                if (_isNowPlayingViewActive) return;
                 k.Handled = true;
-                _searchField.CanFocus = true;
-                _isSearchActive = true;
-                _searchField.SetFocus();
-                if (k == Key.V.WithCtrl)
-                {
-                    _searchField.PasteFromClipboard(preferPrimary: false);
-                }
+                Application.RequestStop(addDlg);
                 return;
             }
+        }
 
-            char c = char.ToUpperInvariant((char)k.AsRune.Value);
+        // 若当前处于其它弹窗（Dialog/Modal）中，不拦截按键，交由弹窗处理
+        if (_activeModalDialog != null || (Application.TopRunnableView != null && Application.TopRunnableView != this))
+        {
+            return;
+        }
 
-            if (!_isSearchActive && !_searchField.HasFocus)
-            {
-                if ((k == Key.D1 || c == '1') && _searchSongsBtn.Visible)
-                {
-                    k.Handled = true;
-                    await OnContextAction1Async();
-                    return;
-                }
-                if ((k == Key.D2 || c == '2') && _searchPlaylistsBtn.Visible)
-                {
-                    k.Handled = true;
-                    await OnContextAction2Async();
-                    return;
-                }
-                if ((k == Key.D3 || c == '3') && _searchAlbumsBtn.Visible)
-                {
-                    k.Handled = true;
-                    await OnContextAction3Async();
-                    return;
-                }
-            }
+        // 2. 若当前获焦控件是文本输入控件（且非主搜索框），直接放行
+        var focused = Application.Navigation?.GetFocused();
+        if (focused is TextField tf && tf != _searchField)
+        {
+            return;
+        }
 
-            if (_currentViewMode == ViewMode.PlaylistsList && !_isSearchActive)
-            {
-                if (c == 'N' && GetFocusedWindowIndex(focused) == 1)
-                {
-                    k.Handled = true;
-                    HandleCreatePlaylistAsync();
-                    return;
-                }
-                if (c == 'D' && GetFocusedWindowIndex(focused) == 1)
-                {
-                    k.Handled = true;
-                    await HandleDeleteSelectedPlaylistAsync();
-                    return;
-                }
-            }
-
-            if (_currentViewMode == ViewMode.LocalMusic && !_isSearchActive)
-            {
-                if (c == 'A' && GetFocusedWindowIndex(focused) == 1)
-                {
-                    k.Handled = true;
-                    ShowAddFolderDialog();
-                    return;
-                }
-                if (c == 'R')
-                {
-                    k.Handled = true;
-                    await RescanLocalMusicAsync();
-                    return;
-                }
-                if (c == 'F')
-                {
-                    k.Handled = true;
-                    ShowFolderManageDialog();
-                    return;
-                }
-            }
-
-
-            if (_currentViewMode == ViewMode.WebDav && !_isSearchActive)
-            {
-                if (c == 'F')
-                {
-                    k.Handled = true;
-                    ShowWebdavManageDialog();
-                    return;
-                }
-                if (c == 'D')
-                {
-                    k.Handled = true;
-                    await ToggleWebDavViewModeAsync();
-                    return;
-                }
-                if (c == 'A')
-                {
-                    k.Handled = true;
-                    await ImportCurrentWebDavFolderAsync();
-                    return;
-                }
-                if (c == 'R')
-                {
-                    k.Handled = true;
-                    await RefreshWebDavAsync();
-                    return;
-                }
-                if (c == 'S')
-                {
-                    k.Handled = true;
-                    await ScanWebDavMetadataAsync();
-                    return;
-                }
-                if (k == Key.Backspace)
-                {
-                    k.Handled = true;
-                    await NavigateUpWebDavFolderAsync();
-                    return;
-                }
-            }
-
-            if (c == 'Q')
+        // 2.5. AOD 后台息屏模式：任意键唤醒恢复主界面（按 Q/q 仍触发确认退出）
+        if (_isAodMode)
+        {
+            if (k.AsRune.Value == 'q' || k.AsRune.Value == 'Q')
             {
                 k.Handled = true;
                 ShowExitConfirmDialog();
                 return;
             }
 
-            if (c == 'V')
+            k.Handled = true;
+            ExitAodMode();
+            return;
+        }
+
+        // 3. 搜索框处于激活打字状态：全部交由 _searchField.KeyDown 独立处理，避免双重并发触发
+        if (_searchField.HasFocus && _isSearchActive)
+        {
+            return;
+        }
+
+        // 4. 全局 Tab 与 Shift+Tab 流转
+        if (k == Key.Tab || k.AsRune.Value == '\t' || k.ToString().Contains("Tab"))
+        {
+            var curFocused = Application.Navigation?.GetFocused();
+            AppLogger.Force("MainWindow", $"Global Tab pressed: isShift={k.IsShift}, _isNowPlayingViewActive={_isNowPlayingViewActive}, focusedView={curFocused?.GetType().Name ?? "null"}");
+            k.Handled = true;
+            _isSearchActive = false;
+            _searchField.CanFocus = false;
+            if (_isNowPlayingViewActive)
+            {
+                _nowPlayingView.HandleTabNavigation(!k.IsShift);
+                return;
+            }
+            SwitchNextFocusWindow(!k.IsShift);
+            return;
+        }
+
+        // 5. 焦点丢失/悬空时的安全自愈兜底（按方向键或回车立即将焦点恢复至中央歌曲列表）
+        if (!_isNowPlayingViewActive && GetFocusedWindowIndex(focused) == -1 && (k == Key.CursorUp || k == Key.CursorDown || k == Key.CursorLeft || k == Key.CursorRight || k == Key.Enter))
+        {
+            _songListView.SetFocusToList();
+            Application.Invoke(UpdateFrameBorderHighlights);
+        }
+
+        // 6. 只有未在搜索框内打字时，按 F3、'/' 或 Ctrl+V 才作为激活搜索框的快捷键（大播放界面下禁止唤出搜索）
+        if (k == Key.F3 || k.AsRune.Value == '/' || k == Key.V.WithCtrl)
+        {
+            if (_isNowPlayingViewActive) return;
+            k.Handled = true;
+            _searchField.CanFocus = true;
+            _isSearchActive = true;
+            _searchField.SetFocus();
+            if (k == Key.V.WithCtrl)
+            {
+                _searchField.PasteFromClipboard(preferPrimary: false);
+            }
+            return;
+        }
+
+        char c = char.ToUpperInvariant((char)k.AsRune.Value);
+
+        if (!_isSearchActive && !_searchField.HasFocus)
+        {
+            if ((k == Key.D1 || c == '1') && _searchSongsBtn.Visible)
             {
                 k.Handled = true;
-                ToggleNowPlayingView();
+                await OnContextAction1Async();
                 return;
             }
-
-            if (k == Key.Space)
+            if ((k == Key.D2 || c == '2') && _searchPlaylistsBtn.Visible)
             {
                 k.Handled = true;
-                await TogglePlayOrPauseAsync();
+                await OnContextAction2Async();
                 return;
             }
-
-            if (await HandleLetterActionKeyAsync(c, k))
+            if ((k == Key.D3 || c == '3') && _searchAlbumsBtn.Visible)
             {
+                k.Handled = true;
+                await OnContextAction3Async();
                 return;
             }
+        }
+
+        if (_currentViewMode == ViewMode.PlaylistsList && !_isSearchActive)
+        {
+            if (c == 'N' && GetFocusedWindowIndex(focused) == 1)
+            {
+                k.Handled = true;
+                HandleCreatePlaylistAsync();
+                return;
+            }
+            if (c == 'D' && GetFocusedWindowIndex(focused) == 1)
+            {
+                k.Handled = true;
+                await HandleDeleteSelectedPlaylistAsync();
+                return;
+            }
+        }
+
+        if (_currentViewMode == ViewMode.LocalMusic && !_isSearchActive)
+        {
+            if (c == 'A' && GetFocusedWindowIndex(focused) == 1)
+            {
+                k.Handled = true;
+                ShowAddFolderDialog();
+                return;
+            }
+            if (c == 'R')
+            {
+                k.Handled = true;
+                await RescanLocalMusicAsync();
+                return;
+            }
+            if (c == 'F')
+            {
+                k.Handled = true;
+                ShowFolderManageDialog();
+                return;
+            }
+        }
+
+
+        if (_currentViewMode == ViewMode.WebDav && !_isSearchActive)
+        {
+            if (c == 'F')
+            {
+                k.Handled = true;
+                ShowWebdavManageDialog();
+                return;
+            }
+            if (c == 'D')
+            {
+                k.Handled = true;
+                await ToggleWebDavViewModeAsync();
+                return;
+            }
+            if (c == 'A')
+            {
+                k.Handled = true;
+                await ImportCurrentWebDavFolderAsync();
+                return;
+            }
+            if (c == 'R')
+            {
+                k.Handled = true;
+                await RefreshWebDavAsync();
+                return;
+            }
+            if (c == 'S')
+            {
+                k.Handled = true;
+                await ScanWebDavMetadataAsync();
+                return;
+            }
+            if (k == Key.Backspace)
+            {
+                k.Handled = true;
+                await NavigateUpWebDavFolderAsync();
+                return;
+            }
+        }
+
+        if (c == 'Q')
+        {
+            k.Handled = true;
+            ShowExitConfirmDialog();
+            return;
+        }
+
+        if (c == 'V')
+        {
+            k.Handled = true;
+            ToggleNowPlayingView();
+            return;
+        }
+
+        if (k == Key.Space)
+        {
+            k.Handled = true;
+            await TogglePlayOrPauseAsync();
+            return;
+        }
+
+        if (await HandleLetterActionKeyAsync(c, k))
+        {
+            return;
+        }
     }
 
     private async Task<bool> HandleLetterActionKeyAsync(char c, Key k)
@@ -896,7 +896,7 @@ public sealed partial class MainWindow
                     _standaloneWebServer?.Dispose();
                     _standaloneWebServer = null;
                 }
-                catch {}
+                catch { }
                 try
                 {
                     _connectMdns?.Dispose();
@@ -911,7 +911,7 @@ public sealed partial class MainWindow
                         _connectServer = null;
                     }
                 }
-                catch {}
+                catch { }
                 _player.Dispose();
                 _mprisService.Dispose();
                 Application.RequestStop();

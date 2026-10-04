@@ -25,15 +25,15 @@ public sealed class WebdavServerEditDialog : Dialog
 
     private static Scheme TransparentDialogScheme { get; } = new Scheme
     {
-        Normal    = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextWhite, Color.None),
-        Focus     = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark),
+        Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextWhite, Color.None),
+        Focus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark),
         HotNormal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuPinkAccent, Color.None),
-        HotFocus  = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.MikuPinkAccent),
-        Disabled  = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
+        HotFocus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.MikuPinkAccent),
+        Disabled = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
         Highlight = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenPrimary, Color.None),
-        Active    = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
-        ReadOnly  = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
-        Editable  = new Terminal.Gui.Drawing.Attribute(Color.White, Color.None)
+        Active = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
+        ReadOnly = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
+        Editable = new Terminal.Gui.Drawing.Attribute(Color.White, Color.None)
     };
 
     public WebdavServerEditDialog(WebDavServer? existingServer, Action<WebDavServer> onSaved)
@@ -208,7 +208,7 @@ public sealed class WebdavServerEditDialog : Dialog
             _trustCertLabel.SetScheme(new Scheme
             {
                 Normal = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark),
-                Focus  = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark)
+                Focus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark)
             });
         }
         else if (_trustSelfSigned)
@@ -216,7 +216,7 @@ public sealed class WebdavServerEditDialog : Dialog
             _trustCertLabel.SetScheme(new Scheme
             {
                 Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenPrimary, Color.None),
-                Focus  = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark)
+                Focus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark)
             });
         }
         else
@@ -224,7 +224,7 @@ public sealed class WebdavServerEditDialog : Dialog
             _trustCertLabel.SetScheme(new Scheme
             {
                 Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextWhite, Color.None),
-                Focus  = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark)
+                Focus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark)
             });
         }
     }

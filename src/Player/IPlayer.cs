@@ -25,10 +25,10 @@ public interface IPlayer : IDisposable
     /// <summary>
     /// 更新当前曲目元数据（供 Web 播放器向客户端同步展示封面与标题等信息）
     /// </summary>
-    void UpdateCurrentSong(Song? song) {}
+    void UpdateCurrentSong(Song? song) { }
 
     /// <summary>
     /// 更新当前曲目歌词（供 Web 播放器向客户端同步动态歌词）
     /// </summary>
-    void UpdateCurrentLyrics(List<LyricLine>? lyrics) {}
+    void UpdateCurrentLyrics(List<LyricLine>? lyrics) { }
 }

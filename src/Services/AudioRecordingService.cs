@@ -365,7 +365,7 @@ public sealed class AudioRecordingSession : IDisposable
                 {
                     PulseAudioSimpleNative.pa_simple_free(_pulseHandle);
                 }
-                catch {}
+                catch { }
                 _pulseHandle = IntPtr.Zero;
             }
         }

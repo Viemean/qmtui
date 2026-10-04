@@ -312,7 +312,7 @@ public sealed unsafe partial class DesktopNotificationService : IDisposable
                             string? msg = Marshal.PtrToStringUTF8(err.Message);
                             AppLogger.Debug("DesktopNotification", $"D-Bus Notify failed: code={err.Code}, msg={msg}");
                         }
-                        catch {}
+                        catch { }
                         finally
                         {
                             g_error_free(callErr);

@@ -294,7 +294,7 @@ public sealed class LoginHttpServer : IDisposable
             {
                 _cts?.Cancel();
             }
-            catch {}
+            catch { }
 
             try
             {

@@ -463,7 +463,7 @@ public static partial class WebDavService
                                 existing.LastModified = item.LastModified;
                                 if (!string.IsNullOrEmpty(existing.LocalCachedPath) && File.Exists(existing.LocalCachedPath))
                                 {
-                                    try { File.Delete(existing.LocalCachedPath); } catch {}
+                                    try { File.Delete(existing.LocalCachedPath); } catch { }
                                     existing.LocalCachedPath = null;
                                 }
                                 newBatchCount++;
@@ -515,7 +515,7 @@ public static partial class WebDavService
                         existing.LastModified = item.LastModified;
                         if (!string.IsNullOrEmpty(existing.LocalCachedPath) && File.Exists(existing.LocalCachedPath))
                         {
-                            try { File.Delete(existing.LocalCachedPath); } catch {}
+                            try { File.Delete(existing.LocalCachedPath); } catch { }
                             existing.LocalCachedPath = null;
                         }
                     }

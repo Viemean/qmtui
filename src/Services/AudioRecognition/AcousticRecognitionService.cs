@@ -17,7 +17,7 @@ public static class AcousticRecognitionService
     /// 识别 16000Hz PCM 采样切片并检索曲库
     /// </summary>
     public static async Task<RecognitionResult?> RecognizePcmSamplesAsync(
-        short[] pcm16k, 
+        short[] pcm16k,
         CancellationToken cancellationToken = default)
     {
         if (pcm16k == null || pcm16k.Length < (int)(16000 * 1.5))

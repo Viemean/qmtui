@@ -150,7 +150,7 @@ public static partial class TerminalImageHelper
                 return (info.Value.Width, info.Value.Height);
             }
         }
-        catch {}
+        catch { }
         return null;
     }
 
@@ -221,7 +221,7 @@ public static partial class TerminalImageHelper
         }
         finally
         {
-            try { if (File.Exists(tmpPng)) File.Delete(tmpPng); } catch {}
+            try { if (File.Exists(tmpPng)) File.Delete(tmpPng); } catch { }
             MemoryManager.ScheduleTrim(1500);
         }
 

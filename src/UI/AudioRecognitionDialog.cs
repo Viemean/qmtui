@@ -44,15 +44,15 @@ public sealed class AudioRecognitionDialog : Dialog
 
     private static Scheme TransparentDialogScheme { get; } = new Scheme
     {
-        Normal    = new Attribute(MikuTheme.MikuTextWhite, Color.None),
-        Focus     = new Attribute(Color.White, MikuTheme.QqGreenDark),
+        Normal = new Attribute(MikuTheme.MikuTextWhite, Color.None),
+        Focus = new Attribute(Color.White, MikuTheme.QqGreenDark),
         HotNormal = new Attribute(MikuTheme.MikuPinkAccent, Color.None),
-        HotFocus  = new Attribute(Color.White, MikuTheme.MikuPinkAccent),
-        Disabled  = new Attribute(MikuTheme.MikuTextMuted, Color.None),
+        HotFocus = new Attribute(Color.White, MikuTheme.MikuPinkAccent),
+        Disabled = new Attribute(MikuTheme.MikuTextMuted, Color.None),
         Highlight = new Attribute(MikuTheme.QqGreenPrimary, Color.None),
-        Active    = new Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
-        ReadOnly  = new Attribute(MikuTheme.MikuTextMuted, Color.None),
-        Editable  = new Attribute(Color.White, Color.None)
+        Active = new Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
+        ReadOnly = new Attribute(MikuTheme.MikuTextMuted, Color.None),
+        Editable = new Attribute(Color.White, Color.None)
     };
 
     private string GetCurrentSourceButtonText()
@@ -587,8 +587,8 @@ public sealed class AudioRecognitionDialog : Dialog
         _detailLabel3.Y = 4;
         _detailLabel3.Visible = !string.IsNullOrWhiteSpace(result.Album);
 
-        string sourceName = (result.Source == "Official" || result.Source == "QQMusic" || result.Source == "Native" || result.Source == "原生") 
-            ? "原生声学引擎" 
+        string sourceName = (result.Source == "Official" || result.Source == "QQMusic" || result.Source == "Native" || result.Source == "原生")
+            ? "原生声学引擎"
             : result.Source;
 
         string timeInfo = elapsedSeconds > 0 ? $"  耗时: {elapsedSeconds:F1}s" : "";

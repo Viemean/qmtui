@@ -176,13 +176,13 @@ public static partial class WebDavService
             catch (OperationCanceledException)
             {
                 AppLogger.Info("WebDavService", $"Download audio canceled: {fileHref}");
-                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch {}
+                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
                 return null;
             }
             catch (Exception ex)
             {
                 AppLogger.Error("WebDavService", $"Download audio failed {fileHref}: {ex.Message}");
-                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch {}
+                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
                 return null;
             }
             finally
@@ -216,7 +216,7 @@ public static partial class WebDavService
             ATL.Track? track = null;
             if (File.Exists(localPath))
             {
-                try { track = new ATL.Track(localPath); } catch {}
+                try { track = new ATL.Track(localPath); } catch { }
             }
 
             lock (s_lock)

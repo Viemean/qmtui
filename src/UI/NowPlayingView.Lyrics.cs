@@ -168,7 +168,7 @@ public sealed partial class NowPlayingView
                 _coverCts?.Cancel();
                 _coverCts?.Dispose();
             }
-            catch {}
+            catch { }
             _coverCts = null;
             _coverFilePath = null;
             _artistLink.SetText("");
@@ -196,7 +196,7 @@ public sealed partial class NowPlayingView
                 _coverCts?.Cancel();
                 _coverCts?.Dispose();
             }
-            catch {}
+            catch { }
             _coverCts = new CancellationTokenSource();
             _coverFilePath = null;
         }
@@ -222,7 +222,7 @@ public sealed partial class NowPlayingView
                         });
                     }
                 }
-                catch (OperationCanceledException) {}
+                catch (OperationCanceledException) { }
                 catch (Exception ex)
                 {
                     AppLogger.Debug("NowPlayingView", $"EnsureSongCoverAsync error: {ex.Message}");
@@ -315,7 +315,7 @@ public sealed partial class NowPlayingView
                             }
                         }
                     }
-                    catch {}
+                    catch { }
                 }
                 _lyricScrollBar?.UpdateMetrics(sourceCount, _lyricListView.Viewport.Height, _lyricListView.Viewport.Y);
             }

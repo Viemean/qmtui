@@ -84,7 +84,7 @@ public static class AudioRecognitionService
     /// 识别 16000Hz PCM 采样切片并联动曲库 (仅使用原生声学算法引擎)
     /// </summary>
     public static async Task<RecognitionResult> RecognizeAndMatchPcmAsync(
-        short[] pcmSamples, 
+        short[] pcmSamples,
         CancellationToken cancellationToken = default)
     {
         if (pcmSamples == null || pcmSamples.Length < (int)(16000 * 1.5))

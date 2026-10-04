@@ -330,13 +330,13 @@ public static partial class TerminalImageHelper
             }
             else
             {
-                try { File.Delete(pngFile); } catch {}
+                try { File.Delete(pngFile); } catch { }
             }
         }
 
         if (File.Exists(localFile) && !IsValidJpgFile(localFile))
         {
-            try { File.Delete(localFile); } catch {}
+            try { File.Delete(localFile); } catch { }
         }
 
         if (isOutdated && File.Exists(localFile))
@@ -363,7 +363,7 @@ public static partial class TerminalImageHelper
                     break;
                 }
             }
-            try { if (File.Exists(tempHighRes)) File.Delete(tempHighRes); } catch {}
+            try { if (File.Exists(tempHighRes)) File.Delete(tempHighRes); } catch { }
         }
         else if (!File.Exists(localFile) || new FileInfo(localFile).Length == 0)
         {
@@ -434,7 +434,7 @@ public static partial class TerminalImageHelper
             var fi = new FileInfo(pngFile);
             if (fi.Length > MaxValidPngCacheBytes || !IsValidPngFile(pngFile))
             {
-                try { File.Delete(pngFile); } catch {}
+                try { File.Delete(pngFile); } catch { }
             }
             else
             {
@@ -485,13 +485,13 @@ public static partial class TerminalImageHelper
                 CacheManager.RecordAccess($"covers/{Path.GetFileName(pngFile)}", fi.Length);
                 return pngFile;
             }
-            try { File.Delete(pngFile); } catch {}
+            try { File.Delete(pngFile); } catch { }
         }
 
         var localFile = Path.Combine(s_cacheDir, $"singer_{singerMid}.jpg");
         if (File.Exists(localFile) && !IsValidJpgFile(localFile))
         {
-            try { File.Delete(localFile); } catch {}
+            try { File.Delete(localFile); } catch { }
         }
         if (!File.Exists(localFile) || new FileInfo(localFile).Length == 0)
         {
@@ -566,13 +566,13 @@ public static partial class TerminalImageHelper
             }
             else
             {
-                try { File.Delete(pngFile); } catch {}
+                try { File.Delete(pngFile); } catch { }
             }
         }
 
         if (File.Exists(localFile) && !IsValidJpgFile(localFile))
         {
-            try { File.Delete(localFile); } catch {}
+            try { File.Delete(localFile); } catch { }
         }
 
         if (isOutdated && File.Exists(localFile))
@@ -588,11 +588,11 @@ public static partial class TerminalImageHelper
                 if (cancellationToken.IsCancellationRequested) break;
                 if (await DownloadImageStreamToFileAsync(url, tempHighRes, cancellationToken).ConfigureAwait(false))
                 {
-                    try { File.Move(tempHighRes, localFile, overwrite: true); } catch {}
+                    try { File.Move(tempHighRes, localFile, overwrite: true); } catch { }
                     break;
                 }
             }
-            try { if (File.Exists(tempHighRes)) File.Delete(tempHighRes); } catch {}
+            try { if (File.Exists(tempHighRes)) File.Delete(tempHighRes); } catch { }
         }
         else if (!File.Exists(localFile) || new FileInfo(localFile).Length == 0)
         {

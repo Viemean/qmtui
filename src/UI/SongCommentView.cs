@@ -585,7 +585,7 @@ public sealed class SongCommentView : View
             _loadCts?.Cancel();
             _loadCts?.Dispose();
         }
-        catch {}
+        catch { }
         _loadCts = null;
 
         _currentSong = song;
@@ -671,7 +671,7 @@ public sealed class SongCommentView : View
         {
             _loadCts?.Cancel();
         }
-        catch {}
+        catch { }
 
         if (_currentSong != null && (_hotComments.Count > 0 || _normalComments.Count > 0))
         {
@@ -695,7 +695,7 @@ public sealed class SongCommentView : View
             _loadCts?.Cancel();
             _loadCts?.Dispose();
         }
-        catch {}
+        catch { }
         _loadCts = new CancellationTokenSource();
         var ct = _loadCts.Token;
 
@@ -792,7 +792,7 @@ public sealed class SongCommentView : View
                 }
             });
         }
-        catch (OperationCanceledException) {}
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             AppLogger.Error("SongCommentView", $"LoadCommentsAsync failed for {song.Title}", ex);
@@ -1416,7 +1416,7 @@ public sealed class SongCommentView : View
             _loadCts?.Cancel();
             _loadCts?.Dispose();
         }
-        catch {}
+        catch { }
         _loadCts = null;
 
         _currentSong = snapshot.Song;

@@ -1604,7 +1604,7 @@ public sealed partial class MainWindow : Window
                     _standaloneWebServer = null;
                 }
             }
-            catch {}
+            catch { }
 
             try
             {
@@ -1620,12 +1620,12 @@ public sealed partial class MainWindow : Window
                     _connectServer = null;
                 }
             }
-            catch {}
+            catch { }
 
-            try { _mprisService.Dispose(); } catch {}
-            try { _player.Dispose(); } catch {}
-            try { UserSession.Current.Save(); } catch {}
-            try { PlaybackQueueService.Instance.SaveQueue(); } catch {}
+            try { _mprisService.Dispose(); } catch { }
+            try { _player.Dispose(); } catch { }
+            try { UserSession.Current.Save(); } catch { }
+            try { PlaybackQueueService.Instance.SaveQueue(); } catch { }
         }
         base.Dispose(disposing);
     }

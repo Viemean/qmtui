@@ -52,7 +52,7 @@ public sealed partial class MainWindow
             previousCts?.Cancel();
             previousCts?.Dispose();
         }
-        catch {}
+        catch { }
 
         var currentCts = _playbackCts;
         var currentSession = Interlocked.Increment(ref _playbackSessionId);
@@ -65,7 +65,7 @@ public sealed partial class MainWindow
             _cachingCts?.Cancel();
             _cachingCts?.Dispose();
         }
-        catch {}
+        catch { }
         _cachingCts = new CancellationTokenSource();
         _hasTriggeredCacheForCurrentSong = false;
         _hasReportedCurrentSong = false;
@@ -206,7 +206,7 @@ public sealed partial class MainWindow
                 }
             }
             _lyricListView.SetSource(new ObservableCollection<string> { "正在加载歌词..." });
-            try { _lyricListView.SelectedItem = 0; } catch {}
+            try { _lyricListView.SelectedItem = 0; } catch { }
         });
 
         string? playUrl;
@@ -477,7 +477,7 @@ public sealed partial class MainWindow
                         });
                     }
                 }
-                catch (OperationCanceledException) {}
+                catch (OperationCanceledException) { }
                 catch (Exception ex)
                 {
                     AppLogger.Debug("MainWindow.Playback", $"Cover load error: {ex.Message}");

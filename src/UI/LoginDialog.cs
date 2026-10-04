@@ -22,15 +22,15 @@ public sealed class LoginDialog : Dialog
 
     private static Scheme TransparentDialogScheme { get; } = new Scheme
     {
-        Normal    = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextWhite, Color.None),
-        Focus     = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark),
+        Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextWhite, Color.None),
+        Focus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark),
         HotNormal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuPinkAccent, Color.None),
-        HotFocus  = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.MikuPinkAccent),
-        Disabled  = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
+        HotFocus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.MikuPinkAccent),
+        Disabled = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
         Highlight = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenPrimary, Color.None),
-        Active    = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
-        ReadOnly  = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
-        Editable  = new Terminal.Gui.Drawing.Attribute(Color.White, Color.None)
+        Active = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
+        ReadOnly = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
+        Editable = new Terminal.Gui.Drawing.Attribute(Color.White, Color.None)
     };
 
     // 1. 网页登录容器 (默认首选)
@@ -595,14 +595,14 @@ public sealed class LoginDialog : Dialog
                 _httpServer?.Dispose();
                 _httpServer = null;
             }
-            catch {}
+            catch { }
 
             try
             {
                 _cts.Cancel();
                 _cts.Dispose();
             }
-            catch {}
+            catch { }
         }
         base.Dispose(disposing);
     }

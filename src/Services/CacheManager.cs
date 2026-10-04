@@ -321,7 +321,7 @@ public static class CacheManager
                         var lrcRel = Path.ChangeExtension(relativePath, ".lrc").Replace('\\', '/');
                         s_entries.TryRemove(lrcRel, out _);
                     }
-                    catch {}
+                    catch { }
                 }
             }
 
@@ -343,7 +343,7 @@ public static class CacheManager
             var di = new DirectoryInfo(dir);
             output.AddRange(di.GetFiles());
         }
-        catch {}
+        catch { }
     }
 
     private static void CleanupOrphanTmpFiles()
@@ -365,10 +365,10 @@ public static class CacheManager
                             f.Delete();
                         }
                     }
-                    catch {}
+                    catch { }
                 }
             }
-            catch {}
+            catch { }
         }
     }
 

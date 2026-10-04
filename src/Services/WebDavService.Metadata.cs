@@ -299,7 +299,7 @@ public static partial class WebDavService
             }
             finally
             {
-                try { if (File.Exists(tmpFile)) File.Delete(tmpFile); } catch {}
+                try { if (File.Exists(tmpFile)) File.Delete(tmpFile); } catch { }
             }
 
             // 若音频头部未写入元数据标签，以清洗后的歌名通过在线 API 智能匹配歌手与专辑
@@ -371,14 +371,14 @@ public static partial class WebDavService
                         lock (s_lock) { SaveConfig(); }
                     }
                 }
-                catch (OperationCanceledException) {}
+                catch (OperationCanceledException) { }
                 catch (Exception ex)
                 {
                     AppLogger.Warn("WebDavService", $"Single song enrich error for {songCache.Href}: {ex.Message}");
                 }
                 finally
                 {
-                    try { semaphore.Release(); } catch {}
+                    try { semaphore.Release(); } catch { }
                 }
             }, ct));
         }
@@ -387,7 +387,7 @@ public static partial class WebDavService
         {
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) {}
+        catch (OperationCanceledException) { }
         finally
         {
             tasks.Clear();
@@ -494,7 +494,7 @@ public static partial class WebDavService
                                     }
                                 }
                             }
-                            catch {}
+                            catch { }
                         }
 
                         if (track.EmbeddedPictures != null && track.EmbeddedPictures.Count > 0)
@@ -505,7 +505,7 @@ public static partial class WebDavService
                                 ct.ThrowIfCancellationRequested();
                                 await File.WriteAllBytesAsync(tempExtractImg, pic.PictureData, ct).ConfigureAwait(false);
                                 var result = await TerminalImageHelper.EnsureLocalImageProcessedAsync(tempExtractImg, cacheKey, ct).ConfigureAwait(false);
-                                try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch {}
+                                try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch { }
                                 if (!string.IsNullOrEmpty(result) && File.Exists(result))
                                 {
                                     return result;
@@ -525,8 +525,8 @@ public static partial class WebDavService
             }
             finally
             {
-                try { if (File.Exists(tmpHeaderFile)) File.Delete(tmpHeaderFile); } catch {}
-                try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch {}
+                try { if (File.Exists(tmpHeaderFile)) File.Delete(tmpHeaderFile); } catch { }
+                try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch { }
             }
 
             if (ct.IsCancellationRequested) return null;
@@ -560,7 +560,7 @@ public static partial class WebDavService
                                     ct.ThrowIfCancellationRequested();
                                     await File.WriteAllBytesAsync(tempExtractImg, bytes, ct).ConfigureAwait(false);
                                     var result = await TerminalImageHelper.EnsureLocalImageProcessedAsync(tempExtractImg, cacheKey, ct).ConfigureAwait(false);
-                                    try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch {}
+                                    try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch { }
                                     if (!string.IsNullOrEmpty(result) && File.Exists(result))
                                     {
                                         return result;
@@ -805,7 +805,7 @@ public static partial class WebDavService
             }
             finally
             {
-                try { if (File.Exists(tmpHeaderFile)) File.Delete(tmpHeaderFile); } catch {}
+                try { if (File.Exists(tmpHeaderFile)) File.Delete(tmpHeaderFile); } catch { }
             }
         }
         catch (Exception ex)
@@ -917,7 +917,7 @@ public static partial class WebDavService
             }
             finally
             {
-                try { if (File.Exists(tmpFile)) File.Delete(tmpFile); } catch {}
+                try { if (File.Exists(tmpFile)) File.Delete(tmpFile); } catch { }
             }
         }
         catch (Exception ex)

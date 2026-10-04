@@ -20,26 +20,26 @@ namespace QmTui.UI;
 public static class MikuTheme
 {
     // 主题色彩定义
-    public static readonly Color QqGreenPrimary  = new(0x31, 0xC2, 0x7C); // #31C27C 绿色
-    public static readonly Color QqGreenLight    = new(0x5F, 0xE3, 0xA1); // #5FE3A1 浅绿色
-    public static readonly Color QqGreenDark     = new(0x20, 0x58, 0x54); // #205854 聚焦背景色
-    public static readonly Color QqGreenActive   = new(0x18, 0x46, 0x42); // #184642 未获焦选中底色
-    public static readonly Color QqTextLyricDim  = new(0xB8, 0xCC, 0xD0); // #B8CCD0 歌词次要文字颜色
+    public static readonly Color QqGreenPrimary = new(0x31, 0xC2, 0x7C); // #31C27C 绿色
+    public static readonly Color QqGreenLight = new(0x5F, 0xE3, 0xA1); // #5FE3A1 浅绿色
+    public static readonly Color QqGreenDark = new(0x20, 0x58, 0x54); // #205854 聚焦背景色
+    public static readonly Color QqGreenActive = new(0x18, 0x46, 0x42); // #184642 未获焦选中底色
+    public static readonly Color QqTextLyricDim = new(0xB8, 0xCC, 0xD0); // #B8CCD0 歌词次要文字颜色
 
     // 点缀色
-    public static readonly Color MikuPinkAccent  = new(0xFF, 0x52, 0x77); // #FF5277 品红
-    public static readonly Color MikuPinkLight   = new(0xFF, 0x7A, 0x99); // #FF7A99 粉红
+    public static readonly Color MikuPinkAccent = new(0xFF, 0x52, 0x77); // #FF5277 品红
+    public static readonly Color MikuPinkLight = new(0xFF, 0x7A, 0x99); // #FF7A99 粉红
 
     // 背景底色：采用 Color.None 透传终端原生背景
-    public static readonly Color MikuBgCanvas    = Color.None;
-    public static readonly Color MikuBgSurface   = Color.None;
-    public static readonly Color MikuBgDialog    = new(0x1A, 0x21, 0x2C); // 弹窗背景色
-    public static readonly Color MikuBgFocus     = QqGreenDark;           // 列表聚焦高亮
+    public static readonly Color MikuBgCanvas = Color.None;
+    public static readonly Color MikuBgSurface = Color.None;
+    public static readonly Color MikuBgDialog = new(0x1A, 0x21, 0x2C); // 弹窗背景色
+    public static readonly Color MikuBgFocus = QqGreenDark;           // 列表聚焦高亮
 
     // 字体文本层级
-    public static readonly Color MikuTextWhite   = new(0xED, 0xF6, 0xF6); // #EDF6F6 正文字体颜色
-    public static readonly Color MikuTextSub     = new(0xA2, 0xE8, 0xE2); // #A2E8E2 次级文字颜色
-    public static readonly Color MikuTextMuted   = new(0x62, 0x82, 0x8A); // #62828A 弱化文字颜色
+    public static readonly Color MikuTextWhite = new(0xED, 0xF6, 0xF6); // #EDF6F6 正文字体颜色
+    public static readonly Color MikuTextSub = new(0xA2, 0xE8, 0xE2); // #A2E8E2 次级文字颜色
+    public static readonly Color MikuTextMuted = new(0x62, 0x82, 0x8A); // #62828A 弱化文字颜色
 
     public static Scheme Base { get; } = CreateBaseScheme();
     public static Scheme Dialog { get; } = CreateDialogScheme();
@@ -58,15 +58,15 @@ public static class MikuTheme
     {
         return new Scheme
         {
-            Normal    = new Attribute(MikuTextWhite,    MikuBgSurface),
-            Focus     = new Attribute(Color.White,      QqGreenDark),   // 选中行白色文字与高亮背景
-            HotNormal = new Attribute(MikuPinkAccent,   MikuBgSurface),
-            HotFocus  = new Attribute(Color.White,      MikuPinkAccent),
-            Disabled  = new Attribute(MikuTextMuted,    MikuBgSurface),
-            Highlight = new Attribute(QqGreenPrimary,   MikuBgSurface),
-            Active    = new Attribute(Color.White,      QqGreenActive), // 未获焦选中行
-            ReadOnly  = new Attribute(MikuTextMuted,    MikuBgSurface),
-            Editable  = new Attribute(Color.White,      Color.None)
+            Normal = new Attribute(MikuTextWhite, MikuBgSurface),
+            Focus = new Attribute(Color.White, QqGreenDark),   // 选中行白色文字与高亮背景
+            HotNormal = new Attribute(MikuPinkAccent, MikuBgSurface),
+            HotFocus = new Attribute(Color.White, MikuPinkAccent),
+            Disabled = new Attribute(MikuTextMuted, MikuBgSurface),
+            Highlight = new Attribute(QqGreenPrimary, MikuBgSurface),
+            Active = new Attribute(Color.White, QqGreenActive), // 未获焦选中行
+            ReadOnly = new Attribute(MikuTextMuted, MikuBgSurface),
+            Editable = new Attribute(Color.White, Color.None)
         };
     }
 
@@ -74,15 +74,15 @@ public static class MikuTheme
     {
         return new Scheme
         {
-            Normal    = new Attribute(MikuTextWhite,    MikuBgDialog),
-            Focus     = new Attribute(Color.White,      QqGreenDark),
-            HotNormal = new Attribute(MikuPinkAccent,   MikuBgDialog),
-            HotFocus  = new Attribute(Color.White,      MikuPinkAccent),
-            Disabled  = new Attribute(MikuTextMuted,    MikuBgDialog),
-            Highlight = new Attribute(QqGreenPrimary,   MikuBgDialog),
-            Active    = new Attribute(QqGreenLight,     QqGreenDark),
-            ReadOnly  = new Attribute(MikuTextMuted,    MikuBgDialog),
-            Editable  = new Attribute(Color.White,      MikuBgDialog)
+            Normal = new Attribute(MikuTextWhite, MikuBgDialog),
+            Focus = new Attribute(Color.White, QqGreenDark),
+            HotNormal = new Attribute(MikuPinkAccent, MikuBgDialog),
+            HotFocus = new Attribute(Color.White, MikuPinkAccent),
+            Disabled = new Attribute(MikuTextMuted, MikuBgDialog),
+            Highlight = new Attribute(QqGreenPrimary, MikuBgDialog),
+            Active = new Attribute(QqGreenLight, QqGreenDark),
+            ReadOnly = new Attribute(MikuTextMuted, MikuBgDialog),
+            Editable = new Attribute(Color.White, MikuBgDialog)
         };
     }
 
@@ -91,15 +91,15 @@ public static class MikuTheme
         return new Scheme
         {
             // 底部控制栏
-            Normal    = new Attribute(QqGreenPrimary,   MikuBgSurface),
-            Focus     = new Attribute(Color.White,      QqGreenDark),
-            HotNormal = new Attribute(MikuPinkAccent,   MikuBgSurface),
-            HotFocus  = new Attribute(Color.White,      MikuPinkAccent),
-            Disabled  = new Attribute(MikuTextMuted,    MikuBgSurface),
-            Highlight = new Attribute(QqGreenLight,     MikuBgSurface),
-            Active    = new Attribute(QqGreenPrimary,   MikuBgSurface),
-            ReadOnly  = new Attribute(MikuTextMuted,    MikuBgSurface),
-            Editable  = new Attribute(Color.White,      Color.None)
+            Normal = new Attribute(QqGreenPrimary, MikuBgSurface),
+            Focus = new Attribute(Color.White, QqGreenDark),
+            HotNormal = new Attribute(MikuPinkAccent, MikuBgSurface),
+            HotFocus = new Attribute(Color.White, MikuPinkAccent),
+            Disabled = new Attribute(MikuTextMuted, MikuBgSurface),
+            Highlight = new Attribute(QqGreenLight, MikuBgSurface),
+            Active = new Attribute(QqGreenPrimary, MikuBgSurface),
+            ReadOnly = new Attribute(MikuTextMuted, MikuBgSurface),
+            Editable = new Attribute(Color.White, Color.None)
         };
     }
 
@@ -107,15 +107,15 @@ public static class MikuTheme
     {
         return new Scheme
         {
-            Normal    = new Attribute(QqGreenLight,     MikuBgSurface),
-            Focus     = new Attribute(Color.White,      QqGreenDark),
-            HotNormal = new Attribute(QqGreenPrimary,   MikuBgSurface),
-            HotFocus  = new Attribute(Color.White,      QqGreenPrimary),
-            Disabled  = new Attribute(MikuTextMuted,    MikuBgSurface),
-            Highlight = new Attribute(QqGreenLight,     MikuBgSurface),
-            Active    = new Attribute(QqGreenLight,     MikuBgSurface),
-            ReadOnly  = new Attribute(MikuTextMuted,    MikuBgSurface),
-            Editable  = new Attribute(Color.White,      Color.None)
+            Normal = new Attribute(QqGreenLight, MikuBgSurface),
+            Focus = new Attribute(Color.White, QqGreenDark),
+            HotNormal = new Attribute(QqGreenPrimary, MikuBgSurface),
+            HotFocus = new Attribute(Color.White, QqGreenPrimary),
+            Disabled = new Attribute(MikuTextMuted, MikuBgSurface),
+            Highlight = new Attribute(QqGreenLight, MikuBgSurface),
+            Active = new Attribute(QqGreenLight, MikuBgSurface),
+            ReadOnly = new Attribute(MikuTextMuted, MikuBgSurface),
+            Editable = new Attribute(Color.White, Color.None)
         };
     }
 
@@ -124,15 +124,15 @@ public static class MikuTheme
         return new Scheme
         {
             // 歌词配色：透明背景，当前播放行高亮
-            Normal    = new Attribute(QqTextLyricDim,   Color.None),
-            Focus     = new Attribute(QqGreenPrimary,   Color.None),
-            HotNormal = new Attribute(QqGreenLight,     Color.None),
-            HotFocus  = new Attribute(QqGreenLight,     Color.None),
-            Disabled  = new Attribute(new Color(0x66, 0x77, 0x80), Color.None),
-            Highlight = new Attribute(QqGreenPrimary,   Color.None),
-            Active    = new Attribute(QqGreenPrimary,   Color.None),
-            ReadOnly  = new Attribute(QqTextLyricDim,   Color.None),
-            Editable  = new Attribute(QqGreenPrimary,   Color.None)
+            Normal = new Attribute(QqTextLyricDim, Color.None),
+            Focus = new Attribute(QqGreenPrimary, Color.None),
+            HotNormal = new Attribute(QqGreenLight, Color.None),
+            HotFocus = new Attribute(QqGreenLight, Color.None),
+            Disabled = new Attribute(new Color(0x66, 0x77, 0x80), Color.None),
+            Highlight = new Attribute(QqGreenPrimary, Color.None),
+            Active = new Attribute(QqGreenPrimary, Color.None),
+            ReadOnly = new Attribute(QqTextLyricDim, Color.None),
+            Editable = new Attribute(QqGreenPrimary, Color.None)
         };
     }
 
@@ -141,15 +141,15 @@ public static class MikuTheme
         return new Scheme
         {
             // 未获焦窗格边框
-            Normal    = new Attribute(new Color(0x38, 0x58, 0x54), Color.None),
-            Focus     = new Attribute(QqGreenPrimary,              Color.None),
-            HotNormal = new Attribute(MikuPinkAccent,              Color.None),
-            HotFocus  = new Attribute(Color.White,                 MikuPinkAccent),
-            Disabled  = new Attribute(MikuTextMuted,               Color.None),
+            Normal = new Attribute(new Color(0x38, 0x58, 0x54), Color.None),
+            Focus = new Attribute(QqGreenPrimary, Color.None),
+            HotNormal = new Attribute(MikuPinkAccent, Color.None),
+            HotFocus = new Attribute(Color.White, MikuPinkAccent),
+            Disabled = new Attribute(MikuTextMuted, Color.None),
             Highlight = new Attribute(new Color(0x38, 0x58, 0x54), Color.None),
-            Active    = new Attribute(new Color(0x38, 0x58, 0x54), Color.None),
-            ReadOnly  = new Attribute(new Color(0x38, 0x58, 0x54), Color.None),
-            Editable  = new Attribute(new Color(0x38, 0x58, 0x54), Color.None)
+            Active = new Attribute(new Color(0x38, 0x58, 0x54), Color.None),
+            ReadOnly = new Attribute(new Color(0x38, 0x58, 0x54), Color.None),
+            Editable = new Attribute(new Color(0x38, 0x58, 0x54), Color.None)
         };
     }
 
@@ -158,15 +158,15 @@ public static class MikuTheme
         return new Scheme
         {
             // 获焦激活窗格边框
-            Normal    = new Attribute(QqGreenPrimary, Color.None),
-            Focus     = new Attribute(QqGreenPrimary, Color.None),
+            Normal = new Attribute(QqGreenPrimary, Color.None),
+            Focus = new Attribute(QqGreenPrimary, Color.None),
             HotNormal = new Attribute(MikuPinkAccent, Color.None),
-            HotFocus  = new Attribute(Color.White,    MikuPinkAccent),
-            Disabled  = new Attribute(MikuTextMuted,  Color.None),
-            Highlight = new Attribute(QqGreenLight,   Color.None),
-            Active    = new Attribute(QqGreenPrimary, Color.None),
-            ReadOnly  = new Attribute(QqGreenPrimary, Color.None),
-            Editable  = new Attribute(QqGreenPrimary, Color.None)
+            HotFocus = new Attribute(Color.White, MikuPinkAccent),
+            Disabled = new Attribute(MikuTextMuted, Color.None),
+            Highlight = new Attribute(QqGreenLight, Color.None),
+            Active = new Attribute(QqGreenPrimary, Color.None),
+            ReadOnly = new Attribute(QqGreenPrimary, Color.None),
+            Editable = new Attribute(QqGreenPrimary, Color.None)
         };
     }
 
@@ -175,15 +175,15 @@ public static class MikuTheme
         return new Scheme
         {
             // 窗格顶部标题配色
-            Normal    = new Attribute(QqGreenPrimary, Color.None),
-            Focus     = new Attribute(QqGreenLight,   Color.None),
-            HotNormal = new Attribute(QqGreenLight,   Color.None),
-            HotFocus  = new Attribute(Color.White,    MikuPinkAccent),
-            Disabled  = new Attribute(MikuTextMuted,  Color.None),
-            Highlight = new Attribute(QqGreenLight,   Color.None),
-            Active    = new Attribute(QqGreenPrimary, Color.None),
-            ReadOnly  = new Attribute(QqGreenPrimary, Color.None),
-            Editable  = new Attribute(QqGreenPrimary, Color.None)
+            Normal = new Attribute(QqGreenPrimary, Color.None),
+            Focus = new Attribute(QqGreenLight, Color.None),
+            HotNormal = new Attribute(QqGreenLight, Color.None),
+            HotFocus = new Attribute(Color.White, MikuPinkAccent),
+            Disabled = new Attribute(MikuTextMuted, Color.None),
+            Highlight = new Attribute(QqGreenLight, Color.None),
+            Active = new Attribute(QqGreenPrimary, Color.None),
+            ReadOnly = new Attribute(QqGreenPrimary, Color.None),
+            Editable = new Attribute(QqGreenPrimary, Color.None)
         };
     }
 
@@ -219,15 +219,15 @@ public static class MikuTheme
         var attr = new Attribute(Color.Black, Color.White);
         return new Scheme
         {
-            Normal    = attr,
-            Focus     = attr,
+            Normal = attr,
+            Focus = attr,
             HotNormal = attr,
-            HotFocus  = attr,
-            Disabled  = attr,
+            HotFocus = attr,
+            Disabled = attr,
             Highlight = attr,
-            Active    = attr,
-            ReadOnly  = attr,
-            Editable  = attr
+            Active = attr,
+            ReadOnly = attr,
+            Editable = attr
         };
     }
 
@@ -235,15 +235,15 @@ public static class MikuTheme
     {
         return new Scheme
         {
-            Normal    = new Attribute(Color.White,    QqGreenDark),
-            Focus     = new Attribute(Color.White,    QqGreenPrimary),
-            HotNormal = new Attribute(QqGreenLight,   QqGreenDark),
-            HotFocus  = new Attribute(Color.White,    QqGreenPrimary),
-            Disabled  = new Attribute(MikuTextMuted,  Color.None),
-            Highlight = new Attribute(QqGreenLight,   QqGreenDark),
-            Active    = new Attribute(Color.White,    QqGreenDark),
-            ReadOnly  = new Attribute(Color.White,    QqGreenDark),
-            Editable  = new Attribute(Color.White,    QqGreenDark)
+            Normal = new Attribute(Color.White, QqGreenDark),
+            Focus = new Attribute(Color.White, QqGreenPrimary),
+            HotNormal = new Attribute(QqGreenLight, QqGreenDark),
+            HotFocus = new Attribute(Color.White, QqGreenPrimary),
+            Disabled = new Attribute(MikuTextMuted, Color.None),
+            Highlight = new Attribute(QqGreenLight, QqGreenDark),
+            Active = new Attribute(Color.White, QqGreenDark),
+            ReadOnly = new Attribute(Color.White, QqGreenDark),
+            Editable = new Attribute(Color.White, QqGreenDark)
         };
     }
 
@@ -251,15 +251,15 @@ public static class MikuTheme
     {
         return new Scheme
         {
-            Normal    = new Attribute(MikuTextMuted,  Color.None),
-            Focus     = new Attribute(QqGreenLight,   Color.None),
-            HotNormal = new Attribute(MikuTextSub,    Color.None),
-            HotFocus  = new Attribute(Color.White,    QqGreenPrimary),
-            Disabled  = new Attribute(MikuTextMuted,  Color.None),
-            Highlight = new Attribute(MikuTextMuted,  Color.None),
-            Active    = new Attribute(MikuTextMuted,  Color.None),
-            ReadOnly  = new Attribute(MikuTextMuted,  Color.None),
-            Editable  = new Attribute(MikuTextMuted,  Color.None)
+            Normal = new Attribute(MikuTextMuted, Color.None),
+            Focus = new Attribute(QqGreenLight, Color.None),
+            HotNormal = new Attribute(MikuTextSub, Color.None),
+            HotFocus = new Attribute(Color.White, QqGreenPrimary),
+            Disabled = new Attribute(MikuTextMuted, Color.None),
+            Highlight = new Attribute(MikuTextMuted, Color.None),
+            Active = new Attribute(MikuTextMuted, Color.None),
+            ReadOnly = new Attribute(MikuTextMuted, Color.None),
+            Editable = new Attribute(MikuTextMuted, Color.None)
         };
     }
 

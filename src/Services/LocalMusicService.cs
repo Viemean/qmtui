@@ -610,20 +610,20 @@ public static class LocalMusicService
                     cancellationToken.ThrowIfCancellationRequested();
                     await File.WriteAllBytesAsync(tempExtractImg, pic.PictureData, cancellationToken).ConfigureAwait(false);
                     var result = await TerminalImageHelper.EnsureLocalImageProcessedAsync(tempExtractImg, md5, cancellationToken).ConfigureAwait(false);
-                    try { File.Delete(tempExtractImg); } catch {}
+                    try { File.Delete(tempExtractImg); } catch { }
                     if (!string.IsNullOrEmpty(result)) return result;
                 }
             }
         }
         catch (OperationCanceledException)
         {
-            try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch {}
+            try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch { }
             return null;
         }
         catch (Exception ex)
         {
             AppLogger.Warn("LocalMusicService", $"Failed to extract embedded cover via ATL for {song.LocalFilePath}: {ex.Message}");
-            try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch {}
+            try { if (File.Exists(tempExtractImg)) File.Delete(tempExtractImg); } catch { }
         }
 
         if (cancellationToken.IsCancellationRequested) return null;
