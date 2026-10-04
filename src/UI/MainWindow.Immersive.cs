@@ -251,6 +251,7 @@ public sealed partial class MainWindow
         _miniCoverView.Visible = false;
         _miniCoverView.ClearCover();
         _artistAlbumDetailView.ClearImage();
+        _songCommentView.OnDeactivated();
         _songListView.Visible = false;
         _lyricFrame.Visible = false;
         _searchLabel.Visible = false;

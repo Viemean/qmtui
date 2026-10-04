@@ -128,6 +128,32 @@ public static partial class TerminalImageHelper
         return null;
     }
 
+    /// <summary>
+    /// 获取本地图像的像素宽高（解析头信息，开销极小）
+    /// </summary>
+    public static (int width, int height)? GetImageDimensions(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return null;
+        try
+        {
+            byte[] fileBytes = File.ReadAllBytes(filePath);
+            if (IsValidWebpFile(filePath))
+            {
+                var webpDecoded = WebPNative.DecodeRgba(fileBytes, out int w, out int h);
+                if (webpDecoded != null) return (w, h);
+            }
+
+            using var ms = new MemoryStream(fileBytes);
+            var info = StbImageSharp.ImageInfo.FromStream(ms);
+            if (info != null && info.Value.Width > 0 && info.Value.Height > 0)
+            {
+                return (info.Value.Width, info.Value.Height);
+            }
+        }
+        catch {}
+        return null;
+    }
+
     private static async Task<string?> ApplyRoundedCornersAsync(string sourceFile, string targetPng, CancellationToken cancellationToken = default)
     {
         if (!File.Exists(sourceFile) || new FileInfo(sourceFile).Length == 0 || cancellationToken.IsCancellationRequested) return null;
@@ -349,6 +375,22 @@ public static partial class TerminalImageHelper
     public const uint ImageIdMiniCover = 1;
     public const uint ImageIdNowPlaying = 2;
     public const uint ImageIdArtistDetail = 3;
+    public const uint ImageIdCommentPreview = 4;
+    public const uint ImageIdCommentBase = 100;
+    public const int MaxConcurrentCommentImages = 4;
+
+    /// <summary>
+    /// 清除终端中所有已渲染的评论配图 Kitty 图像
+    /// </summary>
+    public static void ClearCommentImages()
+    {
+        if (!IsImageSupported) return;
+        DeleteKittyImage(ImageIdCommentPreview);
+        for (uint i = 0; i < MaxConcurrentCommentImages; i++)
+        {
+            DeleteKittyImage(ImageIdCommentBase + i);
+        }
+    }
 
     private readonly record struct ImageCacheKey(string FilePath, int Cols, int Rows, long LastWriteTicks, uint ImageId = 0);
 

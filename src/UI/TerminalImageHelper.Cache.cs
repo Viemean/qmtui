@@ -88,6 +88,56 @@ public static partial class TerminalImageHelper
         }
     }
 
+    private static readonly string s_commentImagesDir = Path.Combine(CacheManager.CoversDir, "comments");
+    private static readonly ConcurrentDictionary<string, Task<string?>> s_commentDownloads = new();
+
+    public static string GetCommentImageLocalPath(string commentId)
+    {
+        Directory.CreateDirectory(s_commentImagesDir);
+        var safeId = string.Join("_", commentId.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+        return Path.Combine(s_commentImagesDir, $"{safeId}.jpg");
+    }
+
+    public static async Task<string?> EnsureCommentImageDownloadedAsync(string picUrl, string commentId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(picUrl) || string.IsNullOrEmpty(commentId)) return null;
+
+        var localPath = GetCommentImageLocalPath(commentId);
+        if (File.Exists(localPath) && new FileInfo(localPath).Length > 0)
+        {
+            return localPath;
+        }
+
+        return await s_commentDownloads.GetOrAdd(commentId, async _ =>
+        {
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, picUrl);
+                using var resp = await s_httpClient.SendAsync(req, ct).ConfigureAwait(false);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var bytes = await resp.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+                    if (bytes.Length > 0)
+                    {
+                        var tmpPath = localPath + ".tmp";
+                        await File.WriteAllBytesAsync(tmpPath, bytes, ct).ConfigureAwait(false);
+                        File.Move(tmpPath, localPath, overwrite: true);
+                        return localPath;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("TerminalImage", $"Download comment image failed for {commentId}: {ex.Message}");
+            }
+            finally
+            {
+                s_commentDownloads.TryRemove(commentId, out Task<string?>? _);
+            }
+            return null;
+        }).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// 读取 PNG 头部前 24 字节获取图像像素宽高（零堆分配）
     /// </summary>
