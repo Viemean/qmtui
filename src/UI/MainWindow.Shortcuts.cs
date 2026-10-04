@@ -535,13 +535,6 @@ public sealed partial class MainWindow
             return true;
         }
 
-        if (c == 'X')
-        {
-            k.Handled = true;
-            await HandleExportSongAsync();
-            return true;
-        }
-
         if (c == 'J')
         {
             k.Handled = true;

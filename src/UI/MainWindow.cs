@@ -1900,43 +1900,5 @@ public sealed partial class MainWindow : Window
         AppLogger.Info("MainWindow", $"Desktop song switch notification toggled: {stateStr}");
     }
 
-    private async Task HandleExportSongAsync()
-    {
-        Song? targetSong = null;
-        if (_songListView.Songs.Count > 0 && _songListView.SelectedItem is { } idx && idx >= 0 && idx < _songListView.Songs.Count)
-        {
-            targetSong = _songListView.Songs[idx];
-        }
-        else
-        {
-            targetSong = _activeSong ?? _controlBar.CurrentSong;
-        }
-
-        if (targetSong == null)
-        {
-            _controlBar.UpdateStatus("[导出] 请先在列表中选中歌曲或起播一首歌曲");
-            return;
-        }
-
-        _controlBar.UpdateStatus($"[导出中] 正在导出: {targetSong.Title}...");
-        var quality = _actualQualityTier;
-
-        _ = Task.Run(async () =>
-        {
-            var res = await AudioExportService.ExportSongAsync(targetSong, quality).ConfigureAwait(false);
-            Application.Invoke(() =>
-            {
-                if (res.Success)
-                {
-                    _controlBar.UpdateStatus($"[导出成功] 已保存至: {Path.GetFileName(res.FilePath)} (按 X 再次导出)");
-                }
-                else
-                {
-                    _controlBar.UpdateStatus($"[导出失败] {res.Message}");
-                }
-            });
-        });
-    }
-
     #endregion
 }
