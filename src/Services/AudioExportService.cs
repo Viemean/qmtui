@@ -1,11 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using QmTui.Api;
 using QmTui.Models;
-using QmTui.UI;
 using QmTui.Utils;
 
 namespace QmTui.Services;
@@ -73,7 +76,7 @@ public static class AudioExportService
             File.Copy(sourcePath, destPath, overwrite: false);
 
             // 5. 依托 ATL.NET 写入元数据、内嵌封面与双语歌词
-            await InjectMetadataAndAssetsAsync(destPath, song, ct).ConfigureAwait(false);
+            await InjectMetadataAndAssetsAsync(destPath, song, qualityTier, ct).ConfigureAwait(false);
 
             AppLogger.Info("AudioExportService", $"Successfully exported: {destPath}");
             return new ExportResult(true, $"导出成功: {Path.GetFileName(destPath)}", destPath);
@@ -211,9 +214,12 @@ public static class AudioExportService
     }
 
     /// <summary>
-    /// 借助 ATL.NET 将标签元数据、内嵌高清封面及歌词写入目标文件
+    /// 借助 ATL.NET 将标签元数据、内嵌高清封面及歌词写入目标文件（标准/HQ 嵌入 1200 高清，HQ 以上 SQ/Hi-Res/母带 优先拉取无损原图）
     /// </summary>
-    public static async Task InjectMetadataAndAssetsAsync(string destPath, Song song, CancellationToken ct = default)
+    public static Task InjectMetadataAndAssetsAsync(string destPath, Song song, CancellationToken ct = default)
+        => InjectMetadataAndAssetsAsync(destPath, song, AudioQualityTier.SQ, ct);
+
+    public static async Task InjectMetadataAndAssetsAsync(string destPath, Song song, AudioQualityTier tier, CancellationToken ct = default)
     {
         try
         {
@@ -226,18 +232,14 @@ public static class AudioExportService
             if (!string.IsNullOrWhiteSpace(song.Artist)) track.Artist = song.Artist;
             if (!string.IsNullOrWhiteSpace(song.Album)) track.Album = song.Album;
 
-            // 2. 内嵌高清封面
+            // 2. 内嵌高清封面（标准/HQ 下载 1200 高清，HQ 以上下载原图）
             try
             {
-                var coverPath = await TerminalImageHelper.EnsureSongCoverAsync(song, ct).ConfigureAwait(false);
-                if (!string.IsNullOrEmpty(coverPath) && File.Exists(coverPath))
+                byte[]? coverBytes = await ResolveCoverArtBytesAsync(song, tier, ct).ConfigureAwait(false);
+                if (coverBytes != null && coverBytes.Length > 0)
                 {
-                    byte[] coverBytes = await File.ReadAllBytesAsync(coverPath, ct).ConfigureAwait(false);
-                    if (coverBytes.Length > 0)
-                    {
-                        track.EmbeddedPictures.Clear();
-                        track.EmbeddedPictures.Add(ATL.PictureInfo.fromBinaryData(coverBytes));
-                    }
+                    track.EmbeddedPictures.Clear();
+                    track.EmbeddedPictures.Add(ATL.PictureInfo.fromBinaryData(coverBytes));
                 }
             }
             catch (Exception ex)
@@ -328,5 +330,129 @@ public static class AudioExportService
             }
         }
         return sb.ToString().Trim();
+    }
+
+    public const long MaxRawCoverBytes = (long)(2.5 * 1024 * 1024); // 2.5 MB
+    public const int CoverCompressionQuality = 88;
+
+    private static readonly Regex s_resolutionRegex = new(@"R\d+x\d+", RegexOptions.Compiled);
+
+    public static string ReplaceDimension(string url, int dimension) =>
+        string.IsNullOrWhiteSpace(url) ? "" : s_resolutionRegex.Replace(url, $"R{dimension}x{dimension}");
+
+    public static string GetRawUrlOnly(string url) =>
+        string.IsNullOrWhiteSpace(url) ? "" : s_resolutionRegex.Replace(url, "");
+
+    /// <summary>
+    /// 对超出体积安全阈值（2.5MB）的超大封面进行高质量 JPEG 88 内存重压缩，保持原始分辨率，避免内嵌元数据过大导致老式设备播放解析异常
+    /// </summary>
+    public static byte[] SanitizeCoverArt(byte[] rawBytes)
+    {
+        if (rawBytes == null || rawBytes.Length <= MaxRawCoverBytes)
+        {
+            return rawBytes ?? Array.Empty<byte>();
+        }
+
+        try
+        {
+            var image = StbImageSharp.ImageResult.FromMemory(rawBytes, StbImageSharp.ColorComponents.RedGreenBlue);
+            if (image == null || image.Data == null || image.Width <= 0 || image.Height <= 0)
+            {
+                return rawBytes;
+            }
+
+            using var ms = new MemoryStream(rawBytes.Length / 4);
+            var writer = new StbImageWriteSharp.ImageWriter();
+            writer.WriteJpg(image.Data, image.Width, image.Height, StbImageWriteSharp.ColorComponents.RedGreenBlue, ms, CoverCompressionQuality);
+
+            byte[] compressed = ms.ToArray();
+            if (compressed.Length > 0 && compressed.Length < rawBytes.Length)
+            {
+                AppLogger.Info("AudioExportService", $"SanitizeCoverArt compressed oversize cover from {rawBytes.Length} bytes to {compressed.Length} bytes ({image.Width}x{image.Height})");
+                return compressed;
+            }
+
+            return rawBytes;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("AudioExportService", $"Failed to compress oversize cover art, fallback to raw bytes: {ex.Message}");
+            return rawBytes;
+        }
+    }
+
+    /// <summary>
+    /// 判断是否属于 HQ 以上音质（SQ、Hi-Res、母带等）
+    /// </summary>
+    public static bool IsAboveHq(AudioQualityTier tier) =>
+        tier != AudioQualityTier.Standard && tier != AudioQualityTier.HQ;
+
+    /// <summary>
+    /// 为导出音频解析封面图像字节（标准/HQ 拉取 1200/800 高清，HQ 以上优先拉取无损母版原图并限制在 2.5MB 内）
+    /// </summary>
+    public static async Task<byte[]?> ResolveCoverArtBytesAsync(Song song, AudioQualityTier tier, CancellationToken ct = default)
+    {
+        // 1. 本地音频优先读取嵌入封面或本地文件
+        if (song.IsLocal && !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath))
+        {
+            try
+            {
+                var track = new ATL.Track(song.LocalFilePath);
+                if (track.EmbeddedPictures.Count > 0 && track.EmbeddedPictures[0].PictureData.Length > 0)
+                {
+                    return SanitizeCoverArt(track.EmbeddedPictures[0].PictureData);
+                }
+            }
+            catch { }
+        }
+
+        // 2. 根据音质等级生成候选 URL 链（HQ 音质以上下载原图，标准与 HQ 下载 1200 高清）
+        string coverUrl = !string.IsNullOrWhiteSpace(song.CoverUrl)
+            ? song.CoverUrl
+            : (!string.IsNullOrWhiteSpace(song.AlbumMid) ? $"https://y.qq.com/music/photo_new/T002R300x300M000{song.AlbumMid}.jpg?max_age=2592000" : "");
+
+        bool isStandardOrHq = tier == AudioQualityTier.Standard || tier == AudioQualityTier.HQ;
+        var candidateUrls = (isStandardOrHq
+            ? new[]
+            {
+                ReplaceDimension(coverUrl, 1200),
+                ReplaceDimension(coverUrl, 800),
+                coverUrl,
+            }
+            : new[]
+            {
+                GetRawUrlOnly(coverUrl),
+                ReplaceDimension(coverUrl, 1200),
+                coverUrl,
+            })
+            .Where(u => !string.IsNullOrWhiteSpace(u) && !u.StartsWith("file://"))
+            .Distinct();
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+        client.DefaultRequestHeaders.Add("Referer", "https://y.qq.com/");
+
+        foreach (var candidateUrl in candidateUrls)
+        {
+            if (ct.IsCancellationRequested) break;
+            try
+            {
+                using var resp = await client.GetAsync(candidateUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var bodyBytes = await resp.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+                    if (bodyBytes.Length > 0)
+                    {
+                        return SanitizeCoverArt(bodyBytes);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("AudioExportService", $"Failed to fetch candidate cover from {candidateUrl}: {ex.Message}");
+            }
+        }
+
+        return null;
     }
 }

@@ -281,7 +281,7 @@ public sealed partial class MainWindow
                 }
 
                 Application.Invoke(() => _controlBar.UpdateStatus($"[正在注入] 正在为《{song.Title}》写入封面与歌词..."));
-                await AudioExportService.InjectMetadataAndAssetsAsync(targetPath, song).ConfigureAwait(false);
+                await AudioExportService.InjectMetadataAndAssetsAsync(targetPath, song, actualTier).ConfigureAwait(false);
 
                 Application.Invoke(() => _controlBar.UpdateStatus($"[转存完成] 已保存至: {fileName} (含内嵌封面与歌词)"));
             }
