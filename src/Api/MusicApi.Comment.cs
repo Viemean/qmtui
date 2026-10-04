@@ -147,14 +147,18 @@ public sealed partial class MusicApi
                 {
                     foreach (var elem in cArr.EnumerateArray())
                     {
+                        if (elem.TryGetProperty("SeqNo", out var sq))
+                        {
+                            var s = sq.GetString();
+                            if (!string.IsNullOrEmpty(s))
+                            {
+                                lastSeqNo = s;
+                            }
+                        }
                         var c = ParseModernCommentElement(elem, isHot: false);
                         if (c != null)
                         {
                             normalList.Add(c);
-                            if (!string.IsNullOrEmpty(c.SeqNo))
-                            {
-                                lastSeqNo = c.SeqNo;
-                            }
                         }
                     }
                 }

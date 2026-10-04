@@ -121,15 +121,8 @@ public sealed class SongCommentView : View
 
         _listView.ValueChanged += (s, e) =>
         {
-            // 滚动到底部自动加载更多
-            var selected = e.NewValue ?? _listView.SelectedItem;
-            if (_hasMore && !_isLoading && selected.HasValue)
-            {
-                if (selected.Value >= _displayItems.Count - 5)
-                {
-                    _ = LoadCommentsAsync(isInitial: false);
-                }
-            }
+            _scrollBar?.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+            CheckTriggerLoadMore();
         };
 
         _listView.Accepting += (s, e) =>
@@ -148,8 +141,31 @@ public sealed class SongCommentView : View
             }
         };
 
+        _listView.KeyDown += (s, k) =>
+        {
+            if (k == Key.CursorDown || k == Key.PageDown || k == Key.End)
+            {
+                _scrollBar?.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+                CheckTriggerLoadMore();
+            }
+            else if (k == Key.CursorUp || k == Key.PageUp || k == Key.Home)
+            {
+                _scrollBar?.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+            }
+        };
+
         _listView.MouseEvent += (s, m) =>
         {
+            if (m.Flags.HasFlag(MouseFlags.WheeledDown))
+            {
+                _scrollBar?.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+                CheckTriggerLoadMore();
+            }
+            else if (m.Flags.HasFlag(MouseFlags.WheeledUp))
+            {
+                _scrollBar?.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+            }
+
             if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
             {
                 int idx = _listView.SelectedItem ?? -1;
@@ -204,6 +220,8 @@ public sealed class SongCommentView : View
                 int clamped = Math.Clamp(targetRow, 0, count - 1);
                 _listView.SelectedItem = clamped;
                 _listView.Viewport = new System.Drawing.Rectangle(_listView.Viewport.X, clamped, _listView.Viewport.Width, _listView.Viewport.Height);
+                _scrollBar.UpdateMetrics(count, _listView.Viewport.Height, _listView.Viewport.Y);
+                CheckTriggerLoadMore();
             }
         };
         Add(_scrollBar);
@@ -372,10 +390,7 @@ public sealed class SongCommentView : View
         _loadCts = new CancellationTokenSource();
         var ct = _loadCts.Token;
 
-        if (isInitial)
-        {
-            RebuildDisplayItems();
-        }
+        RebuildDisplayItems();
 
         try
         {
@@ -396,7 +411,10 @@ public sealed class SongCommentView : View
                 {
                     _totalCommentCount = pageResult.TotalCount;
                     _hasMore = pageResult.HasMore;
-                    _lastSeqNo = pageResult.LastSeqNo;
+                    if (!string.IsNullOrEmpty(pageResult.LastSeqNo))
+                    {
+                        _lastSeqNo = pageResult.LastSeqNo;
+                    }
                     _currentPage = targetPage;
 
                     if (isInitial)
@@ -422,18 +440,38 @@ public sealed class SongCommentView : View
                     }
                     else
                     {
-                        foreach (var c in pageResult.Comments)
+                        if (pageResult.Comments.Count == 0)
                         {
-                            if (_seenCommentIds.Add(c.CommentId))
+                            _hasMore = false;
+                        }
+                        else
+                        {
+                            int addedCount = 0;
+                            foreach (var c in pageResult.Comments)
                             {
-                                _normalComments.Add(c);
+                                if (_seenCommentIds.Add(c.CommentId))
+                                {
+                                    _normalComments.Add(c);
+                                    addedCount++;
+                                }
+                            }
+                            if (addedCount == 0)
+                            {
+                                _hasMore = false;
                             }
                         }
                     }
                 }
                 else
                 {
-                    if (isInitial) _isError = true;
+                    if (isInitial)
+                    {
+                        _isError = true;
+                    }
+                    else
+                    {
+                        _hasMore = false;
+                    }
                 }
 
                 _isLoading = false;
@@ -580,9 +618,32 @@ public sealed class SongCommentView : View
     private void UpdateListSource()
     {
         var textList = _displayItems.Select(d => d.Text).ToList();
+        var prevY = _listView.Viewport.Y;
+        var prevSel = _listView.SelectedItem;
         _listView.SetSource(new ObservableCollection<string>(textList));
+        if (prevY > 0 && prevY < textList.Count)
+        {
+            _listView.Viewport = new System.Drawing.Rectangle(_listView.Viewport.X, prevY, _listView.Viewport.Width, _listView.Viewport.Height);
+        }
+        if (prevSel.HasValue && prevSel.Value < textList.Count)
+        {
+            _listView.SelectedItem = prevSel.Value;
+        }
         _scrollBar.UpdateMetrics(textList.Count, _listView.Viewport.Height, _listView.Viewport.Y);
         SetNeedsDraw();
+    }
+
+    private void CheckTriggerLoadMore()
+    {
+        if (!_hasMore || _isLoading || _displayItems.Count == 0) return;
+
+        int current = _listView.SelectedItem ?? 0;
+        int viewBottom = _listView.Viewport.Y + _listView.Viewport.Height;
+
+        if (current >= _displayItems.Count - 8 || viewBottom >= _displayItems.Count - 6)
+        {
+            _ = LoadCommentsAsync(isInitial: false);
+        }
     }
 
     private static List<string> WrapText(string text, int maxWidth)

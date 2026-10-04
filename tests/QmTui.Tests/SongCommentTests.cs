@@ -46,4 +46,25 @@ public class SongCommentTests
         Assert.Equal(42, comment.PraiseNum);
         Assert.Equal("上海", comment.Location);
     }
+
+    [Fact]
+    public void CommentPage_PaginationProperties_MatchExpected()
+    {
+        var hot = new SongComment("h1", "热评用户", "", "好听", 1700000000L, 100, true, "", "", "北京", "seq_h1");
+        var normal = new SongComment("n1", "普通用户", "", "支持", 1700000001L, 5, false, "", "", "广东", "seq_n1");
+
+        var page = new CommentPage(
+            TotalCount: 50,
+            HotComments: new List<SongComment> { hot },
+            Comments: new List<SongComment> { normal },
+            HasMore: true,
+            LastSeqNo: "seq_n1"
+        );
+
+        Assert.Equal(50, page.TotalCount);
+        Assert.Single(page.HotComments);
+        Assert.Single(page.Comments);
+        Assert.True(page.HasMore);
+        Assert.Equal("seq_n1", page.LastSeqNo);
+    }
 }
