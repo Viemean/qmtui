@@ -142,13 +142,7 @@ public sealed partial class MainWindow
             _currentSingerMid = artist.Mid;
             _currentSingerName = artist.Name;
 
-            TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
-            _lyricListView.Visible = false;
-            _lyricTransBtn.Visible = false;
-            _lyricImmersiveBtn.Visible = false;
-            _lyricMatchBtn.Visible = false;
-            _artistAlbumDetailView.Visible = true;
-            UpdateLyricTitle($"歌手 - {artist.Name}");
+            PrepareDetailViewDisplay($"歌手 - {artist.Name}");
 
             _songListView.SetSongs([], $"正在加载歌手【{artist.Name}】详细资料与热门作品...");
 
@@ -511,12 +505,7 @@ public sealed partial class MainWindow
     {
         if (string.IsNullOrWhiteSpace(albumMid)) return;
 
-        _lyricListView.Visible = false;
-        _lyricTransBtn.Visible = false;
-        _lyricImmersiveBtn.Visible = false;
-        _lyricMatchBtn.Visible = false;
-        _artistAlbumDetailView.Visible = true;
-        UpdateLyricTitle($"专辑 - {albumName}");
+        PrepareDetailViewDisplay($"专辑 - {albumName}");
 
         var detailTask = MusicApi.GetAlbumDetailInfoAsync(albumMid);
         var coverTask = TerminalImageHelper.IsImageSupported
@@ -627,13 +616,7 @@ public sealed partial class MainWindow
         PushCurrentNavigationSnapshot();
         _currentViewMode = ViewMode.AlbumDetail;
 
-        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
-        _lyricListView.Visible = false;
-        _lyricTransBtn.Visible = false;
-        _lyricImmersiveBtn.Visible = false;
-        _lyricMatchBtn.Visible = false;
-        _artistAlbumDetailView.Visible = true;
-        UpdateLyricTitle($"专辑 - {albumName}");
+        PrepareDetailViewDisplay($"专辑 - {albumName}");
 
         _songListView.SetSongs([], $"正在加载专辑【{albumName}】背景资料与曲目...");
 
@@ -713,12 +696,7 @@ public sealed partial class MainWindow
             if (snapshot.SingerAlbums != null) _singerAlbums = snapshot.SingerAlbums;
             if (snapshot.SingerCachedSongs != null) _singerCachedSongs = snapshot.SingerCachedSongs;
 
-            _lyricListView.Visible = false;
-            _lyricTransBtn.Visible = false;
-            _lyricImmersiveBtn.Visible = false;
-            _lyricMatchBtn.Visible = false;
-            _artistAlbumDetailView.Visible = true;
-            UpdateLyricTitle($"歌手 - {_currentSingerName}");
+            PrepareDetailViewDisplay($"歌手 - {_currentSingerName}");
 
             if (_singerSubMode == SingerSubMode.Albums && _singerAlbums.Count > 0)
             {
@@ -759,21 +737,57 @@ public sealed partial class MainWindow
         SetNeedsDraw();
     }
 
+    private void PrepareDetailViewDisplay(string title)
+    {
+        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
+        _lyricListView.Visible = false;
+        _lyricScrollBar.Visible = false;
+        _lyricTransBtn.Visible = false;
+        _lyricImmersiveBtn.Visible = false;
+        _lyricMatchBtn.Visible = false;
+        _songCommentView.OnDeactivated();
+        _songCommentView.Visible = false;
+        _artistAlbumDetailView.Visible = true;
+        UpdateLyricTitle(title);
+    }
+
     private void ShowLyricView()
     {
         _artistAlbumDetailView.OnDeactivated();
         _artistAlbumDetailView.Visible = false;
-        _lyricListView.Visible = true;
-        _lyricTransBtn.Visible = _hasTranslation;
-        _lyricImmersiveBtn.Visible = true;
-        UpdateLyricMatchButtonHighlight();
-        UpdateLyricTitle("歌词");
         TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
+
+        if (_isCommentViewActive)
+        {
+            _lyricListView.Visible = false;
+            _lyricScrollBar.Visible = false;
+            _lyricTransBtn.Visible = false;
+            _lyricImmersiveBtn.Visible = false;
+            _lyricMatchBtn.Visible = false;
+
+            _songCommentView.Visible = true;
+            _songCommentView.SetSong(_activeSong);
+            _songCommentView.OnActivated();
+            UpdateCommentTitle();
+        }
+        else
+        {
+            _songCommentView.OnDeactivated();
+            _songCommentView.Visible = false;
+
+            _lyricListView.Visible = true;
+            _lyricScrollBar.Visible = true;
+            _lyricTransBtn.Visible = _hasTranslation;
+            _lyricImmersiveBtn.Visible = true;
+            UpdateLyricMatchButtonHighlight();
+            UpdateLyricTitle("歌词");
+            RefreshLyricListView();
+        }
+
         if (_miniCoverView.Visible)
         {
             _miniCoverView.TriggerRenderDelayed();
         }
-        RefreshLyricListView();
         SetNeedsDraw();
     }
 
