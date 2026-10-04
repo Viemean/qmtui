@@ -577,7 +577,13 @@ public sealed partial class NowPlayingView : View
     }
 
     public bool IsCommentViewActive => _isCommentViewActive;
+    public SongCommentView CommentView => _commentView;
     public event Action<bool>? CommentViewToggled;
+
+    public void SyncCommentFrom(SongCommentView other)
+    {
+        _commentView.SyncFrom(other);
+    }
 
     public void SetCommentViewActive(bool active)
     {

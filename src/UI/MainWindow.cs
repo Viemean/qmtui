@@ -954,6 +954,16 @@ public sealed partial class MainWindow : Window
         };
         _songCommentView.CloseRequested += () => ToggleCommentView();
         _songCommentView.TabNavigationRequested += forward => SwitchNextFocusWindow(forward);
+        _songCommentView.TotalCommentCountChanged += count =>
+        {
+            Application.Invoke(() =>
+            {
+                if (_isCommentViewActive)
+                {
+                    UpdateCommentTitle();
+                }
+            });
+        };
         _lyricFrame.Add(_songCommentView);
 
         Add(_lyricFrame);

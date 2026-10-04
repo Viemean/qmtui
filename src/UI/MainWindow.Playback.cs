@@ -515,6 +515,11 @@ public sealed partial class MainWindow
                 _nowPlayingView.SetLyrics(_currentLyrics, _showTranslation);
                 _nowPlayingView.SetLyricMatchedState(IsCurrentSongLyricMatched(song));
                 UpdateLyricMatchButtonHighlight();
+                if (_isCommentViewActive)
+                {
+                    _songCommentView.SetSong(song);
+                    UpdateCommentTitle();
+                }
             });
         }
         else

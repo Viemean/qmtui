@@ -273,6 +273,7 @@ public sealed partial class MainWindow
         _nowPlayingView.SetTranslationState(_showTranslation);
         _nowPlayingView.SetLyricMatchedState(IsCurrentSongLyricMatched(_activeSong));
         _nowPlayingView.SetImmersiveState(_isImmersiveMode);
+        _nowPlayingView.SyncCommentFrom(_songCommentView);
         _nowPlayingView.SetCommentViewActive(_isCommentViewActive);
         _nowPlayingView.OnActivated();
         _nowPlayingView.UpdatePlaybackTime(_player.CurrentPositionSeconds);
@@ -283,9 +284,14 @@ public sealed partial class MainWindow
     {
         _isNowPlayingViewActive = false;
         _nowPlayingView.OnDeactivated();
+        _songCommentView.SyncFrom(_nowPlayingView.CommentView);
         if (_isCommentViewActive != _nowPlayingView.IsCommentViewActive)
         {
             SetCommentViewState(_nowPlayingView.IsCommentViewActive);
+        }
+        else if (_isCommentViewActive)
+        {
+            UpdateCommentTitle();
         }
 
         _sidebarFrame.Visible = true;
@@ -312,6 +318,7 @@ public sealed partial class MainWindow
         {
             _songCommentView.SetSong(_activeSong);
             _songCommentView.OnActivated();
+            UpdateCommentTitle();
         }
         SetNeedsDraw();
     }

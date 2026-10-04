@@ -738,7 +738,7 @@ public sealed partial class MainWindow
             _songCommentView.SetSong(_activeSong);
             _songCommentView.OnActivated();
 
-            _lyricTitleLabel.Text = " 评论 ";
+            UpdateCommentTitle();
         }
         else
         {
@@ -759,6 +759,17 @@ public sealed partial class MainWindow
         UpdateFrameBorderHighlights();
         SetNeedsDraw();
         _nowPlayingView?.SetCommentViewActive(_isCommentViewActive);
+    }
+
+    private void UpdateCommentTitle()
+    {
+        if (!_isCommentViewActive) return;
+
+        int count = _songCommentView.TotalCommentCount;
+        _lyricTitleLabel.Text = count > 0 
+            ? $" 评论 ({SongCommentView.FormatCount(count)}) " 
+            : " 评论 ";
+        _lyricFrame.SetNeedsDraw();
     }
 
     private void SetCommentViewState(bool active)

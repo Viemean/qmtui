@@ -75,9 +75,13 @@ public sealed class SongCommentView : View
 
     public event Action? CloseRequested;
     public event Action<bool>? TabNavigationRequested;
+    public event Action<int>? TotalCommentCountChanged;
 
+    public int TotalCommentCount => _totalCommentCount;
     public bool IsLoading => _isLoading;
     public bool IsImagePreviewActive => _previewOverlay?.Visible ?? false;
+
+    private static SongCommentSnapshot? _sharedSnapshot;
 
     public SongCommentView()
     {
@@ -494,6 +498,18 @@ public sealed class SongCommentView : View
         _loadCts = null;
 
         _currentSong = song;
+
+        if (song != null && _sharedSnapshot != null && _sharedSnapshot.Song?.Mid == song.Mid)
+        {
+            RestoreSnapshot(_sharedSnapshot);
+            return;
+        }
+
+        if (_sharedSnapshot != null && _sharedSnapshot.Song?.Mid != song?.Mid)
+        {
+            _sharedSnapshot = null;
+        }
+
         _hotComments.Clear();
         _normalComments.Clear();
         _seenCommentIds.Clear();
@@ -506,6 +522,7 @@ public sealed class SongCommentView : View
         _isError = false;
 
         RebuildDisplayItems();
+        TotalCommentCountChanged?.Invoke(0);
 
         if (song != null && Visible)
         {
@@ -525,6 +542,8 @@ public sealed class SongCommentView : View
         _hasMore = false;
         _isHotExpanded = false;
         _isError = false;
+        _sharedSnapshot = null;
+        TotalCommentCountChanged?.Invoke(0);
         await LoadCommentsAsync(isInitial: true).ConfigureAwait(false);
     }
 
@@ -533,6 +552,16 @@ public sealed class SongCommentView : View
         Visible = true;
         SetFocus();
         _scrollBar.TriggerActivity();
+
+        if (_currentSong != null && _sharedSnapshot != null && _sharedSnapshot.Song?.Mid == _currentSong.Mid)
+        {
+            if (_normalComments.Count == 0 || _sharedSnapshot.NormalComments.Count > _normalComments.Count || _sharedSnapshot.ViewportY != _listView.Viewport.Y)
+            {
+                RestoreSnapshot(_sharedSnapshot);
+                return;
+            }
+        }
+
         if (_currentSong != null && _hotComments.Count == 0 && _normalComments.Count == 0 && !_isLoading)
         {
             _ = LoadCommentsAsync(isInitial: true);
@@ -552,6 +581,11 @@ public sealed class SongCommentView : View
             _loadCts?.Cancel();
         }
         catch {}
+
+        if (_currentSong != null && (_hotComments.Count > 0 || _normalComments.Count > 0))
+        {
+            _sharedSnapshot = CreateSnapshot();
+        }
     }
 
     private async Task LoadCommentsAsync(bool isInitial)
@@ -594,6 +628,7 @@ public sealed class SongCommentView : View
                 if (pageResult != null)
                 {
                     _totalCommentCount = pageResult.TotalCount;
+                    TotalCommentCountChanged?.Invoke(_totalCommentCount);
                     _hasMore = pageResult.HasMore;
                     if (!string.IsNullOrEmpty(pageResult.LastSeqNo))
                     {
@@ -660,6 +695,10 @@ public sealed class SongCommentView : View
 
                 _isLoading = false;
                 RebuildDisplayItems();
+                if (_currentSong != null)
+                {
+                    _sharedSnapshot = CreateSnapshot();
+                }
             });
         }
         catch (OperationCanceledException) {}
@@ -860,7 +899,7 @@ public sealed class SongCommentView : View
         return lines;
     }
 
-    private static string FormatCount(int count)
+    public static string FormatCount(int count)
     {
         if (count >= 100_000_000) return $"{count / 100_000_000.0:F1}亿";
         if (count >= 10_000) return $"{count / 10_000.0:F1}万";
@@ -1216,4 +1255,156 @@ public sealed class SongCommentView : View
             AppLogger.Debug("SongCommentView", $"RenderPreviewImage failed: {ex.Message}");
         }
     }
+
+    public SongCommentSnapshot CreateSnapshot()
+    {
+        var snapshot = new SongCommentSnapshot
+        {
+            Song = _currentSong,
+            TotalCommentCount = _totalCommentCount,
+            CurrentPage = _currentPage,
+            LastSeqNo = _lastSeqNo,
+            HasMore = _hasMore,
+            IsHotExpanded = _isHotExpanded,
+            SelectedItemIndex = _listView.SelectedItem ?? -1,
+            ViewportY = _listView.Viewport.Y,
+            ScrollRatio = _displayItems.Count > 0 ? (double)_listView.Viewport.Y / _displayItems.Count : 0.0
+        };
+
+        snapshot.HotComments.AddRange(_hotComments);
+        snapshot.NormalComments.AddRange(_normalComments);
+        foreach (var id in _seenCommentIds)
+        {
+            snapshot.SeenCommentIds.Add(id);
+        }
+
+        int sel = _listView.SelectedItem ?? -1;
+        if (sel >= 0 && sel < _displayItems.Count)
+        {
+            snapshot.SelectedCommentId = _displayItems[sel].Comment?.CommentId;
+        }
+
+        int top = _listView.Viewport.Y;
+        if (top >= 0 && top < _displayItems.Count)
+        {
+            snapshot.TopCommentId = _displayItems[top].Comment?.CommentId;
+        }
+
+        return snapshot;
+    }
+
+    public void RestoreSnapshot(SongCommentSnapshot snapshot)
+    {
+        if (snapshot.Song == null) return;
+
+        try
+        {
+            _loadCts?.Cancel();
+            _loadCts?.Dispose();
+        }
+        catch {}
+        _loadCts = null;
+
+        _currentSong = snapshot.Song;
+        _hotComments.Clear();
+        _hotComments.AddRange(snapshot.HotComments);
+        _normalComments.Clear();
+        _normalComments.AddRange(snapshot.NormalComments);
+        _seenCommentIds.Clear();
+        foreach (var id in snapshot.SeenCommentIds)
+        {
+            _seenCommentIds.Add(id);
+        }
+        _totalCommentCount = snapshot.TotalCommentCount;
+        _currentPage = snapshot.CurrentPage;
+        _lastSeqNo = snapshot.LastSeqNo;
+        _hasMore = snapshot.HasMore;
+        _isHotExpanded = snapshot.IsHotExpanded;
+        _isLoading = false;
+        _isError = false;
+
+        RebuildDisplayItems();
+
+        if (_displayItems.Count > 0)
+        {
+            int targetY = -1;
+            if (!string.IsNullOrEmpty(snapshot.TopCommentId))
+            {
+                for (int i = 0; i < _displayItems.Count; i++)
+                {
+                    if (_displayItems[i].Comment?.CommentId == snapshot.TopCommentId)
+                    {
+                        targetY = i;
+                        break;
+                    }
+                }
+            }
+            if (targetY < 0 && snapshot.ScrollRatio > 0)
+            {
+                targetY = (int)Math.Round(snapshot.ScrollRatio * _displayItems.Count);
+            }
+            if (targetY < 0)
+            {
+                targetY = Math.Clamp(snapshot.ViewportY, 0, _displayItems.Count - 1);
+            }
+
+            int targetSel = -1;
+            if (!string.IsNullOrEmpty(snapshot.SelectedCommentId))
+            {
+                for (int i = 0; i < _displayItems.Count; i++)
+                {
+                    if (_displayItems[i].Comment?.CommentId == snapshot.SelectedCommentId &&
+                        IsSelectableCommentRow(_displayItems[i].Type))
+                    {
+                        targetSel = i;
+                        break;
+                    }
+                }
+            }
+            if (targetSel < 0 && snapshot.SelectedItemIndex >= 0)
+            {
+                targetSel = Math.Clamp(snapshot.SelectedItemIndex, 0, _displayItems.Count - 1);
+            }
+
+            if (targetSel >= 0)
+            {
+                _listView.SelectedItem = targetSel;
+            }
+            _listView.Viewport = new System.Drawing.Rectangle(_listView.Viewport.X, targetY, _listView.Viewport.Width, _listView.Viewport.Height);
+            _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+        }
+
+        TotalCommentCountChanged?.Invoke(_totalCommentCount);
+        SetNeedsDraw();
+    }
+
+    public void SyncFrom(SongCommentView other)
+    {
+        if (other == null) return;
+        var snapshot = other.CreateSnapshot();
+        if (snapshot.Song != null)
+        {
+            _sharedSnapshot = snapshot;
+            RestoreSnapshot(snapshot);
+        }
+    }
+}
+
+public sealed class SongCommentSnapshot
+{
+    public Song? Song { get; set; }
+    public List<SongComment> HotComments { get; set; } = new();
+    public List<SongComment> NormalComments { get; set; } = new();
+    public HashSet<string> SeenCommentIds { get; set; } = new();
+    public int TotalCommentCount { get; set; }
+    public int CurrentPage { get; set; }
+    public string LastSeqNo { get; set; } = "";
+    public bool HasMore { get; set; }
+    public bool IsHotExpanded { get; set; }
+
+    public string? SelectedCommentId { get; set; }
+    public string? TopCommentId { get; set; }
+    public int SelectedItemIndex { get; set; } = -1;
+    public int ViewportY { get; set; }
+    public double ScrollRatio { get; set; }
 }
