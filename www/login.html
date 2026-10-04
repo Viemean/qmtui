@@ -85,22 +85,22 @@
         }
         if (data.loginType) {
           document.getElementById('loginType').innerText = data.loginType;
-          document.getElementById('qrImg').alt = data.loginType + ' 登录二维码';
+          document.getElementById('qrImg').alt = `${data.loginType} 登录二维码`;
         }
 
         if (data.ready && data.version !== currentVersion) {
           currentVersion = data.version;
-          document.getElementById('qrImg').src = '/qr.png?v=' + data.version + '&t=' + Date.now();
+          document.getElementById('qrImg').src = `/qr.png?v=${data.version}&t=${Date.now()}`;
         }
 
         if (data.success) {
           const statusEl = document.getElementById('statusText');
           statusEl.className = 'status success';
-          statusEl.innerText = '登录成功 [' + (data.nick || '已登录用户') + ']，终端已同步';
+          statusEl.innerText = `登录成功 [${data.nick || '已登录用户'}]，终端已同步`;
           document.getElementById('refreshBtn').style.display = 'none';
           return;
         }
-      } catch (e) {}
+      } catch (_e) {}
 
       setTimeout(poll, 1500);
     }
@@ -109,8 +109,9 @@
       document.getElementById('statusText').innerText = '正在刷新二维码...';
       try {
         await fetch('/refresh', { method: 'POST' });
-      } catch (e) {}
+      } catch (_e) {}
     }
+    window.refreshQr = refreshQr;
 
     poll();
   </script>

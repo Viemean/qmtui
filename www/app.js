@@ -361,7 +361,7 @@ class ElectronMusicPlayer {
           if (this.audioElement.duration && target < this.audioElement.duration) {
             this.audioElement.currentTime = target;
           }
-        } catch (e) {}
+        } catch (_e) {}
       }
     };
 
@@ -1186,7 +1186,7 @@ class ElectronMusicPlayer {
 
   extractMonetColors(img) {
     try {
-      if (!img || !img.naturalWidth || !img.naturalHeight) return null;
+      if (!img?.naturalWidth || !img.naturalHeight) return null;
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) return null;
