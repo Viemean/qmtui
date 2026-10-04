@@ -214,6 +214,28 @@ public sealed class SongCommentView : View
         _listView.KeyDown += (s, k) =>
         {
             AppLogger.Force("SongCommentView", $"_listView.KeyDown: key={k}, SelectedItem={_listView.SelectedItem}, HasActiveFocus={HasActiveFocus}");
+
+            var ch = char.ToUpperInvariant((char)k.AsRune.Value);
+            if (k == Key.Esc || ch == 'C' || k == Key.C)
+            {
+                if (_previewOverlay?.Visible == true)
+                {
+                    CloseCommentImagePreview();
+                    k.Handled = true;
+                    return;
+                }
+
+                if (Environment.TickCount64 - _lastPreviewCloseTick < 350)
+                {
+                    k.Handled = true;
+                    return;
+                }
+
+                CloseRequested?.Invoke();
+                k.Handled = true;
+                return;
+            }
+
             if (k == Key.CursorDown)
             {
                 NavigateToNextSelectableItem(forward: true);

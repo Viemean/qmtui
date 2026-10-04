@@ -74,5 +74,51 @@ public class CommentFocusNavigationTests
             Application.Shutdown();
         }
     }
+
+    [Fact]
+    public void TestCommentView_CloseWithC_Or_Esc_Works()
+    {
+        Application.Init();
+        try
+        {
+            var top = new View { Width = 100, Height = 40, Visible = true, CanFocus = true };
+            var nowPlaying = new NowPlayingView { Width = 100, Height = 40, Visible = true, CanFocus = true };
+            top.Add(nowPlaying);
+
+            var song = new Song("mid1", "title1", "artist1", "album1", 180, "media1");
+            nowPlaying.SetSong(song, "SQ");
+            nowPlaying.OnActivated();
+
+            // 打开评论区
+            nowPlaying.ToggleCommentView();
+            Assert.True(nowPlaying.IsCommentViewActive);
+
+            var commentViewField = typeof(NowPlayingView).GetField("_commentView", BindingFlags.NonPublic | BindingFlags.Instance);
+            var commentView = (SongCommentView)commentViewField!.GetValue(nowPlaying)!;
+
+            var listViewField = typeof(SongCommentView).GetField("_listView", BindingFlags.NonPublic | BindingFlags.Instance);
+            var listView = (Terminal.Gui.Views.ListView)listViewField!.GetValue(commentView)!;
+
+            // 模拟按 C 键关闭
+            listView.NewKeyDownEvent(Terminal.Gui.Input.Key.C);
+            Assert.False(nowPlaying.IsCommentViewActive);
+
+            System.Threading.Thread.Sleep(400);
+
+            // 再次打开
+            nowPlaying.ToggleCommentView();
+            Assert.True(nowPlaying.IsCommentViewActive);
+
+            System.Threading.Thread.Sleep(400);
+
+            // 模拟按 Esc 键关闭
+            listView.NewKeyDownEvent(Terminal.Gui.Input.Key.Esc);
+            Assert.False(nowPlaying.IsCommentViewActive);
+        }
+        finally
+        {
+            Application.Shutdown();
+        }
+    }
 #pragma warning restore CS0618
 }

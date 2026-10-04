@@ -465,8 +465,17 @@ public sealed partial class MainWindow
 
         if (c == 'C')
         {
-            if (_isNowPlayingViewActive) return true;
             k.Handled = true;
+            if (_isNowPlayingViewActive)
+            {
+                if (_nowPlayingView.CommentView.IsImagePreviewActive)
+                {
+                    _nowPlayingView.CommentView.CloseCommentImagePreview();
+                    return true;
+                }
+                _nowPlayingView.ToggleCommentView();
+                return true;
+            }
             ToggleCommentView();
             return true;
         }
