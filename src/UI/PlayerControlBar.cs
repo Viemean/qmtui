@@ -499,10 +499,16 @@ public sealed partial class PlayerControlBar : FrameView
             NavigateNextControl();
             return;
         }
-        if (k == Key.CursorUp || k == Key.CursorDown)
+        if (k == Key.CursorUp)
         {
             k.Handled = true;
-            ToggleRowControl();
+            MoveRowControl(isDown: false);
+            return;
+        }
+        if (k == Key.CursorDown)
+        {
+            k.Handled = true;
+            MoveRowControl(isDown: true);
             return;
         }
         if (k == Key.Enter || k == Key.Space)

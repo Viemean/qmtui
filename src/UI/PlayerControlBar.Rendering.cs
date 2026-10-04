@@ -51,25 +51,78 @@ public sealed partial class PlayerControlBar
         UpdateControlHighlight();
     }
 
-    private void ToggleRowControl()
+    private void MoveRowControl(bool isDown)
     {
-        if (Array.IndexOf(Row0Controls, _focusedControlIndex) >= 0)
+        bool inRow0 = Array.IndexOf(Row0Controls, _focusedControlIndex) >= 0;
+        if (isDown && !inRow0)
         {
-            _focusedControlIndex = 5;
+            return;
         }
-        else
+        if (!isDown && inRow0)
         {
-            _focusedControlIndex = 7;
+            return;
         }
 
-        if (IsControlSkipped(_focusedControlIndex))
+        int targetIndex = inRow0
+            ? GetRow1AlignedControl(_focusedControlIndex)
+            : GetRow0AlignedControl(_focusedControlIndex);
+
+        var targetRow = inRow0 ? Row1Controls : Row0Controls;
+        if (IsControlSkipped(targetIndex))
         {
-            NavigateNextControl();
+            targetIndex = FindNearestValidControl(targetRow, targetIndex);
         }
-        else
+
+        if (targetIndex >= 0 && !IsControlSkipped(targetIndex))
         {
+            _focusedControlIndex = targetIndex;
             UpdateControlHighlight();
         }
+    }
+
+    private static int GetRow1AlignedControl(int row0Index) => row0Index switch
+    {
+        1 => 3,   // [S] 收藏   -> [O] 循环模式 (X = Pos.AnchorEnd(50))
+        12 => 4,  // [A] 添加   -> [J] 上一首   (X = Pos.AnchorEnd(39))
+        2 => 5,   // [ 分享 ]   -> [ 播放/暂停 ] (X = Pos.AnchorEnd(28))
+        8 => 6,   // [ 转存 ]   -> 下一首 [L]   (X = Pos.AnchorEnd(19))
+        7 => 10,  // [ 音质 ]   -> [ 音量 ]     (X = Pos.AnchorEnd(8))
+        _ => 5
+    };
+
+    private static int GetRow0AlignedControl(int row1Index) => row1Index switch
+    {
+        0 => 1,   // 进度条     -> [S] 收藏 (最左可获焦控制按钮)
+        3 => 1,   // [O] 循环模式 -> [S] 收藏 (X = Pos.AnchorEnd(50))
+        4 => 12,  // [J] 上一首 -> [A] 添加   (X = Pos.AnchorEnd(39))
+        5 => 2,   // [ 播放/暂停 ] -> [ 分享 ] (X = Pos.AnchorEnd(28))
+        6 => 8,   // 下一首 [L] -> [ 转存 ]   (X = Pos.AnchorEnd(19))
+        10 => 7,  // [ 音量 ]   -> [ 音质 ]     (X = Pos.AnchorEnd(8))
+        _ => 7
+    };
+
+    private int FindNearestValidControl(int[] targetRow, int targetIndex)
+    {
+        int targetRowIdx = Array.IndexOf(targetRow, targetIndex);
+        if (targetRowIdx < 0) targetRowIdx = 0;
+        int bestIndex = -1;
+        int minDistance = int.MaxValue;
+
+        for (int i = 0; i < targetRow.Length; i++)
+        {
+            int candidate = targetRow[i];
+            if (!IsControlSkipped(candidate))
+            {
+                int dist = Math.Abs(i - targetRowIdx);
+                if (dist < minDistance)
+                {
+                    minDistance = dist;
+                    bestIndex = candidate;
+                }
+            }
+        }
+
+        return bestIndex;
     }
 
     private bool IsControlSkipped(int index)
