@@ -125,9 +125,19 @@ public sealed partial class SongListView : FrameView
 
     private readonly ObservableCollection<string> _displayRows = [];
 
+    public new string Title
+    {
+        get => _currentFullTitle;
+        set
+        {
+            base.Title = "";
+            SetMarqueeTitle(value ?? "");
+        }
+    }
+
     public SongListView()
     {
-        Title = "";
+        base.Title = "";
         Width = Dim.Percent(58);
         Height = Dim.Fill(5);
         CanFocus = true;

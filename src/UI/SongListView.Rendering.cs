@@ -44,6 +44,7 @@ public sealed partial class SongListView
 
     private void SetMarqueeTitle(string fullText)
     {
+        base.Title = "";
         if (_currentFullTitle == fullText) return;
 
         _currentFullTitle = fullText;
