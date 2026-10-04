@@ -658,27 +658,7 @@ public sealed partial class MusicApi
         return ok;
     }
 
-    private static int GetCurrentGtk()
-    {
-        var cookies = UserSession.Current.Cookies;
-        if (cookies.TryGetValue("p_skey", out var pskey) && !string.IsNullOrEmpty(pskey))
-        {
-            return LoginService.GetACSRFToken(pskey);
-        }
-        if (cookies.TryGetValue("skey", out var skey) && !string.IsNullOrEmpty(skey))
-        {
-            return LoginService.GetACSRFToken(skey);
-        }
-        if (cookies.TryGetValue("qm_keyst", out var qmk) && !string.IsNullOrEmpty(qmk))
-        {
-            return LoginService.GetACSRFToken(qmk);
-        }
-        if (cookies.TryGetValue("qqmusic_key", out var qk) && !string.IsNullOrEmpty(qk))
-        {
-            return LoginService.GetACSRFToken(qk);
-        }
-        return 5381;
-    }
+
 
     /// <summary>
     /// 创建自建歌单

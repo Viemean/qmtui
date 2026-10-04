@@ -114,68 +114,7 @@ public static class AudioRecognitionService
         }
     }
 
-    private static async Task<RecognitionResult> MatchWithCatalogAsync(string title, string artist, string album)
-    {
-        // 1. 构建检索词 (提取声优、角色名、专辑组合)
-        var searchQueries = BuildSearchQueries(title, artist, album);
-        List<Song>? searchSongs = null;
 
-        foreach (var query in searchQueries)
-        {
-            var results = await MusicApi.SearchAsync(query, 1, 15);
-            if (results != null && results.Count > 0)
-            {
-                searchSongs = results;
-                // 若包含声优或完整歌手匹配，优先停在该列表
-                break;
-            }
-        }
-
-        Song? matchedSong = null;
-        if (searchSongs != null && searchSongs.Count > 0)
-        {
-            matchedSong = FindBestMatchedSong(title, artist, album, searchSongs);
-        }
-
-        return new RecognitionResult(true, title, artist, album, matchedSong, "");
-    }
-
-    private static List<string> BuildSearchQueries(string title, string artist, string album)
-    {
-        var queries = new List<string>();
-
-        // 1. 若含有 (CV: xxx) 或 [CV: xxx]，提取声优名优先检索 (如 "星めぐりの歌 宮本侑芽")
-        string cvName = ExtractCvName(artist);
-        if (!string.IsNullOrWhiteSpace(cvName))
-        {
-            queries.Add($"{title} {cvName}");
-        }
-
-        // 2. 原始完整检索
-        if (!string.IsNullOrWhiteSpace(artist))
-        {
-            queries.Add($"{title} {artist}");
-        }
-
-        // 3. 净化后的歌手名 (去除括号备注如 feat./CV)
-        string cleanArtist = CleanArtistName(artist);
-        if (!string.IsNullOrWhiteSpace(cleanArtist) && cleanArtist != artist && cleanArtist != cvName)
-        {
-            queries.Add($"{title} {cleanArtist}");
-        }
-
-        // 4. 带核心专辑名检索 (如 "星めぐりの歌 死亡遊戯で飯を食う。")
-        string cleanAlbum = CleanAlbumName(album);
-        if (!string.IsNullOrWhiteSpace(cleanAlbum))
-        {
-            queries.Add($"{title} {cleanAlbum}");
-        }
-
-        // 5. 兜底纯歌名检索
-        queries.Add(title);
-
-        return queries.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-    }
 
     private static string ExtractCvName(string artist)
     {

@@ -155,36 +155,7 @@ public static class NativeShazamService
                 }
             }
 
-            // 获取 Apple Track ID
-            string? appleTrackId = null;
-            if (track.TryGetProperty("hub", out var hub) &&
-                hub.TryGetProperty("actions", out var actions) &&
-                actions.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var act in actions.EnumerateArray())
-                {
-                    if (act.TryGetProperty("id", out var idProp))
-                    {
-                        appleTrackId = idProp.GetString();
-                        if (!string.IsNullOrEmpty(appleTrackId)) break;
-                    }
-                }
-            }
-            if (string.IsNullOrEmpty(appleTrackId) && track.TryGetProperty("albumadamid", out var adamId))
-            {
-                appleTrackId = adamId.GetString();
-            }
 
-            // 原语种本地化智能校正：
-            // 若歌名是纯 ASCII 罗马音 (无任何中文、日文汉字或假名)，且存在 Apple ID，
-            // 则尝试通过 iTunes 本地化元数据反查当地原语言歌名 (如将 "Koioto to Amazora" 校正为 "恋音と雨空")
-            if (!string.IsNullOrEmpty(appleTrackId) && IsPureAscii(title))
-            {
-                var localized = await TryFetchAppleLocalizedNameAsync(appleTrackId, cancellationToken);
-                if (!string.IsNullOrEmpty(localized.Title)) title = localized.Title;
-                if (!string.IsNullOrEmpty(localized.Artist)) artist = localized.Artist;
-                if (!string.IsNullOrEmpty(localized.Album)) album = localized.Album;
-            }
 
             return (true, title, artist, album, "");
         }
@@ -198,58 +169,10 @@ public static class NativeShazamService
         }
     }
 
-    /// <summary>
-    /// 判断是否全为 ASCII 字符 (用于识别罗马音)
-    /// </summary>
-    private static bool IsPureAscii(string text)
-    {
-        foreach (char c in text)
-        {
-            if (c > 127) return false;
-        }
-        return true;
-    }
+
 
     /// <summary>
-    /// 轻量查询 iTunes 原语种元数据 (超时限制 1.0 秒，避免阻塞)
-    /// </summary>
-    private static async Task<(string Title, string Artist, string Album)> TryFetchAppleLocalizedNameAsync(
-        string appleTrackId,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(1.2));
-
-            var url = $"https://itunes.apple.com/lookup?id={appleTrackId}&country=JP";
-            var resp = await s_httpClient.GetStringAsync(url, cts.Token);
-            using var doc = JsonDocument.Parse(resp);
-            var root = doc.RootElement;
-            if (root.TryGetProperty("results", out var results) && results.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in results.EnumerateArray())
-                {
-                    var trackName = item.TryGetProperty("trackName", out var tn) ? tn.GetString() : null;
-                    var artistName = item.TryGetProperty("artistName", out var an) ? an.GetString() : null;
-                    var collectionName = item.TryGetProperty("collectionName", out var cn) ? cn.GetString() : null;
-
-                    if (!string.IsNullOrEmpty(trackName))
-                    {
-                        return (trackName, artistName ?? "", collectionName ?? "");
-                    }
-                }
-            }
-        }
-        catch
-        {
-            // 忽略非关键的本地化元数据查询超时
-        }
-        return ("", "", "");
-    }
-
-    /// <summary>
-    /// 高性能异步读取 WAV PCM 16-bit 样本
+    /// 异步读取 WAV PCM 16-bit 样本
     /// </summary>
     private static async Task<short[]> ReadWavPcmSamplesAsync(string wavFilePath, CancellationToken cancellationToken)
     {
