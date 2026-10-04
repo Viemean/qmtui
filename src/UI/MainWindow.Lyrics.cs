@@ -715,4 +715,48 @@ public sealed partial class MainWindow
             _controlBar?.UpdateStatus($"[歌词] 声学匹配异常: {ex.Message}");
         }
     }
+
+    private void ToggleCommentView()
+    {
+        if (_artistAlbumDetailView.Visible)
+        {
+            _artistAlbumDetailView.OnDeactivated();
+            _artistAlbumDetailView.Visible = false;
+            TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
+        }
+
+        _isCommentViewActive = !_isCommentViewActive;
+        if (_isCommentViewActive)
+        {
+            _lyricListView.Visible = false;
+            _lyricScrollBar.Visible = false;
+            _lyricTransBtn.Visible = false;
+            _lyricImmersiveBtn.Visible = false;
+            _lyricMatchBtn.Visible = false;
+
+            _songCommentView.Visible = true;
+            _songCommentView.SetSong(_activeSong);
+            _songCommentView.OnActivated();
+
+            _lyricTitleLabel.Text = " 评论 ";
+        }
+        else
+        {
+            _songCommentView.OnDeactivated();
+            _songCommentView.Visible = false;
+
+            _lyricListView.Visible = true;
+            _lyricScrollBar.Visible = true;
+            UpdateTranslationButtonHighlight();
+            UpdateLyricMatchButtonHighlight();
+            _lyricImmersiveBtn.Visible = true;
+
+            _lyricTitleLabel.Text = " 歌词 ";
+            _hotkeyHintLabel.Text = " [V]播放界面  [B]通知  [M]静音  [- / +]音量  [/]搜索  [E]队列  [G]查找  [C]评论";
+            _songListView.SetFocusToList();
+        }
+
+        UpdateFrameBorderHighlights();
+        SetNeedsDraw();
+    }
 }

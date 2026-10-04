@@ -91,7 +91,7 @@ public sealed partial class MainWindow
     {
         _lastUserActivityTick = Environment.TickCount64;
         _lastImmersiveActivityTick = Environment.TickCount64;
-        if (_isImmersiveMode)
+        if (_isImmersiveMode && !_isCommentViewActive)
         {
             bool isLocalOrWebDav = _activeSong != null && (_activeSong.IsLocal || _activeSong.IsWebDav);
             bool transNeedShow = _hasTranslation && !_lyricTransBtn.Visible;
@@ -413,6 +413,11 @@ public sealed partial class MainWindow
 
     private async Task HandleRealEscapeKeyAsync()
     {
+        if (_isCommentViewActive)
+        {
+            ToggleCommentView();
+            return;
+        }
         if (_isImmersiveMode)
         {
             ApplyImmersiveMode(false);

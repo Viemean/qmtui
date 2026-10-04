@@ -158,11 +158,14 @@ public sealed partial class NowPlayingView
         else
         {
             StopImmersiveTimer();
-            _transBtn.Visible = _hasTranslation;
-            _immersiveBtn.Visible = true;
-            if (_currentSong != null && (_currentSong.IsLocal || _currentSong.IsWebDav))
+            if (!_isCommentViewActive)
             {
-                _matchLyricBtn.Visible = true;
+                _transBtn.Visible = _hasTranslation;
+                _immersiveBtn.Visible = true;
+                if (_currentSong != null && (_currentSong.IsLocal || _currentSong.IsWebDav))
+                {
+                    _matchLyricBtn.Visible = true;
+                }
             }
             _isInteractiveHighlightSuppressed = false;
             // 退出沉浸模式后恢复可选择
@@ -177,6 +180,11 @@ public sealed partial class NowPlayingView
     private void UpdateImmersiveButtonHighlight()
     {
         if (_immersiveBtn == null) return;
+        if (_isCommentViewActive)
+        {
+            _immersiveBtn.Visible = false;
+            return;
+        }
         var color = _isImmersiveMode ? MikuTheme.QqGreenLight : MikuTheme.MikuTextMuted;
         var attr = new Attribute(color, Color.None);
         _immersiveBtn.SetScheme(new Scheme
@@ -193,6 +201,7 @@ public sealed partial class NowPlayingView
 
     public void TriggerImmersiveActivity()
     {
+        if (_isCommentViewActive) return;
         _lastImmersiveActivityTick = Environment.TickCount64;
         bool isLocalOrWebDav = _currentSong != null && (_currentSong.IsLocal || _currentSong.IsWebDav);
         bool transNeedShow = _hasTranslation && !_transBtn.Visible;

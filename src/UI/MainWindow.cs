@@ -35,6 +35,8 @@ public sealed partial class MainWindow : Window
     private readonly ListView _lyricListView;
     private readonly ThinScrollBarView _lyricScrollBar;
     private readonly ArtistAlbumDetailView _artistAlbumDetailView;
+    private readonly SongCommentView _songCommentView;
+    private bool _isCommentViewActive;
     private readonly PlayerControlBar _controlBar;
     private readonly Label _hotkeyHintLabel;
     private readonly Label _sidebarTitleLabel;
@@ -941,6 +943,19 @@ public sealed partial class MainWindow : Window
         _artistAlbumDetailView.TabNavigationRequested += forward => SwitchNextFocusWindow(forward);
         _lyricFrame.Add(_artistAlbumDetailView);
 
+        _songCommentView = new SongCommentView
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
+            Visible = false,
+            CanFocus = true
+        };
+        _songCommentView.CloseRequested += () => ToggleCommentView();
+        _songCommentView.TabNavigationRequested += forward => SwitchNextFocusWindow(forward);
+        _lyricFrame.Add(_songCommentView);
+
         Add(_lyricFrame);
 
         _controlBar = new PlayerControlBar();
@@ -1025,7 +1040,7 @@ public sealed partial class MainWindow : Window
         // 底部快捷键操作指南（独立放置在控制栏UI方框下方最底行，干净平整无边框干扰）
         _hotkeyHintLabel = new Label
         {
-            Text = " [V]播放界面  [B]通知  [M]静音  [- / +]音量  [/]搜索  [E]队列  [G]查找",
+            Text = " [V]播放界面  [B]通知  [M]静音  [- / +]音量  [/]搜索  [E]队列  [G]查找  [C]评论",
             X = 0,
             Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),
@@ -1037,6 +1052,17 @@ public sealed partial class MainWindow : Window
         {
             Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextSub, MikuTheme.MikuBgSurface)
         });
+        _hotkeyHintLabel.MouseEvent += (s, m) =>
+        {
+            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
+            {
+                if (m.Position.HasValue && m.Position.Value.X >= 55)
+                {
+                    ToggleCommentView();
+                    m.Handled = true;
+                }
+            }
+        };
         Add(_hotkeyHintLabel);
 
         // 顶部三大窗格置顶常驻高亮标题（即使未获焦暗化边框线条，标题文本始终保持翡翠薄荷绿高亮）
@@ -1097,7 +1123,7 @@ public sealed partial class MainWindow : Window
         {
             if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked) || m.Flags.HasFlag(MouseFlags.LeftButtonPressed))
             {
-                SetFocusToWindow(2);
+                ToggleCommentView();
                 m.Handled = true;
             }
         };

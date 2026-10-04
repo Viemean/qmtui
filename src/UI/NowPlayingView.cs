@@ -42,6 +42,8 @@ public sealed partial class NowPlayingView : View
     private readonly Label _transBtn;
     private readonly Label _immersiveBtn;
     private readonly Label _matchLyricBtn;
+    private readonly SongCommentView _commentView;
+    private bool _isCommentViewActive;
 
     private Song? _currentSong;
     private string? _coverFilePath;
@@ -428,7 +430,19 @@ public sealed partial class NowPlayingView : View
             }
         };
 
-        _lyricContainer.Add(_transBtn, _immersiveBtn, _matchLyricBtn);
+        _commentView = new SongCommentView
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
+            Visible = false,
+            CanFocus = true
+        };
+        _commentView.CloseRequested += ToggleCommentView;
+        _commentView.TabNavigationRequested += forward => HandleTabNavigation(forward);
+
+        _lyricContainer.Add(_commentView, _transBtn, _immersiveBtn, _matchLyricBtn);
         UpdateTransButtonHighlight();
         UpdateImmersiveButtonHighlight();
         UpdateMatchLyricButtonHighlight();
@@ -465,6 +479,7 @@ public sealed partial class NowPlayingView : View
 
             if (ch == 'Y')
             {
+                if (_isCommentViewActive) return;
                 MatchLyricRequested?.Invoke();
                 k.Handled = true;
                 return;
@@ -472,6 +487,7 @@ public sealed partial class NowPlayingView : View
 
             if (ch == 'T')
             {
+                if (_isCommentViewActive) return;
                 if (_hasTranslation)
                 {
                     ToggleTranslationRequested?.Invoke();
@@ -482,6 +498,7 @@ public sealed partial class NowPlayingView : View
 
             if (ch == 'P')
             {
+                if (_isCommentViewActive) return;
                 ToggleImmersiveRequested?.Invoke();
                 k.Handled = true;
                 return;
@@ -496,6 +513,12 @@ public sealed partial class NowPlayingView : View
 
             if (k == Key.Esc)
             {
+                if (_isCommentViewActive)
+                {
+                    ToggleCommentView();
+                    k.Handled = true;
+                    return;
+                }
                 if (_isImmersiveMode)
                 {
                     ToggleImmersiveRequested?.Invoke();
@@ -510,6 +533,13 @@ public sealed partial class NowPlayingView : View
             if (k == Key.V || ch == 'V')
             {
                 BackRequested?.Invoke();
+                k.Handled = true;
+                return;
+            }
+
+            if (k == Key.C || ch == 'C')
+            {
+                ToggleCommentView();
                 k.Handled = true;
                 return;
             }
@@ -540,5 +570,31 @@ public sealed partial class NowPlayingView : View
         };
     }
 
-
+    public void ToggleCommentView()
+    {
+        _isCommentViewActive = !_isCommentViewActive;
+        if (_isCommentViewActive)
+        {
+            _lyricListView.Visible = false;
+            _lyricScrollBar.Visible = false;
+            _transBtn.Visible = false;
+            _immersiveBtn.Visible = false;
+            _matchLyricBtn.Visible = false;
+            _commentView.Visible = true;
+            _commentView.SetSong(_currentSong);
+            _commentView.OnActivated();
+        }
+        else
+        {
+            _commentView.OnDeactivated();
+            _commentView.Visible = false;
+            _lyricListView.Visible = true;
+            _lyricScrollBar.Visible = true;
+            UpdateTransButtonHighlight();
+            UpdateImmersiveButtonHighlight();
+            UpdateMatchLyricButtonHighlight();
+            SetFocus();
+        }
+        SetNeedsDraw();
+    }
 }

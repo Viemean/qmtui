@@ -461,6 +461,14 @@ public sealed partial class MainWindow
             return true;
         }
 
+        if (c == 'C')
+        {
+            if (_isNowPlayingViewActive) return true;
+            k.Handled = true;
+            ToggleCommentView();
+            return true;
+        }
+
         if (c == 'R')
         {
             if (_isNowPlayingViewActive) return true;
@@ -633,6 +641,10 @@ public sealed partial class MainWindow
                 if (_artistAlbumDetailView.Visible)
                 {
                     _artistAlbumDetailView.SetFocusToDesc();
+                }
+                else if (_isCommentViewActive)
+                {
+                    _songCommentView.SetFocus();
                 }
                 else
                 {

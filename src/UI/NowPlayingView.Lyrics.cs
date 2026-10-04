@@ -105,6 +105,7 @@ public sealed partial class NowPlayingView
         _songTitleLabel.Text = song.Title ?? "未知曲目";
         _albumLink.SetText(string.IsNullOrWhiteSpace(song.Album) ? "未知专辑" : song.Album);
         _songInfoContainer.Visible = true;
+        _commentView.SetSong(song);
 
         if (songChanged)
         {
@@ -169,7 +170,7 @@ public sealed partial class NowPlayingView
         _showTranslation = _hasTranslation && showTranslation;
         if (_transBtn != null)
         {
-            _transBtn.Visible = _hasTranslation;
+            _transBtn.Visible = !_isCommentViewActive && _hasTranslation;
             UpdateTransButtonHighlight();
         }
         _currentActiveLyricIndex = -1;
@@ -329,6 +330,11 @@ public sealed partial class NowPlayingView
     public void OnDeactivated()
     {
         Visible = false;
+        if (_isCommentViewActive)
+        {
+            ToggleCommentView();
+        }
+        _commentView.OnDeactivated();
         if (_resizeTimerToken != null)
         {
             Application.RemoveTimeout(_resizeTimerToken);
@@ -369,7 +375,7 @@ public sealed partial class NowPlayingView
     private void UpdateTransButtonHighlight()
     {
         if (_transBtn == null) return;
-        _transBtn.Visible = _hasTranslation;
+        _transBtn.Visible = !_isCommentViewActive && _hasTranslation;
         var color = (_showTranslation && _hasTranslation) ? MikuTheme.QqGreenLight : MikuTheme.MikuTextMuted;
         var attr = new Attribute(color, Color.None);
         _transBtn.SetScheme(new Scheme
@@ -393,6 +399,7 @@ public sealed partial class NowPlayingView
     private void UpdateMatchLyricButtonHighlight()
     {
         if (_matchLyricBtn == null) return;
+        _matchLyricBtn.Visible = !_isCommentViewActive && _currentSong != null && (_currentSong.IsLocal || _currentSong.IsWebDav);
         _matchLyricBtn.Text = "[Y] 匹配";
         var color = _isLyricMatched ? MikuTheme.QqGreenLight : MikuTheme.MikuTextMuted;
         var attr = new Attribute(color, Color.None);
