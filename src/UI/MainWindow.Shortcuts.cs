@@ -264,7 +264,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        // 5. 焦点丢失/悬空时的安全自愈兜底（按方向键或回车立即将焦点恢复至中央歌曲列表）
+        // 5. 焦点丢失时的兜底处理（按方向键或回车将焦点恢复至中央歌曲列表）
         if (!_isNowPlayingViewActive && GetFocusedWindowIndex(focused) == -1 && (k == Key.CursorUp || k == Key.CursorDown || k == Key.CursorLeft || k == Key.CursorRight || k == Key.Enter))
         {
             _songListView.SetFocusToList();
@@ -529,6 +529,15 @@ public sealed partial class MainWindow
             if (_isNowPlayingViewActive) return true;
             k.Handled = true;
             ShowQueueDrawerDialog();
+            return true;
+        }
+
+        bool isD = c == 'D' || k == Key.DeleteChar;
+        if (isD)
+        {
+            if (_isNowPlayingViewActive) return true;
+            k.Handled = true;
+            await HandleRemoveFromCurrentListAsync();
             return true;
         }
 
