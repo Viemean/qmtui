@@ -1161,6 +1161,13 @@ public sealed partial class MainWindow : Window
         _nowPlayingView.MatchLyricRequested += async () => await MatchOrRestoreLyricAsync();
         _nowPlayingView.LoginRequested += ShowLoginDialog;
         _nowPlayingView.AddToPlaylistRequested += () => _ = HandleAddToPlaylistAsync();
+        _nowPlayingView.CommentViewToggled += active =>
+        {
+            if (_isCommentViewActive != active)
+            {
+                SetCommentViewState(active);
+            }
+        };
         Add(_nowPlayingView);
         _aodView = new AodView
         {

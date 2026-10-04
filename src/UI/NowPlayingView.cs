@@ -570,6 +570,15 @@ public sealed partial class NowPlayingView : View
         };
     }
 
+    public bool IsCommentViewActive => _isCommentViewActive;
+    public event Action<bool>? CommentViewToggled;
+
+    public void SetCommentViewActive(bool active)
+    {
+        if (_isCommentViewActive == active) return;
+        ToggleCommentView();
+    }
+
     public void ToggleCommentView()
     {
         _isCommentViewActive = !_isCommentViewActive;
@@ -596,5 +605,6 @@ public sealed partial class NowPlayingView : View
             SetFocus();
         }
         SetNeedsDraw();
+        CommentViewToggled?.Invoke(_isCommentViewActive);
     }
 }

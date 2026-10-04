@@ -758,5 +758,12 @@ public sealed partial class MainWindow
 
         UpdateFrameBorderHighlights();
         SetNeedsDraw();
+        _nowPlayingView?.SetCommentViewActive(_isCommentViewActive);
+    }
+
+    private void SetCommentViewState(bool active)
+    {
+        if (_isCommentViewActive == active) return;
+        ToggleCommentView();
     }
 }

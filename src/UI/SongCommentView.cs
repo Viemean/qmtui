@@ -119,9 +119,31 @@ public sealed class SongCommentView : View
             }
         };
 
+        _scrollBar = new ThinScrollBarView
+        {
+            X = Pos.AnchorEnd(1),
+            Y = 0,
+            Width = 1,
+            Height = Dim.Fill()
+        };
+        _scrollBar.ScrollPositionChanged += targetRow =>
+        {
+            int count = _displayItems.Count;
+            if (count > 0)
+            {
+                int clamped = Math.Clamp(targetRow, 0, count - 1);
+                _listView.SelectedItem = clamped;
+                _listView.Viewport = new System.Drawing.Rectangle(_listView.Viewport.X, clamped, _listView.Viewport.Width, _listView.Viewport.Height);
+                _scrollBar.TriggerActivity();
+                _scrollBar.UpdateMetrics(count, _listView.Viewport.Height, _listView.Viewport.Y);
+                CheckTriggerLoadMore();
+            }
+        };
+
         _listView.ValueChanged += (s, e) =>
         {
-            _scrollBar?.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+            _scrollBar.TriggerActivity();
+            _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
             CheckTriggerLoadMore();
         };
 
@@ -145,12 +167,14 @@ public sealed class SongCommentView : View
         {
             if (k == Key.CursorDown || k == Key.PageDown || k == Key.End)
             {
-                _scrollBar?.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+                _scrollBar.TriggerActivity();
+                _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
                 CheckTriggerLoadMore();
             }
             else if (k == Key.CursorUp || k == Key.PageUp || k == Key.Home)
             {
-                _scrollBar?.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+                _scrollBar.TriggerActivity();
+                _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
             }
         };
 
@@ -158,12 +182,14 @@ public sealed class SongCommentView : View
         {
             if (m.Flags.HasFlag(MouseFlags.WheeledDown))
             {
-                _scrollBar?.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+                _scrollBar.TriggerActivity();
+                _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
                 CheckTriggerLoadMore();
             }
             else if (m.Flags.HasFlag(MouseFlags.WheeledUp))
             {
-                _scrollBar?.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+                _scrollBar.TriggerActivity();
+                _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
             }
 
             if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
@@ -204,26 +230,6 @@ public sealed class SongCommentView : View
         };
 
         Add(_listView);
-
-        _scrollBar = new ThinScrollBarView
-        {
-            X = Pos.AnchorEnd(1),
-            Y = 0,
-            Height = Dim.Fill(),
-            AutoShowOnMetricsChange = false
-        };
-        _scrollBar.ScrollPositionChanged += targetRow =>
-        {
-            int count = _displayItems.Count;
-            if (count > 0)
-            {
-                int clamped = Math.Clamp(targetRow, 0, count - 1);
-                _listView.SelectedItem = clamped;
-                _listView.Viewport = new System.Drawing.Rectangle(_listView.Viewport.X, clamped, _listView.Viewport.Width, _listView.Viewport.Height);
-                _scrollBar.UpdateMetrics(count, _listView.Viewport.Height, _listView.Viewport.Y);
-                CheckTriggerLoadMore();
-            }
-        };
         Add(_scrollBar);
 
         // 右下角悬浮回到顶部按钮 [▲]
@@ -350,6 +356,7 @@ public sealed class SongCommentView : View
     {
         Visible = true;
         SetFocus();
+        _scrollBar.TriggerActivity();
         if (_currentSong != null && _hotComments.Count == 0 && _normalComments.Count == 0 && !_isLoading)
         {
             _ = LoadCommentsAsync(isInitial: true);
@@ -702,6 +709,7 @@ public sealed class SongCommentView : View
         {
             _listView.SelectedItem = 0;
             _listView.Viewport = new System.Drawing.Rectangle(0, 0, _listView.Viewport.Width, _listView.Viewport.Height);
+            _scrollBar.TriggerActivity();
             _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, 0);
             _listView.SetFocus();
             SetNeedsDraw();

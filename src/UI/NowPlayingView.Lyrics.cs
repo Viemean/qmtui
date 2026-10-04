@@ -324,16 +324,18 @@ public sealed partial class NowPlayingView
             _albumLink.SetInteractiveEnabled(true);
         }
 
+        if (_isCommentViewActive)
+        {
+            _commentView.SetSong(_currentSong);
+            _commentView.OnActivated();
+        }
+
         TriggerRenderDelayed();
     }
 
     public void OnDeactivated()
     {
         Visible = false;
-        if (_isCommentViewActive)
-        {
-            ToggleCommentView();
-        }
         _commentView.OnDeactivated();
         if (_resizeTimerToken != null)
         {
