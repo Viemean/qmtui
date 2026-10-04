@@ -138,23 +138,13 @@ public sealed class MiniCoverView : FrameView
             _resizeTimerToken = null;
         }
 
-        // 60ms 快速首绘
-        _resizeTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(60), () =>
+        // 单次 120ms 防抖绘制，确保 Terminal.Gui 字符边框完全绘制完成后单次置顶，消除二次重绘闪烁
+        _resizeTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(120), () =>
         {
             _resizeTimerToken = null;
             if (Visible)
             {
                 RenderCoverIfVisible();
-
-                // 250ms 二次补位重绘，确保所有字符边框绘制完毕后 Kitty 图像稳定贴合
-                Application.AddTimeout(TimeSpan.FromMilliseconds(250), () =>
-                {
-                    if (Visible)
-                    {
-                        RenderCoverIfVisible();
-                    }
-                    return false;
-                });
             }
             return false;
         });

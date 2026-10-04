@@ -20,7 +20,9 @@ namespace QmTui.UI;
 public sealed partial class NowPlayingView
 {
 
-    public void RestoreCoverAfterDialog()
+    public void RestoreCoverAfterDialog() => TriggerRenderDelayed();
+
+    public void TriggerRenderDelayed()
     {
         if (!Visible || !TerminalImageHelper.IsImageSupported || string.IsNullOrEmpty(_coverFilePath) || !File.Exists(_coverFilePath))
         {
@@ -33,7 +35,8 @@ public sealed partial class NowPlayingView
             _resizeTimerToken = null;
         }
 
-        _resizeTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(60), () =>
+        // 单次 120ms 防抖绘制，确保 Terminal.Gui 字符背景全部输出完毕后单次呈现，消除二次重绘闪烁
+        _resizeTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(120), () =>
         {
             _resizeTimerToken = null;
             if (Visible)
@@ -79,10 +82,11 @@ public sealed partial class NowPlayingView
             int renderCol = col + colOffset;
             int renderRow = Math.Max(1, row + rowOffset);
 
-            TerminalImageHelper.RenderKittyImage(_coverFilePath, renderCol, renderRow, targetCols, rows: 0, TerminalImageHelper.ImageIdNowPlaying);
-
             // 严格对齐：底部信息容器 X 坐标与封面起始列完全相同（colOffset），保持绝对左对齐
+            // 在发送终端图像前先对齐下方文本布局，避免图片送出后立即触发子控件重绘擦除 Kitty 图像
             UpdateSongInfoLayout(colOffset, targetCols, rowOffset + targetRows + 1);
+
+            TerminalImageHelper.RenderKittyImage(_coverFilePath, renderCol, renderRow, targetCols, rows: 0, TerminalImageHelper.ImageIdNowPlaying);
         }
         catch
         {
@@ -90,9 +94,22 @@ public sealed partial class NowPlayingView
         }
     }
 
+    private int _lastSongInfoColOffset = -1;
+    private int _lastSongInfoTargetCols = -1;
+    private int _lastSongInfoTopRow = -1;
+
     private void UpdateSongInfoLayout(int colOffset, int targetCols, int topRow)
     {
         if (_songInfoContainer == null) return;
+
+        if (_lastSongInfoColOffset == colOffset && _lastSongInfoTargetCols == targetCols && _lastSongInfoTopRow == topRow)
+        {
+            return;
+        }
+
+        _lastSongInfoColOffset = colOffset;
+        _lastSongInfoTargetCols = targetCols;
+        _lastSongInfoTopRow = topRow;
 
         // 与封面始终保持绝对左对齐
         _songInfoContainer.X = colOffset;

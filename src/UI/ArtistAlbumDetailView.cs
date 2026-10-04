@@ -291,23 +291,13 @@ public sealed class ArtistAlbumDetailView : View
             _resizeTimerToken = null;
         }
 
-        // 第一阶段：60ms 快速首绘制
-        _resizeTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(60), () =>
+        // 单次 120ms 防抖绘制，确保 Terminal.Gui 字符边框完全绘制完成后单次置顶，消除二次重绘闪烁
+        _resizeTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(120), () =>
         {
             _resizeTimerToken = null;
             if (IsActuallyVisible())
             {
                 RenderImageIfVisible();
-
-                // 第二阶段：250ms 二次补位重绘，确保所有边框背景绘制完后 Kitty 原生图像稳定置顶
-                Application.AddTimeout(TimeSpan.FromMilliseconds(250), () =>
-                {
-                    if (IsActuallyVisible())
-                    {
-                        RenderImageIfVisible();
-                    }
-                    return false;
-                });
             }
             return false;
         });

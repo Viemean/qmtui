@@ -98,7 +98,7 @@ public sealed partial class NowPlayingView : View
             Y = 0,
             Width = isImageSupported ? Dim.Percent(48) : 0,
             Height = Dim.Fill(),
-            CanFocus = isImageSupported,
+            CanFocus = false,
             Visible = isImageSupported
         };
 

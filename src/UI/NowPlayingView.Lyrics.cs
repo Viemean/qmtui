@@ -158,7 +158,7 @@ public sealed partial class NowPlayingView
         _coverFilePath = coverPath;
         if (Visible)
         {
-            RenderCoverIfVisible();
+            TriggerRenderDelayed();
         }
     }
 
@@ -323,14 +323,7 @@ public sealed partial class NowPlayingView
             _albumLink.SetInteractiveEnabled(true);
         }
 
-        Application.AddTimeout(TimeSpan.FromMilliseconds(50), () =>
-        {
-            if (Visible)
-            {
-                RenderCoverIfVisible();
-            }
-            return false;
-        });
+        TriggerRenderDelayed();
     }
 
     public void OnDeactivated()
@@ -354,7 +347,7 @@ public sealed partial class NowPlayingView
             Application.RemoveTimeout(_resizeTimerToken);
             _resizeTimerToken = null;
         }
-        _resizeTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(80), () =>
+        _resizeTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(120), () =>
         {
             _resizeTimerToken = null;
             if (Visible)
