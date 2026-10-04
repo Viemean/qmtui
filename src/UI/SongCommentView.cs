@@ -80,6 +80,17 @@ public sealed class SongCommentView : View
     public int TotalCommentCount => _totalCommentCount;
     public bool IsLoading => _isLoading;
     public bool IsImagePreviewActive => _previewOverlay?.Visible ?? false;
+    public bool HasActiveFocus => HasFocus || _listView.HasFocus || (_previewOverlay?.HasFocus ?? false);
+
+    public new bool SetFocus()
+    {
+        Visible = true;
+        bool listFocus = _listView.SetFocus();
+        _scrollBar.TriggerActivity();
+        SetNeedsDraw();
+        AppLogger.Force("SongCommentView", $"SetFocus: _listView.SetFocus()={listFocus}, _listView.HasFocus={_listView.HasFocus}, HasActiveFocus={HasActiveFocus}, SuperView.CanFocus={SuperView?.CanFocus}, Visible={Visible}");
+        return _listView.HasFocus;
+    }
 
     private static SongCommentSnapshot? _sharedSnapshot;
 
@@ -102,6 +113,8 @@ public sealed class SongCommentView : View
             TabStop = TabBehavior.TabGroup
         };
         _listView.KeyBindings.Remove(Key.Space);
+        _listView.KeyBindings.Remove(Key.Tab);
+        _listView.KeyBindings.Remove(Key.Tab.WithShift);
         _listView.SetScheme(MikuTheme.Lyric);
 
         _listView.RowRender += (s, e) =>
@@ -115,7 +128,8 @@ public sealed class SongCommentView : View
                 var fg = (item.Type == ItemType.CommentPic || item.Type == ItemType.HotToggle)
                     ? MikuTheme.QqGreenLight
                     : Color.White;
-                e.RowAttribute = new Attribute(fg, MikuTheme.QqGreenDark);
+                var bg = HasActiveFocus ? MikuTheme.QqGreenDark : Color.None;
+                e.RowAttribute = new Attribute(fg, bg);
                 return;
             }
 
@@ -143,6 +157,9 @@ public sealed class SongCommentView : View
                     break;
             }
         };
+
+        _listView.HasFocusChanged += (s, e) => SetNeedsDraw();
+        HasFocusChanged += (s, e) => SetNeedsDraw();
 
         _scrollBar = new ThinScrollBarView
         {
@@ -196,6 +213,7 @@ public sealed class SongCommentView : View
 
         _listView.KeyDown += (s, k) =>
         {
+            AppLogger.Force("SongCommentView", $"_listView.KeyDown: key={k}, SelectedItem={_listView.SelectedItem}, HasActiveFocus={HasActiveFocus}");
             if (k == Key.CursorDown)
             {
                 NavigateToNextSelectableItem(forward: true);
@@ -237,6 +255,13 @@ public sealed class SongCommentView : View
                 k.Handled = true;
                 return;
             }
+
+            if (k == Key.Tab || k.AsRune.Value == '\t' || k.ToString().Contains("Tab"))
+            {
+                TabNavigationRequested?.Invoke(!k.IsShift);
+                k.Handled = true;
+                return;
+            }
         };
 
         _listView.MouseEvent += (s, m) =>
@@ -274,6 +299,7 @@ public sealed class SongCommentView : View
                     _lastClickedItemIndex = clickedRow;
                     _lastClickTicks = now;
                     _listView.SelectedItem = clickedRow;
+                    _listView.SetFocus();
 
                     if (item.Comment != null && !string.IsNullOrEmpty(item.Comment.PicUrl))
                     {
@@ -474,6 +500,48 @@ public sealed class SongCommentView : View
                     k.Handled = true;
                     return;
                 }
+            }
+
+            if (k == Key.CursorUp)
+            {
+                MovePrevious();
+                k.Handled = true;
+                return;
+            }
+
+            if (k == Key.CursorDown)
+            {
+                MoveNext();
+                k.Handled = true;
+                return;
+            }
+
+            if (k == Key.CursorLeft || k == Key.PageUp)
+            {
+                PagePrevious();
+                k.Handled = true;
+                return;
+            }
+
+            if (k == Key.CursorRight || k == Key.PageDown)
+            {
+                PageNext();
+                k.Handled = true;
+                return;
+            }
+
+            if (k == Key.End)
+            {
+                ScrollToEnd();
+                k.Handled = true;
+                return;
+            }
+
+            if (k == Key.Enter)
+            {
+                ActivateSelected();
+                k.Handled = true;
+                return;
             }
 
             if (k == Key.Tab || k.AsRune.Value == '\t' || k.ToString().Contains("Tab"))
@@ -1063,6 +1131,29 @@ public sealed class SongCommentView : View
                 }
             }
             _listView.SelectedItem = center;
+        }
+    }
+
+    public void MoveNext() => NavigateToNextSelectableItem(forward: true);
+    public void MovePrevious() => NavigateToNextSelectableItem(forward: false);
+    public void PageNext() => PageNavigate(forward: true);
+    public void PagePrevious() => PageNavigate(forward: false);
+    public void ActivateSelected()
+    {
+        int idx = _listView.SelectedItem ?? -1;
+        if (idx >= 0 && idx < _displayItems.Count)
+        {
+            var item = _displayItems[idx];
+            if (item.Type == ItemType.HotToggle)
+            {
+                _isHotExpanded = !_isHotExpanded;
+                RebuildDisplayItems();
+                return;
+            }
+            if (item.Comment != null && !string.IsNullOrEmpty(item.Comment.PicUrl))
+            {
+                ShowCommentImagePreview(item.Comment);
+            }
         }
     }
 

@@ -250,6 +250,8 @@ public sealed partial class MainWindow
             // 4. 全局 Tab 与 Shift+Tab 流转
             if (k == Key.Tab || k.AsRune.Value == '\t' || k.ToString().Contains("Tab"))
             {
+                var curFocused = Application.Navigation?.GetFocused();
+                AppLogger.Force("MainWindow", $"Global Tab pressed: isShift={k.IsShift}, _isNowPlayingViewActive={_isNowPlayingViewActive}, focusedView={curFocused?.GetType().Name ?? "null"}");
                 k.Handled = true;
                 _isSearchActive = false;
                 _searchField.CanFocus = false;
@@ -263,7 +265,7 @@ public sealed partial class MainWindow
             }
 
             // 5. 焦点丢失/悬空时的安全自愈兜底（按方向键或回车立即将焦点恢复至中央歌曲列表）
-            if (GetFocusedWindowIndex(focused) == -1 && (k == Key.CursorUp || k == Key.CursorDown || k == Key.CursorLeft || k == Key.CursorRight || k == Key.Enter))
+            if (!_isNowPlayingViewActive && GetFocusedWindowIndex(focused) == -1 && (k == Key.CursorUp || k == Key.CursorDown || k == Key.CursorLeft || k == Key.CursorRight || k == Key.Enter))
             {
                 _songListView.SetFocusToList();
                 Application.Invoke(UpdateFrameBorderHighlights);

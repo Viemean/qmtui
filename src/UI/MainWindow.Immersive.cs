@@ -189,7 +189,7 @@ public sealed partial class MainWindow
         {
             if (v == _sidebarList || v == _sidebarFrame) return 0;
             if (v == _songListView) return 1;
-            if (v == _lyricFrame || v == _lyricListView || v == _artistAlbumDetailView) return 2;
+            if (v == _lyricFrame || v == _lyricListView || v == _artistAlbumDetailView || v == _songCommentView) return 2;
             if (v == _controlBar) return 3;
             if (v == _nowPlayingView) return 4;
         }

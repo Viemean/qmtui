@@ -303,12 +303,15 @@ public sealed class InteractiveLinkView : Label
     public event Action? LinkSelected;
     public event Action? NavigateNextRequested;
     public event Action? NavigatePrevRequested;
+    public event Action<bool>? TabNavigationRequested;
 
     public InteractiveLinkView(string initialText)
     {
         _text = initialText;
         CanFocus = true;
         TabStop = TabBehavior.TabGroup;
+        KeyBindings.Remove(Key.Tab);
+        KeyBindings.Remove(Key.Tab.WithShift);
         Height = 1;
         MousePositionTracking = true;
         UpdateMetrics();
@@ -362,6 +365,13 @@ public sealed class InteractiveLinkView : Label
         KeyDown += (s, k) =>
         {
             if (!CanFocus) return;
+
+            if (k == Key.Tab || k.AsRune.Value == '\t' || k.ToString().Contains("Tab"))
+            {
+                TabNavigationRequested?.Invoke(!k.IsShift);
+                k.Handled = true;
+                return;
+            }
 
             if (k == Key.Enter || k.AsRune.Value == '\r' || k.AsRune.Value == '\n')
             {

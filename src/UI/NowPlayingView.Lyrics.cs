@@ -28,14 +28,96 @@ public sealed partial class NowPlayingView
         TriggerImmersiveActivity();
         TriggerInteractiveActivity();
 
+        var currentFocused = Application.Navigation?.GetFocused();
+        AppLogger.Force("NowPlayingView", $"HandleTabNavigation: forward={forward}, isImmersive={_isImmersiveMode}, isImageSupported={TerminalImageHelper.IsImageSupported}, isCommentViewActive={_isCommentViewActive}, commentHasActiveFocus={_commentView.HasActiveFocus}, focusedView={currentFocused?.GetType().Name ?? "null"}");
+
         if (_isImmersiveMode || !TerminalImageHelper.IsImageSupported)
         {
-            // 沉浸模式或无图全宽歌词模式下（封面容器已隐藏）：直接流转至底部控制栏
+            if (_isCommentViewActive)
+            {
+                if (_commentView.HasActiveFocus)
+                {
+                    AppLogger.Force("NowPlayingView", "HandleTabNavigation: in no-image/immersive mode, switching focus from CommentView to ControlBar");
+                    FocusControlBarRequested?.Invoke();
+                }
+                else
+                {
+                    bool res = _commentView.SetFocus();
+                    AppLogger.Force("NowPlayingView", $"HandleTabNavigation: in no-image/immersive mode, switching focus to CommentView, result={res}");
+                }
+                FocusChangedNotification?.Invoke();
+                return;
+            }
             FocusControlBarRequested?.Invoke();
             return;
         }
 
-        // 普通模式（有底栏）：在交互项目与底部控制台之间轮转
+        // 评论区激活时：在 [评论区] <-> [歌手] <-> [专辑] <-> [底栏] 之间四元轮转
+        if (_isCommentViewActive)
+        {
+            if (_commentView.HasActiveFocus)
+            {
+                if (forward)
+                {
+                    bool res = _artistLink.SetFocus();
+                    AppLogger.Force("NowPlayingView", $"HandleTabNavigation: CommentView -> ArtistLink, result={res}");
+                }
+                else
+                {
+                    AppLogger.Force("NowPlayingView", "HandleTabNavigation: CommentView -> ControlBar");
+                    FocusControlBarRequested?.Invoke();
+                }
+                FocusChangedNotification?.Invoke();
+            }
+            else if (_artistLink.HasFocus)
+            {
+                if (forward)
+                {
+                    bool res = _albumLink.SetFocus();
+                    AppLogger.Force("NowPlayingView", $"HandleTabNavigation: ArtistLink -> AlbumLink, result={res}");
+                    FocusChangedNotification?.Invoke();
+                }
+                else
+                {
+                    bool res = _commentView.SetFocus();
+                    AppLogger.Force("NowPlayingView", $"HandleTabNavigation: ArtistLink -> CommentView, result={res}");
+                    FocusChangedNotification?.Invoke();
+                }
+            }
+            else if (_albumLink.HasFocus)
+            {
+                if (forward)
+                {
+                    AppLogger.Force("NowPlayingView", "HandleTabNavigation: AlbumLink -> ControlBar");
+                    FocusControlBarRequested?.Invoke();
+                }
+                else
+                {
+                    bool res = _artistLink.SetFocus();
+                    AppLogger.Force("NowPlayingView", $"HandleTabNavigation: AlbumLink -> ArtistLink, result={res}");
+                    FocusChangedNotification?.Invoke();
+                }
+            }
+            else
+            {
+                // 当前焦点在底栏或外部刚切入
+                if (forward)
+                {
+                    bool res = _commentView.SetFocus();
+                    AppLogger.Force("NowPlayingView", $"HandleTabNavigation: External/ControlBar -> CommentView, result={res}");
+                    FocusChangedNotification?.Invoke();
+                }
+                else
+                {
+                    bool res = _albumLink.SetFocus();
+                    AppLogger.Force("NowPlayingView", $"HandleTabNavigation: External/ControlBar -> AlbumLink, result={res}");
+                    FocusChangedNotification?.Invoke();
+                }
+            }
+            return;
+        }
+
+        // 普通歌词模式（有底栏）：在交互项目与底部控制台之间轮转
         if (_artistLink.HasFocus)
         {
             if (forward)

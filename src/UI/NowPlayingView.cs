@@ -11,6 +11,7 @@ using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using QmTui.Models;
+using QmTui.Utils;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 using Color = Terminal.Gui.Drawing.Color;
 using Rectangle = System.Drawing.Rectangle;
@@ -100,8 +101,8 @@ public sealed partial class NowPlayingView : View
             Y = 0,
             Width = isImageSupported ? Dim.Percent(48) : 0,
             Height = Dim.Fill(),
-            CanFocus = isImageSupported,
-            TabStop = TabBehavior.NoStop,
+            CanFocus = true,
+            TabStop = TabBehavior.TabGroup,
             MousePositionTracking = true,
             Visible = isImageSupported
         };
@@ -218,6 +219,9 @@ public sealed partial class NowPlayingView : View
             FocusChangedNotification?.Invoke();
         };
 
+        _artistLink.TabNavigationRequested += forward => HandleTabNavigation(forward);
+        _albumLink.TabNavigationRequested += forward => HandleTabNavigation(forward);
+
         _artistLink.HasFocusChanged += (s, e) => FocusChangedNotification?.Invoke();
         _albumLink.HasFocusChanged += (s, e) => FocusChangedNotification?.Invoke();
         _artistLink.MouseEnter += (s, e) => TriggerInteractiveActivity();
@@ -234,7 +238,8 @@ public sealed partial class NowPlayingView : View
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
-            CanFocus = false
+            CanFocus = true,
+            TabStop = TabBehavior.TabGroup
         };
 
         _lyricListView = new ListView
@@ -462,6 +467,60 @@ public sealed partial class NowPlayingView : View
             TriggerImmersiveActivity();
             TriggerInteractiveActivity();
 
+            if (_isCommentViewActive)
+            {
+                AppLogger.Force("NowPlayingView", $"KeyDown in comment mode: key={k}, focused={Application.Navigation?.GetFocused()?.GetType().Name ?? "null"}, commentHasActiveFocus={_commentView.HasActiveFocus}");
+                if (k == Key.CursorUp)
+                {
+                    _commentView.SetFocus();
+                    _commentView.MovePrevious();
+                    k.Handled = true;
+                    return;
+                }
+                if (k == Key.CursorDown)
+                {
+                    _commentView.SetFocus();
+                    _commentView.MoveNext();
+                    k.Handled = true;
+                    return;
+                }
+                if (k == Key.CursorLeft || k == Key.PageUp)
+                {
+                    _commentView.SetFocus();
+                    _commentView.PagePrevious();
+                    k.Handled = true;
+                    return;
+                }
+                if (k == Key.CursorRight || k == Key.PageDown)
+                {
+                    _commentView.SetFocus();
+                    _commentView.PageNext();
+                    k.Handled = true;
+                    return;
+                }
+                if (k == Key.Home)
+                {
+                    _commentView.SetFocus();
+                    _commentView.ScrollToTop();
+                    k.Handled = true;
+                    return;
+                }
+                if (k == Key.End)
+                {
+                    _commentView.SetFocus();
+                    _commentView.ScrollToEnd();
+                    k.Handled = true;
+                    return;
+                }
+                if (k == Key.Enter)
+                {
+                    _commentView.SetFocus();
+                    _commentView.ActivateSelected();
+                    k.Handled = true;
+                    return;
+                }
+            }
+
             var ch = char.ToUpperInvariant((char)k.AsRune.Value);
             if (ch == 'E')
             {
@@ -594,6 +653,7 @@ public sealed partial class NowPlayingView : View
     public void ToggleCommentView()
     {
         _isCommentViewActive = !_isCommentViewActive;
+        AppLogger.Force("NowPlayingView", $"ToggleCommentView: _isCommentViewActive={_isCommentViewActive}");
         if (_isCommentViewActive)
         {
             _lyricListView.Visible = false;
@@ -604,6 +664,8 @@ public sealed partial class NowPlayingView : View
             _commentView.Visible = true;
             _commentView.SetSong(_currentSong);
             _commentView.OnActivated();
+            bool fRes = _commentView.SetFocus();
+            AppLogger.Force("NowPlayingView", $"ToggleCommentView: _commentView.SetFocus()={fRes}, HasActiveFocus={_commentView.HasActiveFocus}");
         }
         else
         {
