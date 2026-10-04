@@ -83,8 +83,10 @@ public static partial class TerminalImageHelper
                 return true;
             }
 
-            // 2. 探测原生支持 Kitty Graphics Protocol 独立渲染层的终端（Ghostty 等）
-            if (termProgram.Equals("ghostty", StringComparison.OrdinalIgnoreCase))
+            // 2. 探测原生支持 Kitty Graphics Protocol 独立渲染层的终端（Ghostty, Rio 等）
+            if (termProgram.Equals("ghostty", StringComparison.OrdinalIgnoreCase) ||
+                termProgram.Equals("rio", StringComparison.OrdinalIgnoreCase) ||
+                term.Equals("rio", StringComparison.OrdinalIgnoreCase))
             {
                 s_isImageSupported = true;
                 return true;
