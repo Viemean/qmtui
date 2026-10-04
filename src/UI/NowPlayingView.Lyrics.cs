@@ -306,6 +306,7 @@ public sealed partial class NowPlayingView
     {
         Visible = true;
         SetFocus();
+        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
         _lastRenderCols = Viewport.Width;
         _lastRenderRows = Viewport.Height;
         RefreshLyrics();

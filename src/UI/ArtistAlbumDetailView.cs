@@ -158,7 +158,7 @@ public sealed class ArtistAlbumDetailView : View
 
         _imageContainer.ViewportChanged += (s, e) =>
         {
-            if (Visible)
+            if (IsActuallyVisible())
             {
                 TriggerImageRenderDelayed();
             }
@@ -226,6 +226,26 @@ public sealed class ArtistAlbumDetailView : View
         TriggerImageRenderDelayed();
     }
 
+    private bool IsActuallyVisible()
+    {
+        if (!Visible) return false;
+        for (View? v = SuperView; v != null; v = v.SuperView)
+        {
+            if (!v.Visible) return false;
+        }
+        return true;
+    }
+
+    public void ClearImage()
+    {
+        if (_resizeTimerToken != null)
+        {
+            Application.RemoveTimeout(_resizeTimerToken);
+            _resizeTimerToken = null;
+        }
+        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
+    }
+
     public void OnActivated()
     {
         Visible = true;
@@ -235,24 +255,23 @@ public sealed class ArtistAlbumDetailView : View
     public void OnDeactivated()
     {
         Visible = false;
-        if (_resizeTimerToken != null)
-        {
-            Application.RemoveTimeout(_resizeTimerToken);
-            _resizeTimerToken = null;
-        }
-        TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
+        ClearImage();
     }
 
     public void OnWindowResized()
     {
-        if (!Visible) return;
+        if (!IsActuallyVisible()) return;
         TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdArtistDetail);
         TriggerImageRenderDelayed();
     }
 
     internal void TriggerImageRenderDelayed()
     {
-        if (!Visible) return;
+        if (!IsActuallyVisible())
+        {
+            ClearImage();
+            return;
+        }
 
         bool hasValidImage = !string.IsNullOrEmpty(_currentImagePath) && File.Exists(_currentImagePath);
         if (!TerminalImageHelper.IsImageSupported || !hasValidImage)
@@ -276,14 +295,14 @@ public sealed class ArtistAlbumDetailView : View
         _resizeTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(60), () =>
         {
             _resizeTimerToken = null;
-            if (Visible)
+            if (IsActuallyVisible())
             {
                 RenderImageIfVisible();
 
                 // 第二阶段：250ms 二次补位重绘，确保所有边框背景绘制完后 Kitty 原生图像稳定置顶
                 Application.AddTimeout(TimeSpan.FromMilliseconds(250), () =>
                 {
-                    if (Visible)
+                    if (IsActuallyVisible())
                     {
                         RenderImageIfVisible();
                     }
@@ -296,7 +315,7 @@ public sealed class ArtistAlbumDetailView : View
 
     private void RenderImageIfVisible()
     {
-        if (!Visible || !TerminalImageHelper.IsImageSupported || string.IsNullOrEmpty(_currentImagePath) || !File.Exists(_currentImagePath))
+        if (!IsActuallyVisible() || !TerminalImageHelper.IsImageSupported || string.IsNullOrEmpty(_currentImagePath) || !File.Exists(_currentImagePath))
         {
             _titleLabel.Visible = true;
             _subLabel.Visible = true;

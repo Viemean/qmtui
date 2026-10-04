@@ -250,6 +250,7 @@ public sealed partial class MainWindow
         _sidebarFrame.Visible = false;
         _miniCoverView.Visible = false;
         _miniCoverView.ClearCover();
+        _artistAlbumDetailView.ClearImage();
         _songListView.Visible = false;
         _lyricFrame.Visible = false;
         _searchLabel.Visible = false;
@@ -340,7 +341,7 @@ public sealed partial class MainWindow
 
         if (_artistAlbumDetailView.Visible)
         {
-            _artistAlbumDetailView.OnDeactivated();
+            _artistAlbumDetailView.ClearImage();
         }
         else
         {
