@@ -607,6 +607,7 @@ public sealed partial class MainWindow : Window
                 _sidebarClickInEmptyArea = false;
                 return;
             }
+            CancelFavoriteSync();
             ClearNavigationStack();
             var idx = _sidebarList.SelectedItem ?? 0;
             if (idx == 0)

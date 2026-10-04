@@ -17,10 +17,16 @@ public sealed partial class MainWindow
 {
     private CancellationTokenSource? _favoriteSyncCts;
 
-    private async Task LoadFavoriteSongsAsync(bool forceRefresh = false)
+    private void CancelFavoriteSync()
     {
         _favoriteSyncCts?.Cancel();
         _favoriteSyncCts?.Dispose();
+        _favoriteSyncCts = null;
+    }
+
+    private async Task LoadFavoriteSongsAsync(bool forceRefresh = false)
+    {
+        CancelFavoriteSync();
         _favoriteSyncCts = new CancellationTokenSource();
         var ct = _favoriteSyncCts.Token;
 
@@ -144,7 +150,7 @@ public sealed partial class MainWindow
                     var currentCount = allSongs.Count;
                     Application.Invoke(() =>
                     {
-                        if (_currentViewMode == ViewMode.Favorite)
+                        if (_currentViewMode == ViewMode.Favorite && !ct.IsCancellationRequested)
                         {
                             _songListView.Title = $"我的喜欢: 正在同步更多 ({currentCount}/{result.Total} 首)...";
                             _controlBar.UpdateStatus($"[后台同步] 正在载入我的喜欢更多曲目 ({currentCount}/{result.Total} 首)...");
