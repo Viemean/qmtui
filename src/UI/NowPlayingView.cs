@@ -123,7 +123,7 @@ public sealed partial class NowPlayingView : View
 
         _unsupportedLabel3 = new Label
         {
-            Text = "(如 Kitty / WezTerm / Ghostty)",
+            Text = "(如 Kitty / Ghostty)",
             X = Pos.Center(),
             Y = Pos.Center() + 2,
             Visible = false
