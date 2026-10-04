@@ -431,11 +431,35 @@ public sealed partial class MainWindow
 
     private async Task HandleRealEscapeKeyAsync()
     {
+        if (_isNowPlayingViewActive)
+        {
+            if (_nowPlayingView.CommentView.IsImagePreviewActive)
+            {
+                _nowPlayingView.CommentView.CloseCommentImagePreview();
+                return;
+            }
+            if (Environment.TickCount64 - _nowPlayingView.CommentView.LastPreviewCloseTick < 400)
+            {
+                return;
+            }
+            if (_nowPlayingView.IsCommentViewActive)
+            {
+                _nowPlayingView.ToggleCommentView();
+                return;
+            }
+            CloseNowPlayingView();
+            return;
+        }
+
         if (_isCommentViewActive)
         {
             if (_songCommentView.IsImagePreviewActive)
             {
                 _songCommentView.CloseCommentImagePreview();
+                return;
+            }
+            if (Environment.TickCount64 - _songCommentView.LastPreviewCloseTick < 400)
+            {
                 return;
             }
             ToggleCommentView();
@@ -445,10 +469,6 @@ public sealed partial class MainWindow
         {
             ApplyImmersiveMode(false);
             return;
-        }
-        if (_isNowPlayingViewActive)
-        {
-            CloseNowPlayingView();
         }
         else if (_navigationStack.Count > 0)
         {

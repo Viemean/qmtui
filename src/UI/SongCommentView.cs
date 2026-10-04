@@ -80,6 +80,7 @@ public sealed class SongCommentView : View
     public int TotalCommentCount => _totalCommentCount;
     public bool IsLoading => _isLoading;
     public bool IsImagePreviewActive => _previewOverlay?.Visible ?? false;
+    public long LastPreviewCloseTick => _lastPreviewCloseTick;
     public bool HasActiveFocus => HasFocus || _listView.HasFocus || (_previewOverlay?.HasFocus ?? false);
 
     public new bool SetFocus()

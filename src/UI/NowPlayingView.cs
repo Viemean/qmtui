@@ -580,6 +580,11 @@ public sealed partial class NowPlayingView : View
                         k.Handled = true;
                         return;
                     }
+                    if (Environment.TickCount64 - _commentView.LastPreviewCloseTick < 400)
+                    {
+                        k.Handled = true;
+                        return;
+                    }
                     ToggleCommentView();
                     k.Handled = true;
                     return;
