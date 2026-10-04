@@ -515,6 +515,12 @@ public sealed partial class NowPlayingView : View
             {
                 if (_isCommentViewActive)
                 {
+                    if (_commentView.IsImagePreviewActive)
+                    {
+                        _commentView.CloseCommentImagePreview();
+                        k.Handled = true;
+                        return;
+                    }
                     ToggleCommentView();
                     k.Handled = true;
                     return;

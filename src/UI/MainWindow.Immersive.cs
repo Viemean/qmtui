@@ -426,6 +426,11 @@ public sealed partial class MainWindow
     {
         if (_isCommentViewActive)
         {
+            if (_songCommentView.IsImagePreviewActive)
+            {
+                _songCommentView.CloseCommentImagePreview();
+                return;
+            }
             ToggleCommentView();
             return;
         }

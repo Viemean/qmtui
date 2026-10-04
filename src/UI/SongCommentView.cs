@@ -71,11 +71,13 @@ public sealed class SongCommentView : View
     private SongComment? _previewingComment;
     private int _lastClickedItemIndex = -1;
     private long _lastClickTicks;
+    private long _lastPreviewCloseTick;
 
     public event Action? CloseRequested;
     public event Action<bool>? TabNavigationRequested;
 
     public bool IsLoading => _isLoading;
+    public bool IsImagePreviewActive => _previewOverlay?.Visible ?? false;
 
     public SongCommentView()
     {
@@ -190,32 +192,46 @@ public sealed class SongCommentView : View
 
         _listView.KeyDown += (s, k) =>
         {
-            var ch = char.ToUpperInvariant((char)k.AsRune.Value);
-            if (ch == 'I' || k == Key.I)
+            if (k == Key.CursorDown)
             {
-                var target = GetTargetCommentForPreview(out int targetRowIdx);
-                if (target != null)
-                {
-                    if (targetRowIdx >= 0 && targetRowIdx < _displayItems.Count)
-                    {
-                        _listView.SelectedItem = targetRowIdx;
-                    }
-                    ShowCommentImagePreview(target);
-                    k.Handled = true;
-                    return;
-                }
+                NavigateToNextSelectableItem(forward: true);
+                k.Handled = true;
+                return;
             }
 
-            if (k == Key.CursorDown || k == Key.PageDown || k == Key.End)
+            if (k == Key.CursorUp)
             {
-                _scrollBar.TriggerActivity();
-                _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
-                CheckTriggerLoadMore();
+                NavigateToNextSelectableItem(forward: false);
+                k.Handled = true;
+                return;
             }
-            else if (k == Key.CursorUp || k == Key.PageUp || k == Key.Home)
+
+            if (k == Key.CursorLeft || k == Key.PageUp)
             {
-                _scrollBar.TriggerActivity();
-                _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+                PageNavigate(forward: false);
+                k.Handled = true;
+                return;
+            }
+
+            if (k == Key.CursorRight || k == Key.PageDown)
+            {
+                PageNavigate(forward: true);
+                k.Handled = true;
+                return;
+            }
+
+            if (k == Key.Home)
+            {
+                ScrollToTop();
+                k.Handled = true;
+                return;
+            }
+
+            if (k == Key.End)
+            {
+                ScrollToEnd();
+                k.Handled = true;
+                return;
             }
         };
 
@@ -340,8 +356,8 @@ public sealed class SongCommentView : View
         {
             X = Pos.Center(),
             Y = Pos.Center(),
-            Width = 42,
-            Height = 18,
+            Width = 38,
+            Height = 7,
             Title = "📷 评论配图",
             BorderStyle = LineStyle.Rounded
         };
@@ -379,7 +395,7 @@ public sealed class SongCommentView : View
 
         _previewHintLabel = new Label
         {
-            Text = "[ 点击任意处或按 Esc / I 关闭 ]",
+            Text = "[ 点击任意处或按 Esc / Enter 关闭 ]",
             X = Pos.Center(),
             Y = Pos.AnchorEnd(1),
             Visible = true
@@ -413,6 +429,12 @@ public sealed class SongCommentView : View
             if (_previewOverlay.Visible)
             {
                 CloseCommentImagePreview();
+                k.Handled = true;
+                return;
+            }
+
+            if (Environment.TickCount64 - _lastPreviewCloseTick < 350)
+            {
                 k.Handled = true;
                 return;
             }
@@ -768,7 +790,7 @@ public sealed class SongCommentView : View
         if (!string.IsNullOrEmpty(c.PicUrl))
         {
             var picText = TerminalImageHelper.IsImageSupported
-                ? "  [📷 评论配图 (按 I 或点击查看)]"
+                ? "  [📷 评论配图 (按 Enter 或点击查看)]"
                 : "  [图片]";
             _displayItems.Add(new DisplayItem(ItemType.CommentPic, picText, c, isHot));
         }
@@ -871,6 +893,120 @@ public sealed class SongCommentView : View
         }
     }
 
+    public void ScrollToEnd()
+    {
+        if (_displayItems.Count > 0)
+        {
+            int last = _displayItems.Count - 1;
+            for (int i = last; i >= 0; i--)
+            {
+                if (IsSelectableCommentRow(_displayItems[i].Type))
+                {
+                    last = i;
+                    break;
+                }
+            }
+            _listView.SelectedItem = last;
+            EnsureRowVisibleInViewport(last);
+            _scrollBar.TriggerActivity();
+            _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+            CheckTriggerLoadMore();
+            SetNeedsDraw();
+        }
+    }
+
+    private static bool IsSelectableCommentRow(ItemType type) =>
+        type == ItemType.CommentMeta || type == ItemType.CommentPic || type == ItemType.HotToggle;
+
+    private void EnsureRowVisibleInViewport(int row)
+    {
+        int viewTop = _listView.Viewport.Y;
+        int viewHeight = _listView.Viewport.Height > 0 ? _listView.Viewport.Height : Frame.Height;
+
+        if (row < viewTop)
+        {
+            _listView.Viewport = new System.Drawing.Rectangle(_listView.Viewport.X, row, _listView.Viewport.Width, _listView.Viewport.Height);
+        }
+        else if (row >= viewTop + viewHeight)
+        {
+            int newY = row - viewHeight + 1;
+            _listView.Viewport = new System.Drawing.Rectangle(_listView.Viewport.X, Math.Max(0, newY), _listView.Viewport.Width, _listView.Viewport.Height);
+        }
+    }
+
+    private void NavigateToNextSelectableItem(bool forward)
+    {
+        if (_displayItems.Count == 0) return;
+
+        int cur = _listView.SelectedItem ?? 0;
+        int next = cur;
+
+        if (forward)
+        {
+            for (int i = cur + 1; i < _displayItems.Count; i++)
+            {
+                if (IsSelectableCommentRow(_displayItems[i].Type))
+                {
+                    next = i;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            for (int i = cur - 1; i >= 0; i--)
+            {
+                if (IsSelectableCommentRow(_displayItems[i].Type))
+                {
+                    next = i;
+                    break;
+                }
+            }
+        }
+
+        if (next != cur)
+        {
+            _listView.SelectedItem = next;
+            EnsureRowVisibleInViewport(next);
+            _scrollBar.TriggerActivity();
+            _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+            if (forward) CheckTriggerLoadMore();
+            SetNeedsDraw();
+        }
+    }
+
+    private void PageNavigate(bool forward)
+    {
+        if (_displayItems.Count == 0) return;
+
+        int viewHeight = _listView.Viewport.Height > 0 ? _listView.Viewport.Height : Frame.Height;
+        int step = Math.Max(2, viewHeight - 2);
+        int cur = _listView.SelectedItem ?? 0;
+        int target = forward ? Math.Min(_displayItems.Count - 1, cur + step) : Math.Max(0, cur - step);
+
+        int best = target;
+        int minDiff = int.MaxValue;
+        for (int i = Math.Max(0, target - 6); i <= Math.Min(_displayItems.Count - 1, target + 6); i++)
+        {
+            if (IsSelectableCommentRow(_displayItems[i].Type))
+            {
+                int diff = Math.Abs(i - target);
+                if (diff < minDiff)
+                {
+                    minDiff = diff;
+                    best = i;
+                }
+            }
+        }
+
+        _listView.SelectedItem = best;
+        EnsureRowVisibleInViewport(best);
+        _scrollBar.TriggerActivity();
+        _scrollBar.UpdateMetrics(_displayItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
+        if (forward) CheckTriggerLoadMore();
+        SetNeedsDraw();
+    }
+
     private void EnsureSelectedItemInViewport()
     {
         int viewTop = _listView.Viewport.Y;
@@ -879,107 +1015,27 @@ public sealed class SongCommentView : View
         if (curSel < viewTop || curSel >= viewTop + viewHeight)
         {
             int center = Math.Clamp(viewTop + viewHeight / 2, 0, Math.Max(0, _displayItems.Count - 1));
+            for (int i = center; i < Math.Min(_displayItems.Count, center + 4); i++)
+            {
+                if (IsSelectableCommentRow(_displayItems[i].Type))
+                {
+                    center = i;
+                    break;
+                }
+            }
             _listView.SelectedItem = center;
         }
     }
 
-    private SongComment? GetTargetCommentForPreview(out int targetRowIdx)
-    {
-        targetRowIdx = -1;
-        if (_displayItems.Count == 0) return null;
-
-        int selIdx = _listView.SelectedItem ?? -1;
-        int viewTop = _listView.Viewport.Y;
-        int viewHeight = _listView.Viewport.Height > 0 ? _listView.Viewport.Height : Frame.Height;
-
-        // 1. 如果当前光标在视口内且当前行属于带图评论
-        if (selIdx >= viewTop && selIdx < viewTop + viewHeight && selIdx >= 0 && selIdx < _displayItems.Count)
-        {
-            var curItem = _displayItems[selIdx];
-            if (curItem.Comment != null && !string.IsNullOrEmpty(curItem.Comment.PicUrl))
-            {
-                targetRowIdx = FindCommentPicRowIndex(curItem.Comment, selIdx);
-                return curItem.Comment;
-            }
-        }
-
-        // 2. 搜索当前视口可见区域内的所有带图项
-        int minIdx = Math.Max(0, viewTop);
-        int maxIdx = Math.Min(_displayItems.Count - 1, viewTop + viewHeight - 1);
-
-        // 2.1 若光标在视口内，找视口内离光标最近的带图项
-        if (selIdx >= minIdx && selIdx <= maxIdx)
-        {
-            SongComment? nearest = null;
-            int minDistance = int.MaxValue;
-            int foundRow = -1;
-            for (int i = minIdx; i <= maxIdx; i++)
-            {
-                var item = _displayItems[i];
-                if (item.Comment != null && !string.IsNullOrEmpty(item.Comment.PicUrl))
-                {
-                    int dist = Math.Abs(i - selIdx);
-                    if (dist < minDistance)
-                    {
-                        minDistance = dist;
-                        nearest = item.Comment;
-                        foundRow = i;
-                    }
-                }
-            }
-            if (nearest != null)
-            {
-                targetRowIdx = FindCommentPicRowIndex(nearest, foundRow);
-                return nearest;
-            }
-        }
-
-        // 2.2 若光标不在当前视口内，从视口顶部向下取第一张可见配图
-        for (int i = minIdx; i <= maxIdx; i++)
-        {
-            var item = _displayItems[i];
-            if (item.Comment != null && !string.IsNullOrEmpty(item.Comment.PicUrl))
-            {
-                targetRowIdx = FindCommentPicRowIndex(item.Comment, i);
-                return item.Comment;
-            }
-        }
-
-        // 2.3 全局保底
-        if (selIdx >= 0 && selIdx < _displayItems.Count)
-        {
-            var item = _displayItems[selIdx];
-            if (item.Comment != null && !string.IsNullOrEmpty(item.Comment.PicUrl))
-            {
-                targetRowIdx = FindCommentPicRowIndex(item.Comment, selIdx);
-                return item.Comment;
-            }
-        }
-
-        return null;
-    }
-
-    private int FindCommentPicRowIndex(SongComment comment, int fallbackIdx)
-    {
-        for (int i = Math.Max(0, fallbackIdx - 6); i <= Math.Min(_displayItems.Count - 1, fallbackIdx + 6); i++)
-        {
-            if (_displayItems[i].Type == ItemType.CommentPic && _displayItems[i].Comment?.CommentId == comment.CommentId)
-            {
-                return i;
-            }
-        }
-        return fallbackIdx;
-    }
-
     private (int targetCols, int targetRows) CalculateAdaptiveImageDimensions(string? localPath)
     {
-        int maxR = Math.Clamp(Frame.Height - 6, 8, 22);
-        int maxC = Math.Clamp(Frame.Width - 6, 16, 56);
+        // 尽可能占满歌曲界面（右半区）可用空间，同时受限于 Frame.Width 与 Frame.Height，绝不侵占左侧封面
+        int maxC = Math.Max(16, Frame.Width - 4);
+        int maxR = Math.Max(8, Frame.Height - 4);
 
         var dims = TerminalImageHelper.GetImageDimensions(localPath);
         if (dims != null && dims.Value.width > 0 && dims.Value.height > 0)
         {
-            // 物理像素宽高在终端 1:2 字符比例下的自然字符宽高比
             double cellAspect = (double)dims.Value.width / dims.Value.height * 2.0;
 
             int targetRows = maxR;
@@ -996,7 +1052,7 @@ public sealed class SongCommentView : View
             return (targetCols, targetRows);
         }
 
-        return (Math.Min(maxC, 38), Math.Min(maxR, 14));
+        return (Math.Min(maxC, 60), Math.Min(maxR, 26));
     }
 
     private void UpdatePreviewBoxSizeForImage(string? localPath)
@@ -1018,6 +1074,15 @@ public sealed class SongCommentView : View
         _previewMaskLabel.Text = sb.ToString();
     }
 
+    private void SetLoadingPreviewBox()
+    {
+        _previewBox.Width = 38;
+        _previewBox.Height = 7;
+        _previewMaskLabel.Text = "";
+        _previewLoadingLabel.Visible = true;
+        _previewOverlay.SetNeedsLayout();
+    }
+
     private void ShowCommentImagePreview(SongComment comment)
     {
         if (!TerminalImageHelper.IsImageSupported || string.IsNullOrEmpty(comment.PicUrl)) return;
@@ -1026,11 +1091,21 @@ public sealed class SongCommentView : View
         _previewBox.Title = $"📷 {comment.Nick} 的配图";
 
         var localPath = TerminalImageHelper.GetCommentImageLocalPath(comment.CommentId);
-        UpdatePreviewBoxSizeForImage(localPath);
+        bool hasCached = File.Exists(localPath) && new FileInfo(localPath).Length > 0;
+
+        if (hasCached)
+        {
+            UpdatePreviewBoxSizeForImage(localPath);
+            _previewLoadingLabel.Visible = false;
+        }
+        else
+        {
+            SetLoadingPreviewBox();
+        }
 
         _previewOverlay.Visible = true;
-        _previewLoadingLabel.Visible = true;
         _previewOverlay.SetFocus();
+        _previewOverlay.SetNeedsLayout();
         SetNeedsDraw();
 
         if (_previewRenderTimerToken != null)
@@ -1039,7 +1114,7 @@ public sealed class SongCommentView : View
             _previewRenderTimerToken = null;
         }
 
-        _previewRenderTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(80), () =>
+        _previewRenderTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(hasCached ? 60 : 80), () =>
         {
             _previewRenderTimerToken = null;
             if (_previewOverlay.Visible && _previewingComment == comment)
@@ -1050,15 +1125,19 @@ public sealed class SongCommentView : View
         });
     }
 
-    private void CloseCommentImagePreview()
+    public void CloseCommentImagePreview()
     {
+        _lastPreviewCloseTick = Environment.TickCount64;
         if (_previewRenderTimerToken != null)
         {
             Application.RemoveTimeout(_previewRenderTimerToken);
             _previewRenderTimerToken = null;
         }
         TerminalImageHelper.DeleteKittyImage(TerminalImageHelper.ImageIdCommentPreview);
-        _previewOverlay.Visible = false;
+        if (_previewOverlay != null)
+        {
+            _previewOverlay.Visible = false;
+        }
         _previewingComment = null;
         _listView.SetFocus();
         SetNeedsDraw();
@@ -1097,7 +1176,7 @@ public sealed class SongCommentView : View
             }
             else
             {
-                _previewLoadingLabel.Visible = true;
+                SetLoadingPreviewBox();
                 _ = Task.Run(async () =>
                 {
                     var downloaded = await TerminalImageHelper.EnsureCommentImageDownloadedAsync(comment.PicUrl, comment.CommentId).ConfigureAwait(false);
@@ -1107,7 +1186,25 @@ public sealed class SongCommentView : View
                         {
                             if (_previewOverlay.Visible && _previewingComment == comment)
                             {
-                                RenderPreviewImage(comment);
+                                UpdatePreviewBoxSizeForImage(downloaded);
+                                _previewOverlay.SetNeedsLayout();
+                                SetNeedsDraw();
+
+                                if (_previewRenderTimerToken != null)
+                                {
+                                    Application.RemoveTimeout(_previewRenderTimerToken);
+                                    _previewRenderTimerToken = null;
+                                }
+
+                                _previewRenderTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(70), () =>
+                                {
+                                    _previewRenderTimerToken = null;
+                                    if (_previewOverlay.Visible && _previewingComment == comment)
+                                    {
+                                        RenderPreviewImage(comment);
+                                    }
+                                    return false;
+                                });
                             }
                         });
                     }
