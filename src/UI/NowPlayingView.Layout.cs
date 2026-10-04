@@ -287,6 +287,7 @@ public sealed class InteractiveLinkView : Label
 {
     private string _text;
     private bool _isHighlightSuppressed;
+    private bool _isHovered;
 
     public int ContentWidth { get; private set; }
 
@@ -300,11 +301,37 @@ public sealed class InteractiveLinkView : Label
         CanFocus = true;
         TabStop = TabBehavior.TabGroup;
         Height = 1;
+        MousePositionTracking = true;
         UpdateMetrics();
+
+        MouseEnter += (s, e) =>
+        {
+            if (!CanFocus) return;
+            if (!_isHovered)
+            {
+                _isHovered = true;
+                UpdateVisualScheme();
+            }
+        };
+
+        MouseLeave += (s, e) =>
+        {
+            if (_isHovered)
+            {
+                _isHovered = false;
+                UpdateVisualScheme();
+            }
+        };
 
         MouseEvent += (s, m) =>
         {
             if (!CanFocus) return; // 沉浸模式下禁用一切交互与选中
+
+            if (!_isHovered)
+            {
+                _isHovered = true;
+                UpdateVisualScheme();
+            }
 
             // 单击仅获焦，双击才执行激活跳转（防止误触）
             if (m.Flags.HasFlag(MouseFlags.LeftButtonDoubleClicked))
@@ -365,6 +392,10 @@ public sealed class InteractiveLinkView : Label
     {
         CanFocus = enabled;
         TabStop = enabled ? TabBehavior.TabGroup : TabBehavior.NoStop;
+        if (!enabled)
+        {
+            _isHovered = false;
+        }
         UpdateVisualScheme();
     }
 
@@ -387,7 +418,7 @@ public sealed class InteractiveLinkView : Label
 
     private void UpdateVisualScheme()
     {
-        bool showActive = CanFocus && HasFocus && !_isHighlightSuppressed;
+        bool showActive = CanFocus && (HasFocus || _isHovered) && !_isHighlightSuppressed;
         if (showActive)
         {
             SetScheme(new Scheme

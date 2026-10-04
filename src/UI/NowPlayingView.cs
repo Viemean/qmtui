@@ -98,7 +98,9 @@ public sealed partial class NowPlayingView : View
             Y = 0,
             Width = isImageSupported ? Dim.Percent(48) : 0,
             Height = Dim.Fill(),
-            CanFocus = false,
+            CanFocus = isImageSupported,
+            TabStop = TabBehavior.NoStop,
+            MousePositionTracking = true,
             Visible = isImageSupported
         };
 
@@ -142,7 +144,9 @@ public sealed partial class NowPlayingView : View
             Y = Pos.AnchorEnd(4),
             Width = Dim.Fill(2),
             Height = 3,
-            CanFocus = true
+            CanFocus = true,
+            TabStop = TabBehavior.NoStop,
+            MousePositionTracking = true
         };
 
         _artistLink = new InteractiveLinkView("");
@@ -214,6 +218,8 @@ public sealed partial class NowPlayingView : View
 
         _artistLink.HasFocusChanged += (s, e) => FocusChangedNotification?.Invoke();
         _albumLink.HasFocusChanged += (s, e) => FocusChangedNotification?.Invoke();
+        _artistLink.MouseEnter += (s, e) => TriggerInteractiveActivity();
+        _albumLink.MouseEnter += (s, e) => TriggerInteractiveActivity();
 
         _songInfoContainer.Add(_artistLink, _hyphenLabel, _songTitleLabel, _albumLink);
         _coverContainer.Add(_songInfoContainer);
