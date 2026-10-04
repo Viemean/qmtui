@@ -245,11 +245,14 @@ public static partial class TerminalImageHelper
 
     /// <summary>
     /// 获取封面本地缓存路径，如未缓存或损坏则自愈重新拉取并转为 Kitty 协议兼容的 PNG 格式
+    /// <summary>
+    /// 获取专辑封面本地缓存路径，如未缓存则异步拉取并转为 Kitty 协议兼容的 6px 圆角 PNG 格式
     /// </summary>
     public static async Task<string?> EnsureAlbumCoverAsync(string albumMid, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(albumMid) || cancellationToken.IsCancellationRequested) return null;
 
+        var localFile = Path.Combine(s_cacheDir, $"{albumMid}.jpg");
         var pngFile = Path.Combine(s_cacheDir, $"{albumMid}.png");
         bool isOutdated = false;
         if (File.Exists(pngFile))
@@ -281,7 +284,6 @@ public static partial class TerminalImageHelper
             }
         }
 
-        var localFile = Path.Combine(s_cacheDir, $"{albumMid}.jpg");
         if (File.Exists(localFile) && !IsValidJpgFile(localFile))
         {
             try { File.Delete(localFile); } catch {}
@@ -289,17 +291,26 @@ public static partial class TerminalImageHelper
 
         if (isOutdated && File.Exists(localFile))
         {
-            var highResUrl = $"https://y.qq.com/music/photo_new/T002R1200x1200M000{albumMid}.jpg?max_age=2592000";
+            string[] upgradeUrls =
+            [
+                $"https://y.qq.com/music/photo_new/T002R1200x1200M000{albumMid}.jpg?max_age=2592000",
+                $"https://y.gtimg.cn/music/photo_new/T002R800x800M000{albumMid}.jpg?max_age=2592000"
+            ];
             var tempHighRes = localFile + ".highres.tmp";
-            if (await DownloadImageStreamToFileAsync(highResUrl, tempHighRes, cancellationToken).ConfigureAwait(false))
+            foreach (var url in upgradeUrls)
             {
-                try
+                if (cancellationToken.IsCancellationRequested) break;
+                if (await DownloadImageStreamToFileAsync(url, tempHighRes, cancellationToken).ConfigureAwait(false))
                 {
-                    File.Move(tempHighRes, localFile, overwrite: true);
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Debug("TerminalImage", $"Move highres cover failed for {albumMid}: {ex.Message}");
+                    try
+                    {
+                        File.Move(tempHighRes, localFile, overwrite: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("TerminalImage", $"Move highres cover failed for {albumMid}: {ex.Message}");
+                    }
+                    break;
                 }
             }
             try { if (File.Exists(tempHighRes)) File.Delete(tempHighRes); } catch {}
@@ -313,10 +324,10 @@ public static partial class TerminalImageHelper
                 $"https://y.qq.com/music/photo_new/T002R800x800M000{albumMid}.jpg?max_age=2592000",
                 $"https://y.qq.com/music/photo_new/T002R800x800M000{rawMid}_1.jpg?max_age=2592000",
                 $"https://y.qq.com/music/photo_new/T002R800x800M000{rawMid}_2.jpg?max_age=2592000",
+                $"https://y.gtimg.cn/music/photo_new/T002R1200x1200M000{albumMid}.jpg?max_age=2592000",
                 $"https://y.gtimg.cn/music/photo_new/T002R800x800M000{albumMid}.jpg?max_age=2592000",
-                $"https://y.gtimg.cn/music/photo_new/T002R800x800M000{rawMid}_1.jpg?max_age=2592000",
                 $"https://y.qq.com/music/photo_new/T002R500x500M000{albumMid}.jpg?max_age=2592000",
-                $"https://y.qq.com/music/photo_new/T002R300x300M000{albumMid}.jpg?max_age=2592000"
+                $"https://y.qq.com/music/photo_new/T002M000{albumMid}.jpg?max_age=2592000"
             ];
 
             foreach (var url in resolutionUrls)
@@ -476,6 +487,7 @@ public static partial class TerminalImageHelper
     {
         if (string.IsNullOrWhiteSpace(songMid) || string.IsNullOrWhiteSpace(vsMid) || cancellationToken.IsCancellationRequested) return null;
 
+        var localFile = Path.Combine(s_cacheDir, $"single_{songMid}.jpg");
         var pngFile = Path.Combine(s_cacheDir, $"single_{songMid}.png");
         var coverKey = $"single_{songMid}";
         bool isOutdated = false;
@@ -508,7 +520,6 @@ public static partial class TerminalImageHelper
             }
         }
 
-        var localFile = Path.Combine(s_cacheDir, $"single_{songMid}.jpg");
         if (File.Exists(localFile) && !IsValidJpgFile(localFile))
         {
             try { File.Delete(localFile); } catch {}
@@ -518,8 +529,8 @@ public static partial class TerminalImageHelper
         {
             string[] upgradeUrls =
             [
-                $"https://y.qq.com/music/photo_new/T062M000{vsMid}.jpg?max_age=2592000",
-                $"https://y.qq.com/music/photo_new/T062R1200x1200M000{vsMid}.jpg?max_age=2592000"
+                $"https://y.qq.com/music/photo_new/T062R1200x1200M000{vsMid}.jpg?max_age=2592000",
+                $"https://y.gtimg.cn/music/photo_new/T062R800x800M000{vsMid}.jpg?max_age=2592000"
             ];
             var tempHighRes = localFile + ".highres.tmp";
             foreach (var url in upgradeUrls)
@@ -537,11 +548,11 @@ public static partial class TerminalImageHelper
         {
             string[] resolutionUrls =
             [
-                $"https://y.qq.com/music/photo_new/T062M000{vsMid}.jpg?max_age=2592000",          // 原画档案档
                 $"https://y.qq.com/music/photo_new/T062R1200x1200M000{vsMid}.jpg?max_age=2592000",    // 1200x1200 超高清大图
                 $"https://y.qq.com/music/photo_new/T062R800x800M000{vsMid}.jpg?max_age=2592000",      // 800x800 高清档
                 $"https://y.gtimg.cn/music/photo_new/T062R1200x1200M000{vsMid}.jpg?max_age=2592000",  // 备用 CDN
-                $"https://y.qq.com/music/photo_new/T062R500x500M000{vsMid}.jpg?max_age=2592000"
+                $"https://y.qq.com/music/photo_new/T062R500x500M000{vsMid}.jpg?max_age=2592000",
+                $"https://y.qq.com/music/photo_new/T062M000{vsMid}.jpg?max_age=2592000"
             ];
 
             foreach (var url in resolutionUrls)
@@ -590,6 +601,7 @@ public static partial class TerminalImageHelper
         if (string.IsNullOrWhiteSpace(url) || cancellationToken.IsCancellationRequested) return null;
 
         var urlHash = Convert.ToHexString(System.Security.Cryptography.MD5.HashData(Encoding.UTF8.GetBytes(url))).ToLowerInvariant();
+        var localFile = Path.Combine(s_cacheDir, $"http_{urlHash}.raw");
         var pngFile = Path.Combine(s_cacheDir, $"http_{urlHash}.png");
         if (File.Exists(pngFile))
         {
@@ -602,7 +614,6 @@ public static partial class TerminalImageHelper
             try { File.Delete(pngFile); } catch { }
         }
 
-        var localFile = Path.Combine(s_cacheDir, $"http_{urlHash}.raw");
         if (File.Exists(localFile) && (!IsValidJpgFile(localFile) && !IsValidPngFile(localFile) && !IsValidWebpFile(localFile)))
         {
             try { File.Delete(localFile); } catch { }
