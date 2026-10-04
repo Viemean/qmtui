@@ -154,7 +154,7 @@ public sealed partial class SongListView
     }
 
     /// <summary>
-    /// 平滑滚动到指定行并选中该行（居中视口与更新滚动条）
+    /// 滚动到指定行并选中该行（居中视口与更新滚动条）
     /// </summary>
     public bool ScrollToAndSelectItem(int targetIdx)
     {

@@ -437,7 +437,8 @@ public sealed partial class MusicApi
         }
         return 0;
     }
-    /// 根据用户指定或偏好的音质获取直链，支持智能梯度回退
+    /// <summary>
+    /// 根据用户指定或偏好的音质获取直链，支持梯度回退
     /// </summary>
     public static async Task<(string? Url, string Quality, AudioQualityTier Tier)> GetPlayUrlForTierAsync(string songMid, string mediaMid = "", AudioQualityTier preferred = AudioQualityTier.SQ, CancellationToken ct = default)
     {
@@ -544,7 +545,7 @@ public sealed partial class MusicApi
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> s_visualMidCache = new();
 
     /// <summary>
-    /// 获取单曲专属视觉封面 MID（track_info.vs[1]），用于无 AlbumMid 单曲的原画/超高清封面拉取
+    /// 获取单曲专属视觉封面 MID（track_info.vs[1]），用于无 AlbumMid 单曲的封面获取
     /// </summary>
     public static async Task<string?> GetSongVisualMidAsync(string songMid, CancellationToken ct = default)
     {

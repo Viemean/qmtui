@@ -8,9 +8,9 @@ using QmTui.Utils;
 namespace QmTui.Services.AudioRecognition;
 
 /// <summary>
-/// 高性能本地/缓存音频切片 PCM 提取器
-/// 利用系统 GStreamer 管道快速局部解码目标区域（避开前奏静音，提取 15s~23s 黄金主歌/副歌片段），
-/// 输出 16000Hz 16-bit 单声道 PCM 样本，直接送入 ACR 声学指纹提取器。
+/// 本地/缓存音频切片 PCM 提取器
+/// 利用系统 GStreamer 管道局部解码目标区域（避开前奏静音，提取 15s~23s 音频片段），
+/// 输出 16000Hz 16-bit 单声道 PCM 样本，输入 ACR 声学指纹提取器。
 /// </summary>
 public static class AudioSliceDecoder
 {

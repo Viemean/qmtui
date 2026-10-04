@@ -8,7 +8,7 @@ namespace QmTui.UI;
 public sealed partial class MainWindow
 {
     /// <summary>
-    /// 进入“猜你喜欢”视窗：若当前已经在播放电台流，则平滑恢复电台卡片展示而不打断播放；否则启动全新电台流
+    /// 进入“猜你喜欢”视窗：若当前正在播放电台流，则恢复电台卡片展示而不打断播放；否则启动新电台流
     /// </summary>
     private async Task ResumeOrStartGuessRadioAsync()
     {

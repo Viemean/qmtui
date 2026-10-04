@@ -4,7 +4,7 @@ namespace QmTui.Utils;
 
 /// <summary>
 /// 内存治理管理器：通过异步防抖机制在后台平稳期执行 glibc 内存修剪与轻量垃圾回收，
-/// 彻底解决 GStreamer 解码本地/WebDAV 无损大音频流时的 native arena 内存滞留问题，
+/// 释放 GStreamer 解码本地/WebDAV 无损音频流时的 native arena 内存，
 /// 且不在主线程或高频切歌期产生任何停顿开销。
 /// </summary>
 public static partial class MemoryManager

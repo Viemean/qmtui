@@ -93,8 +93,8 @@ public sealed class RollingAudioBuffer
 }
 
 /// <summary>
-/// 系统内录后台智能预录管理器
-/// 在内存中维持最近 3.5 秒的系统内录音频切片，实现按快捷键瞬间 0 延迟发射首发识别请求。
+/// 系统内录后台预录管理器
+/// 在内存中维持最近 3.5 秒的系统内录音频切片，用于识别时直接发送首轮识别请求。
 /// 具备静音自动休眠，避免常驻阻止声卡睡眠或系统状态栏录音提示。
 /// </summary>
 public static class AudioPreRollManager

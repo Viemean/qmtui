@@ -62,10 +62,10 @@ public sealed partial class GstPlayer : IPlayer
                 if (_pipeline != 0)
                 {
                     // 仅启用 GST_PLAY_FLAG_AUDIO (2) | GST_PLAY_FLAG_SOFT_VOLUME (16) = 18
-                    // 彻底关闭 GST_PLAY_FLAG_VIDEO (1)，避免本地/WebDAV 无损音频内嵌高清封面被当做视频流解码并分配数百兆视频帧缓冲区
+                    // 关闭 GST_PLAY_FLAG_VIDEO (1)，避免音频内嵌封面被当做视频流解码并分配视频帧缓冲区
                     gst_util_set_object_arg(_pipeline, "flags", "18");
 
-                    // 显式将 video-sink 与 text-sink 绑定至 fakesink 杜绝任何隐式视频呈现管道创建
+                    // 将 video-sink 与 text-sink 绑定至 fakesink，避免隐式视频呈现管道创建
                     var fakesink = gst_element_factory_make("fakesink", "qmtui_fakesink");
                     if (fakesink != 0)
                     {

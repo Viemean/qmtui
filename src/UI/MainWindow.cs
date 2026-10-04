@@ -587,7 +587,7 @@ public sealed partial class MainWindow : Window
         };
         Add(_songListView);
 
-        // 3.5. 主列表即时查找悬浮窗 (G 键触发) - 置于中央歌曲列表视窗内靠上居中，彻底消除与右侧分割线重叠
+        // 3.5. 主列表即时查找悬浮窗 (G 键触发) - 置于中央歌曲列表视窗内靠上居中，避免与右侧分割线重叠
         _quickSearchBar = new QuickSearchFloatingBar
         {
             X = Pos.Center(),
@@ -1257,7 +1257,7 @@ public sealed partial class MainWindow : Window
             {
                 if (IsRadioModeActive)
                 {
-                    // 电台模式：单曲播放结束后自动平滑跳至下一首
+                    // 电台模式：单曲播放结束后自动切换至下一首
                     await PlayNextRadioTrackAsync();
                     return;
                 }
@@ -1276,7 +1276,7 @@ public sealed partial class MainWindow : Window
             });
         };
 
-        // 递归解除全部子控件对 Space 和 Tab 的默认拦截（TextField 除外），确保全局快捷键与视窗循环流转顺畅
+        // 递归解除全部子控件对 Space 和 Tab 的默认拦截（TextField 除外），使全局快捷键与视窗可响应 Space 和 Tab
         UnbindSpaceKey(this);
         UnbindTabKeys(this);
 

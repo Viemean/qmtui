@@ -228,7 +228,7 @@ public sealed class AudioRecordingSession : IDisposable
             }
         }
 
-        // 仅在录音线程彻底退出读取循环后，才由本线程安全释放 pulseHandle
+        // 录音线程退出读取循环后，释放 pulseHandle
         lock (_lock)
         {
             if (_pulseHandle != IntPtr.Zero)

@@ -233,7 +233,7 @@ public class PlatformApiTests
         {
             if (added)
             {
-                // 确保即使断言失败也必定执行清理还原，绝不污染用户收藏夹
+                // 确保即使断言失败也执行清理还原，清理测试数据
                 await Task.Delay(500);
                 _output.WriteLine($"[模块: 歌曲收藏] 2. 执行取消收藏 (异常安全清理) -> '{testSong.Title}'...");
                 var removeResult = await MusicApi.RemoveSongFromFavoriteAsync(testSong);

@@ -63,7 +63,7 @@ public sealed class PlaybackQueueService
     private PlaybackQueueService() { }
 
     /// <summary>
-    /// 装载全新播放队列并定位起始播放索引与来源上下文
+    /// 装载新播放队列并定位起始播放索引与来源上下文
     /// </summary>
     public void SetQueue(IEnumerable<Song> songs, int startIndex = 0, PlaybackSourceContext? sourceContext = null)
     {
@@ -250,7 +250,7 @@ public sealed class PlaybackQueueService
     }
 
     /// <summary>
-    /// 预先窥视下一首曲目（用于平滑预加载，不改变内部游标）
+    /// 预先窥视下一首曲目（用于预加载，不改变内部游标）
     /// </summary>
     public Song? PeekNextSong()
     {

@@ -294,8 +294,6 @@ public static partial class TerminalImageHelper
     }
 
     /// <summary>
-    /// 获取封面本地缓存路径，如未缓存或损坏则自愈重新拉取并转为 Kitty 协议兼容的 PNG 格式
-    /// <summary>
     /// 获取专辑封面本地缓存路径，如未缓存则异步拉取并转为 Kitty 协议兼容的 6px 圆角 PNG 格式
     /// </summary>
     public static async Task<string?> EnsureAlbumCoverAsync(string albumMid, CancellationToken cancellationToken = default)
@@ -405,7 +403,7 @@ public static partial class TerminalImageHelper
             return localFile;
         }
 
-        // 应用平滑 6px 圆角遮罩处理（无外扩阴影）
+        // 应用 6px 圆角遮罩处理（无外扩阴影）
         var processed = await ApplyRoundedCornersAsync(localFile, pngFile, cancellationToken).ConfigureAwait(false);
         if (!string.IsNullOrEmpty(processed) && File.Exists(processed))
         {
@@ -422,7 +420,7 @@ public static partial class TerminalImageHelper
     }
 
     /// <summary>
-    /// 处理本地图片（内嵌封面或本地 cover.jpg），添加平滑 6px 抗锯齿圆角并转为 Kitty 协议兼容 PNG
+    /// 处理本地图片（内嵌封面或本地 cover.jpg），添加 6px 抗锯齿圆角并转为 Kitty 协议兼容 PNG
     /// </summary>
     public static async Task<string?> EnsureLocalImageProcessedAsync(string localRawImagePath, string cacheKey, CancellationToken cancellationToken = default)
     {
@@ -598,7 +596,7 @@ public static partial class TerminalImageHelper
         {
             string[] resolutionUrls =
             [
-                $"https://y.qq.com/music/photo_new/T062R1200x1200M000{vsMid}.jpg?max_age=2592000",    // 1200x1200 超高清大图
+                $"https://y.qq.com/music/photo_new/T062R1200x1200M000{vsMid}.jpg?max_age=2592000",    // 1200x1200 分辨率大图
                 $"https://y.qq.com/music/photo_new/T062R800x800M000{vsMid}.jpg?max_age=2592000",      // 800x800 高清档
                 $"https://y.gtimg.cn/music/photo_new/T062R1200x1200M000{vsMid}.jpg?max_age=2592000",  // 备用 CDN
                 $"https://y.qq.com/music/photo_new/T062R500x500M000{vsMid}.jpg?max_age=2592000",
@@ -695,7 +693,7 @@ public static partial class TerminalImageHelper
     }
 
     /// <summary>
-    /// 获取歌曲播放时对应的超高清封面（智能自愈：优先专辑1200，单曲智能调用T062原画/1200，本地音频提取嵌入封面）
+    /// 获取歌曲播放封面（优先专辑 1200，单曲调用 T062 原画/1200，本地音频提取嵌入封面）
     /// </summary>
     public static async Task<string?> EnsureSongCoverAsync(Song? song, CancellationToken cancellationToken = default)
     {
@@ -738,7 +736,7 @@ public static partial class TerminalImageHelper
 
         if (cancellationToken.IsCancellationRequested) return null;
 
-        // 1. 若拥有 AlbumMid，优先获取专辑 1200 超高清封面
+        // 1. 若拥有 AlbumMid，优先获取专辑 1200 分辨率封面
         if (!string.IsNullOrWhiteSpace(song.AlbumMid))
         {
             var albumCover = await EnsureAlbumCoverAsync(song.AlbumMid, cancellationToken).ConfigureAwait(false);

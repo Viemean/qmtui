@@ -412,7 +412,7 @@ public sealed class AudioRecognitionDialog : Dialog
 
             int inflightRequests = 0;
 
-            // 内录若拥有预录切片，可在首个时刻（0ms）即刻发起试探，实现秒级命中
+            // 内录若拥有预录切片，可在首个时刻（0ms）直接发起试探
             bool hasPreRoll = preRollBytes != null && preRollBytes.Length >= (int)(16000 * 2 * 2.6);
             if (hasPreRoll)
             {

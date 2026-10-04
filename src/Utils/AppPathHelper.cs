@@ -3,7 +3,7 @@ using System.IO;
 namespace QmTui.Utils;
 
 /// <summary>
-/// 全局路径管理帮助类（全面使用 ~/.config/qmtui, ~/.cache/qmtui, ~/.local/share/qmtui，自动无缝迁移旧配置）
+/// 全局路径管理类（统一使用 ~/.config/qmtui, ~/.cache/qmtui, ~/.local/share/qmtui，自动迁移旧配置）
 /// </summary>
 public static class AppPathHelper
 {

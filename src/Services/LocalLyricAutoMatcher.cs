@@ -41,9 +41,9 @@ internal sealed partial class MatchedLyricJsonContext : JsonSerializerContext
 }
 
 /// <summary>
-/// 本地、WebDAV 与在线音乐统一智能歌词匹配与多级共享缓存调度器
+/// 本地、WebDAV 与在线音乐歌词自动匹配与缓存调度器
 /// 采用 SongMid 权威母本库 + 物理路径快表 + 元数据软索引三级架构，
-/// 支持在线、本地与 WebDAV 三方数据无缝互通，并提供 GStreamer 声学指纹 (ACR) 高精度识别通道。
+/// 支持在线、本地与 WebDAV 数据互通，并提供 GStreamer 声学指纹 (ACR) 识别通道。
 /// </summary>
 public static class LocalLyricAutoMatcher
 {
@@ -62,7 +62,7 @@ public static class LocalLyricAutoMatcher
     }
 
     /// <summary>
-    /// 判断当前歌曲是否需要进行智能匹配
+    /// 判断当前歌曲是否需要进行歌词匹配
     /// </summary>
     public static bool NeedsMatching(Song song, List<LyricLine> currentLyrics)
     {
@@ -195,7 +195,7 @@ public static class LocalLyricAutoMatcher
                 return null;
             }
 
-            // 防负优化检查：若原歌词已有有效非占位内容，而官方歌词没有提供双语翻译，则保留原歌词（用户强制匹配时不拦截）
+            // 原歌词保护检查：若原歌词已有有效非占位内容，而官方歌词没有提供双语翻译，则保留原歌词（用户强制匹配时不拦截）
             bool currentIsPlaceholder = LyricParser.IsPlaceholderLyrics(currentLyrics);
             bool newHasTrans = officialLyrics.Exists(l => !string.IsNullOrWhiteSpace(l.Trans));
             if (!forceMatch && currentLyrics.Count > 0 && !currentIsPlaceholder && !newHasTrans)

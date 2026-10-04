@@ -360,7 +360,7 @@ public sealed partial class PlayerControlBar
         _nowPlayingLabel.Text = text;
         SetNeedsLayout();
 
-        // 倒计时 2500ms 后自动平滑恢复为当前的“歌手 - 歌曲名字 - 专辑名字”
+        // 倒计时 2500ms 后恢复为当前的“歌手 - 歌曲名字 - 专辑名字”
         _temporaryStatusTimeout = Application.AddTimeout(TimeSpan.FromMilliseconds(2500), () =>
         {
             _temporaryStatusTimeout = null;

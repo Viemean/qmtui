@@ -34,7 +34,7 @@ public sealed partial class MusicApi
         var page = Math.Max(0, pageNum);
         var size = Math.Clamp(pageSize, 1, 50);
 
-        // 仅在终端支持图形协议时向网关开启图片配图，无图终端传 0 彻底杜绝图片下发与内存解码
+        // 仅在终端支持图形协议时向网关开启图片配图，无图终端传 0 避免图片下发与内存解码
         var picEnable = TerminalImageHelper.IsImageSupported ? 1 : 0;
 
         var modern = await FetchModernCommentsAsync(actualId, page, size, lastCommentSeqNo, picEnable, ct).ConfigureAwait(false);
@@ -204,7 +204,7 @@ public sealed partial class MusicApi
                 praiseNum = pn.GetInt32();
             }
 
-            // 无图终端彻底屏蔽图片 URL，避免任何图片请求可能
+            // 无图终端不提取图片 URL，避免触发图片请求
             var picUrl = TerminalImageHelper.IsImageSupported && obj.TryGetProperty("Pic", out var p) ? p.GetString() ?? "" : "";
             var picSize = obj.TryGetProperty("PicSize", out var ps) ? ps.GetString() ?? "" : "";
             var location = obj.TryGetProperty("Location", out var loc) ? loc.GetString() ?? "" : "";

@@ -10,7 +10,7 @@ using QmTui.Utils;
 namespace QmTui.Services;
 
 /// <summary>
-/// “猜你喜欢”个性化音乐电台服务，管理电台推荐流拉取、去重与平滑推流
+/// “猜你喜欢”个性化音乐电台服务，管理电台推荐流拉取、去重与推流
 /// </summary>
 public sealed class RadioService
 {
@@ -67,7 +67,7 @@ public sealed class RadioService
     }
 
     /// <summary>
-    /// 重置并启动全新电台流，拉取首批歌曲
+    /// 重置并启动新电台流，拉取首批歌曲
     /// </summary>
     public async Task<Song?> StartRadioAsync(int batchSize = 5)
     {

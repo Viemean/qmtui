@@ -31,7 +31,7 @@ public sealed class CacheEntry
 /// 1. 统一纳入 online audio (audio/)、WebDAV 音频 (webdav/) 与封面图像 (covers/)；
 /// 2. 默认配额上限 1GB，统一池化管理；
 /// 3. 采用应用层 SLRU (Segmented LRU) 算法，按 Probation 试听段与 Protected 常用段分级淘汰，抵抗快速切歌造成的缓存污染；
-/// 4. 彻底脱离底层文件系统 atime 依赖，完美兼容 Android Termux / proot / Docker 等挂载限制环境。
+/// 4. 避免底层文件系统 atime 依赖，兼容 Android Termux / proot / Docker 等挂载限制环境。
 /// </summary>
 public static class CacheManager
 {

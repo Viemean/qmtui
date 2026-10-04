@@ -10,7 +10,7 @@ namespace QmTui.UI;
 
 /// <summary>
 /// 底部现代化微边框播放控制栏
-/// 包含当前曲目/音质档位、双语歌词[译]切换、音量调节(步进/滚轮/静音)与高精度进度条
+/// 包含当前曲目/音质档位、双语歌词[译]切换、音量调节(步进/滚轮/静音)与进度条
 /// </summary>
 public sealed partial class PlayerControlBar : FrameView
 {
@@ -213,7 +213,7 @@ public sealed partial class PlayerControlBar : FrameView
         Add(_shareBtn);
 
         // 3. 第 1 行：
-        // 左侧：加长高精度进度条 (30格) + 紧邻右侧的 [ 收藏 ] 按钮
+        // 左侧：进度条 (30格) + 紧邻右侧的 [ 收藏 ] 按钮
         // 右侧：[ 随机 ] + [ 上一首 ] + [ 暂停 ] + [ 下一首 ]
 
         _progressLabel = new Label

@@ -302,7 +302,7 @@ public static partial class WebDavService
                 try { if (File.Exists(tmpFile)) File.Delete(tmpFile); } catch { }
             }
 
-            // 若音频头部未写入元数据标签，以清洗后的歌名通过在线 API 智能匹配歌手与专辑
+            // 若音频头部未写入元数据标签，以清洗后的歌名通过在线 API 匹配歌手与专辑
             var cleanTitle = CleanTrackNumberPrefix(cache.Title);
             if (!string.IsNullOrWhiteSpace(cleanTitle) && (string.IsNullOrWhiteSpace(cache.Artist) || cache.Artist == "未知歌手"))
             {

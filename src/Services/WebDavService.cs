@@ -22,7 +22,7 @@ namespace QmTui.Services;
 /// 1. 基于原生 HttpClient 发送 PROPFIND，通过 XDocument 解析目录树；
 /// 2. 支持自签名证书与 Basic Auth 凭据认证；
 /// 3. 本地边播边存隔离，防止 NAS 密码在 GStreamer/D-Bus 广播中泄露；
-/// 4. 目录树与平铺大曲库无缝轮转。
+/// 4. 目录树与平铺曲库轮转。
 /// </summary>
 public static partial class WebDavService
 {

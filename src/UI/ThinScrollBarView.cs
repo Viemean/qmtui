@@ -50,7 +50,7 @@ public sealed class ThinScrollBarView : View
         });
         Add(_trackLabel);
 
-        // 定时检查是否超过 3 秒无活动，平滑隐藏
+        // 定时检查是否超过 3 秒无活动，隐藏滚动条
         _timeoutToken = Application.AddTimeout(TimeSpan.FromMilliseconds(500), () =>
         {
             if (_isActive && Environment.TickCount64 - _lastActivityTick > 3000)

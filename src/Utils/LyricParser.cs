@@ -76,7 +76,7 @@ public static partial class LyricParser
     }
 
     /// <summary>
-    /// 解析本地 LRC 文本为 LyricLine 列表（智能识别同时间戳双语原歌词与中文翻译）
+    /// 解析本地 LRC 文本为 LyricLine 列表（识别同时间戳双语原歌词与翻译）
     /// </summary>
     public static List<LyricLine> ParseSingleLrc(string? lrcText)
     {
@@ -148,7 +148,7 @@ public static partial class LyricParser
     }
 
     /// <summary>
-    /// 高精度双语时间轴智能对齐算法
+    /// 双语时间轴对齐算法
     /// </summary>
     public static List<LyricLine> MergeLyrics(string rawLyric, string rawTrans)
     {

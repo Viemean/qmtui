@@ -102,7 +102,7 @@ public sealed class WebdavManageDialog : Dialog
 
         Add(_selectBtn, _addBtn, _editBtn, _deleteBtn);
 
-        // 按钮直接绑定原生 Accepting（完美支持鼠标左键点击与键盘回车/空格触发）
+        // 按钮绑定原生 Accepting（支持鼠标左键点击与键盘回车/空格触发）
         _selectBtn.Accepting += (s, e) => SelectCurrentServer();
         _addBtn.Accepting += (s, e) => ShowAddDialog();
         _editBtn.Accepting += (s, e) => ShowEditDialog();

@@ -890,7 +890,7 @@ public sealed class SongCommentView : View
 
     private void AppendCommentItem(SongComment c, int usableWidth, bool isHot)
     {
-        // 头部信息行：[热评] 昵称 [IP属地] · 时间   [👍 赞数]
+        // 头部信息行：[热评] 昵称 [IP属地] · 时间   [点赞数]
         var metaBuilder = new StringBuilder();
         if (isHot)
         {

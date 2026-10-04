@@ -131,7 +131,7 @@ public sealed partial class MainWindow
                     return;
                 }
 
-                // 在即将切入的瞬间精确采样瞬时进度与播放状态，实现平滑过渡
+                // 在切入前采样当前进度与播放状态，保持状态连续
                 double currentPos = _player.CurrentPositionSeconds;
                 bool wasPlaying = _player.IsPlaying;
 

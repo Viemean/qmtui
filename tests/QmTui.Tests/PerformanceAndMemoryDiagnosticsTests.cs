@@ -115,7 +115,7 @@ public class PerformanceAndMemoryDiagnosticsTests
             _output.WriteLine($"  - Final Heap:    {finalAllocated / 1024.0 / 1024.0:F2} MB");
             _output.WriteLine($"  - Residual Net Growth: {leakGrowth / 1024.0:F2} KB");
 
-            // 50 次切换后残留增长应当极其微小（小于 5MB，无累积句柄或强引用泄漏）
+            // 50 次切换后残留增长应当小于 5MB（无累积句柄或强引用泄漏）
             Assert.True(leakGrowth < 5 * 1024 * 1024, $"Potential memory leak detected: net growth {leakGrowth / 1024.0} KB");
         }
         finally

@@ -96,7 +96,7 @@ public sealed class ConnectDialog : Dialog
         }
         else
         {
-            // 终端物理空间不足以容纳大二维码，优雅自适应为纯 PIN 码连接引导
+            // 终端物理空间不足以容纳大二维码时，自适应切换为纯 PIN 码连接引导
             dlgW = Math.Clamp(screenCols - 4, 44, 56);
             dlgH = Math.Clamp(screenRows - 2, 12, 14);
         }
@@ -131,7 +131,7 @@ public sealed class ConnectDialog : Dialog
         }
         Add(_qrView);
 
-        // 3. 右侧信息容器 (若左右分栏则严格使用 Pos.Right(_qrView) + 2 相对约束，杜绝遮挡)
+        // 3. 右侧信息容器 (若左右分栏则使用 Pos.Right(_qrView) + 2 相对约束，避免遮挡)
         _rightPane = new View
         {
             CanFocus = true
@@ -213,7 +213,7 @@ public sealed class ConnectDialog : Dialog
         _pairedLabel.SetScheme(TransparentDialogScheme);
         _rightPane.Add(_pairedLabel);
 
-        // 5. 按钮控制栏（采用双行排布，彻底消除窄屏或长文字下右侧关闭按钮被截断问题）
+        // 5. 按钮控制栏（采用双行排布，避免窄屏或长文字下右侧关闭按钮被截断）
         _refreshPinBtn = new Button
         {
             Text = "刷新 PIN (R)",
@@ -348,7 +348,7 @@ public sealed class ConnectDialog : Dialog
             return;
         }
 
-        // 2. 初始立即展示兜底发布页二维码，杜绝界面等待卡顿
+        // 2. 初始展示兜底发布页二维码，避免界面等待卡顿
         Application.Invoke(() =>
         {
             if (_isDownloadMode)
