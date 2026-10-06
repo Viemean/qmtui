@@ -2,6 +2,7 @@
 // High performance acoustic stream transformation pipeline
 // </auto-generated>
 #nullable enable
+using System.Buffers;
 using System.Buffers.Binary;
 using QmTui.Utils;
 
@@ -18,10 +19,12 @@ public static class AcousticFingerprintExtractor
     public const int FreqWindow = 20;
     public const int MaxPeaksPerFrame = 5;
     public const float MagThreshold = 20000.0f;
+    public const float MagThresholdSq = MagThreshold * MagThreshold;
 
     private static readonly float[] _hW = _inHw();
     private static readonly (int i, int j)[] _brS = _inBrs();
-    private static readonly (float Re, float Im)[][] _tw = _inTw();
+    private static readonly float[][] _twRe = _inTwRe();
+    private static readonly float[][] _twIm = _inTwIm();
 
     private static readonly int[] _mbw = [1, 2, 3, 4, 5, 6, 7, 9];
     private static readonly int[] _mic = [36, 18, 12, 9, 7, 6, 5, 4];
@@ -59,13 +62,15 @@ public static class AcousticFingerprintExtractor
         return swaps.ToArray();
     }
 
-    private static (float Re, float Im)[][] _inTw()
+    private static float[][] _inTwRe()
     {
-        var tw = new (float Re, float Im)[10][];
+        int stages = 0;
+        for (int l = 1; l < FftSize; l <<= 1) stages++;
+        var twRe = new float[stages][];
         int stage = 0;
         for (int l = 1; l < FftSize; l <<= 1)
         {
-            tw[stage] = new (float, float)[l];
+            twRe[stage] = new float[l];
             double angle = -Math.PI / l;
             double wRe = Math.Cos(angle);
             double wIm = Math.Sin(angle);
@@ -73,7 +78,7 @@ public static class AcousticFingerprintExtractor
             double curIm = 0.0;
             for (int k = 0; k < l; k++)
             {
-                tw[stage][k] = ((float)curRe, (float)curIm);
+                twRe[stage][k] = (float)curRe;
                 double nextRe = curRe * wRe - curIm * wIm;
                 double nextIm = curRe * wIm + curIm * wRe;
                 curRe = nextRe;
@@ -81,7 +86,34 @@ public static class AcousticFingerprintExtractor
             }
             stage++;
         }
-        return tw;
+        return twRe;
+    }
+
+    private static float[][] _inTwIm()
+    {
+        int stages = 0;
+        for (int l = 1; l < FftSize; l <<= 1) stages++;
+        var twIm = new float[stages][];
+        int stage = 0;
+        for (int l = 1; l < FftSize; l <<= 1)
+        {
+            twIm[stage] = new float[l];
+            double angle = -Math.PI / l;
+            double wRe = Math.Cos(angle);
+            double wIm = Math.Sin(angle);
+            double curRe = 1.0;
+            double curIm = 0.0;
+            for (int k = 0; k < l; k++)
+            {
+                twIm[stage][k] = (float)curIm;
+                double nextRe = curRe * wRe - curIm * wIm;
+                double nextIm = curRe * wIm + curIm * wRe;
+                curRe = nextRe;
+                curIm = nextIm;
+            }
+            stage++;
+        }
+        return twIm;
     }
 
     public readonly record struct Landmark(int Time, int Freq);
@@ -93,13 +125,155 @@ public static class AcousticFingerprintExtractor
             return null;
         }
 
-        var landmarks = ExtractLandmarks(samples);
-        byte[] featBytes = PackLandmarks(landmarks);
-        if (featBytes.Length == 0)
+        int totalSamples = samples.Length;
+        int numFrames = (totalSamples - WindowSize) / HopSize + 1;
+        if (numFrames <= TimeWindow * ChannelCount)
         {
             return null;
         }
 
+        int halfFft = FftSize / 2;
+        int binsPerFrame = halfFft + 1;
+        var spectrogram = new float[numFrames * binsPerFrame];
+        var fftRe = new float[FftSize];
+        var fftIm = new float[FftSize];
+
+        for (int i = 0; i < numFrames; i++)
+        {
+            int stStart = i * HopSize;
+            for (int n = 0; n < WindowSize; n++)
+            {
+                fftRe[n] = samples[stStart + n] * _hW[n];
+                fftIm[n] = 0.0f;
+            }
+            for (int n = WindowSize; n < FftSize; n++)
+            {
+                fftRe[n] = 0.0f;
+                fftIm[n] = 0.0f;
+            }
+
+            _cFft(fftRe, fftIm);
+
+            int frameOffset = i * binsPerFrame;
+            int vCount = System.Numerics.Vector<float>.Count;
+            int simdBranches = binsPerFrame - (binsPerFrame % vCount);
+            if (System.Numerics.Vector.IsHardwareAccelerated && simdBranches > 0)
+            {
+                for (int f = 0; f < simdBranches; f += vCount)
+                {
+                    var reV = new System.Numerics.Vector<float>(fftRe, f);
+                    var imV = new System.Numerics.Vector<float>(fftIm, f);
+                    var magV = reV * reV + imV * imV;
+                    magV.CopyTo(spectrogram, frameOffset + f);
+                }
+                for (int f = simdBranches; f <= halfFft; f++)
+                {
+                    spectrogram[frameOffset + f] = fftRe[f] * fftRe[f] + fftIm[f] * fftIm[f];
+                }
+            }
+            else
+            {
+                for (int f = 0; f <= halfFft; f++)
+                {
+                    spectrogram[frameOffset + f] = fftRe[f] * fftRe[f] + fftIm[f] * fftIm[f];
+                }
+            }
+        }
+
+        using var outStream = new MemoryStream(1024);
+        Span<int> topFreqs = stackalloc int[MaxPeaksPerFrame];
+        Span<float> topVals = stackalloc float[MaxPeaksPerFrame];
+
+        var chTimes = new List<int>(256);
+        var chFreqs = new List<int>(256);
+
+        for (int ch = 0; ch < ChannelCount; ch++)
+        {
+            chTimes.Clear();
+            chFreqs.Clear();
+
+            int numT = (numFrames - ch + ChannelCount - 1) / ChannelCount;
+            int targetEnd = Math.Max(0, numT - TimeWindow);
+
+            for (int t = 0; t < targetEnd; t++)
+            {
+                int candCount = 0;
+                int frameIdx = t * ChannelCount + ch;
+                int rowOffset = frameIdx * binsPerFrame;
+
+                for (int f = 3; f <= 510; f++)
+                {
+                    float v = spectrogram[rowOffset + f];
+                    if (v < MagThresholdSq) continue;
+                    if (candCount == MaxPeaksPerFrame && v <= topVals[MaxPeaksPerFrame - 1]) continue;
+
+                    if (spectrogram[rowOffset + f - 1] > v || spectrogram[rowOffset + f + 1] > v) continue;
+                    if (t > 0 && spectrogram[((t - 1) * ChannelCount + ch) * binsPerFrame + f] > v) continue;
+                    if (t < numT - 1 && spectrogram[((t + 1) * ChannelCount + ch) * binsPerFrame + f] > v) continue;
+
+                    int tStart = Math.Max(0, t - TimeWindow);
+                    int tEnd = t + TimeWindow;
+                    int fStart = Math.Max(3, f - FreqWindow);
+                    int fEnd = Math.Min(510, f + FreqWindow);
+
+                    bool isLocalMax = true;
+                    for (int tPrime = tStart; tPrime <= tEnd; tPrime++)
+                    {
+                        int primeOffset = (tPrime * ChannelCount + ch) * binsPerFrame;
+                        for (int fPrime = fStart; fPrime <= fEnd; fPrime++)
+                        {
+                            if (spectrogram[primeOffset + fPrime] > v)
+                            {
+                                isLocalMax = false;
+                                break;
+                            }
+                        }
+                        if (!isLocalMax) break;
+                    }
+
+                    if (isLocalMax)
+                    {
+                        if (candCount < MaxPeaksPerFrame)
+                        {
+                            int insertPos = candCount;
+                            while (insertPos > 0 && topVals[insertPos - 1] < v)
+                            {
+                                topVals[insertPos] = topVals[insertPos - 1];
+                                topFreqs[insertPos] = topFreqs[insertPos - 1];
+                                insertPos--;
+                            }
+                            topVals[insertPos] = v;
+                            topFreqs[insertPos] = f;
+                            candCount++;
+                        }
+                        else
+                        {
+                            int insertPos = MaxPeaksPerFrame - 1;
+                            while (insertPos > 0 && topVals[insertPos - 1] < v)
+                            {
+                                topVals[insertPos] = topVals[insertPos - 1];
+                                topFreqs[insertPos] = topFreqs[insertPos - 1];
+                                insertPos--;
+                            }
+                            topVals[insertPos] = v;
+                            topFreqs[insertPos] = f;
+                        }
+                    }
+                }
+
+                for (int k = 0; k < candCount; k++)
+                {
+                    chTimes.Add(t);
+                    chFreqs.Add(topFreqs[k]);
+                }
+            }
+
+            _pkP1D(chTimes, outStream);
+            _pkP2D(chFreqs, outStream);
+        }
+
+        byte[] featBytes = outStream.ToArray();
+        if (featBytes.Length == 0) return null;
         float duration = (float)samples.Length / SampleRate;
         return new AcousticFeature(featBytes, duration, 0, 0.0f);
     }
@@ -124,77 +298,79 @@ public static class AcousticFingerprintExtractor
             return [[], [], [], []];
         }
 
-        var spectrogram = new float[numFrames][];
+        int halfFft = FftSize / 2;
+        int binsPerFrame = halfFft + 1;
+        var spectrogram = new float[numFrames * binsPerFrame];
         var fftRe = new float[FftSize];
         var fftIm = new float[FftSize];
-        int vCount = System.Numerics.Vector<float>.Count;
-        int halfFft = FftSize / 2;
-        int simdBranches = halfFft - (halfFft % vCount);
 
         for (int i = 0; i < numFrames; i++)
-        {
-            int stStart = i * HopSize;
-            for (int n = 0; n < WindowSize; n++)
             {
-                fftRe[n] = samples[stStart + n] * _hW[n];
-                fftIm[n] = 0.0f;
-            }
-
-            _cFft(fftRe, fftIm);
-
-            var mag = new float[halfFft + 1];
-            if (System.Numerics.Vector.IsHardwareAccelerated && simdBranches > 0)
-            {
-                for (int f = 0; f < simdBranches; f += vCount)
+                int stStart = i * HopSize;
+                for (int n = 0; n < WindowSize; n++)
                 {
-                    var reV = new System.Numerics.Vector<float>(fftRe, f);
-                    var imV = new System.Numerics.Vector<float>(fftIm, f);
-                    var magV = System.Numerics.Vector.SquareRoot(reV * reV + imV * imV);
-                    magV.CopyTo(mag, f);
+                    fftRe[n] = samples[stStart + n] * _hW[n];
+                    fftIm[n] = 0.0f;
                 }
-                for (int f = simdBranches; f <= halfFft; f++)
+                for (int n = WindowSize; n < FftSize; n++)
                 {
-                    mag[f] = MathF.Sqrt(fftRe[f] * fftRe[f] + fftIm[f] * fftIm[f]);
+                    fftRe[n] = 0.0f;
+                    fftIm[n] = 0.0f;
+                }
+
+                _cFft(fftRe, fftIm);
+
+                int frameOffset = i * binsPerFrame;
+                int vCount = System.Numerics.Vector<float>.Count;
+                int simdBranches = binsPerFrame - (binsPerFrame % vCount);
+                if (System.Numerics.Vector.IsHardwareAccelerated && simdBranches > 0)
+                {
+                    for (int f = 0; f < simdBranches; f += vCount)
+                    {
+                        var reV = new System.Numerics.Vector<float>(fftRe, f);
+                        var imV = new System.Numerics.Vector<float>(fftIm, f);
+                        var magV = reV * reV + imV * imV;
+                        magV.CopyTo(spectrogram, frameOffset + f);
+                    }
+                    for (int f = simdBranches; f <= halfFft; f++)
+                    {
+                        spectrogram[frameOffset + f] = fftRe[f] * fftRe[f] + fftIm[f] * fftIm[f];
+                    }
+                }
+                else
+                {
+                    for (int f = 0; f <= halfFft; f++)
+                    {
+                        spectrogram[frameOffset + f] = fftRe[f] * fftRe[f] + fftIm[f] * fftIm[f];
+                    }
                 }
             }
-            else
-            {
-                for (int f = 0; f <= halfFft; f++)
-                {
-                    mag[f] = MathF.Sqrt(fftRe[f] * fftRe[f] + fftIm[f] * fftIm[f]);
-                }
-            }
-            spectrogram[i] = mag;
-        }
-
-        var channelSpecs = new List<float[]>[ChannelCount];
-        for (int ch = 0; ch < ChannelCount; ch++)
-        {
-            channelSpecs[ch] = new List<float[]>(numFrames / ChannelCount + 1);
-        }
-
-        for (int i = 0; i < numFrames; i++)
-        {
-            channelSpecs[i % ChannelCount].Add(spectrogram[i]);
-        }
 
         var result = new List<Landmark>[ChannelCount];
+        Span<int> topFreqs = stackalloc int[MaxPeaksPerFrame];
+        Span<float> topVals = stackalloc float[MaxPeaksPerFrame];
 
-        var cands = new List<(int f, float val)>(64);
         for (int ch = 0; ch < ChannelCount; ch++)
         {
-            var spec = channelSpecs[ch];
-            int numT = spec.Count;
             result[ch] = new List<Landmark>();
-
+            int numT = (numFrames - ch + ChannelCount - 1) / ChannelCount;
             int targetEnd = Math.Max(0, numT - TimeWindow);
+
             for (int t = 0; t < targetEnd; t++)
             {
-                cands.Clear();
+                int candCount = 0;
+                int frameIdx = t * ChannelCount + ch;
+                int rowOffset = frameIdx * binsPerFrame;
+
                 for (int f = 3; f <= 510; f++)
                 {
-                    float val = spec[t][f];
-                    if (val < MagThreshold) continue;
+                    float v = spectrogram[rowOffset + f];
+                    if (v < MagThresholdSq) continue;
+                    if (candCount == MaxPeaksPerFrame && v <= topVals[MaxPeaksPerFrame - 1]) continue;
+
+                    if (spectrogram[rowOffset + f - 1] > v || spectrogram[rowOffset + f + 1] > v) continue;
+                    if (t > 0 && spectrogram[((t - 1) * ChannelCount + ch) * binsPerFrame + f] > v) continue;
+                    if (t < numT - 1 && spectrogram[((t + 1) * ChannelCount + ch) * binsPerFrame + f] > v) continue;
 
                     int tStart = Math.Max(0, t - TimeWindow);
                     int tEnd = t + TimeWindow;
@@ -202,30 +378,53 @@ public static class AcousticFingerprintExtractor
                     int fEnd = Math.Min(510, f + FreqWindow);
 
                     bool isLocalMax = true;
-                    for (int tPrime = tStart; tPrime <= tEnd && isLocalMax; tPrime++)
+                    for (int tPrime = tStart; tPrime <= tEnd; tPrime++)
                     {
-                        var row = spec[tPrime];
+                        int primeOffset = (tPrime * ChannelCount + ch) * binsPerFrame;
                         for (int fPrime = fStart; fPrime <= fEnd; fPrime++)
                         {
-                            if (row[fPrime] > val)
+                            if (spectrogram[primeOffset + fPrime] > v)
                             {
                                 isLocalMax = false;
                                 break;
                             }
                         }
+                        if (!isLocalMax) break;
                     }
 
                     if (isLocalMax)
                     {
-                        cands.Add((f, val));
+                        if (candCount < MaxPeaksPerFrame)
+                        {
+                            int insertPos = candCount;
+                            while (insertPos > 0 && topVals[insertPos - 1] < v)
+                            {
+                                topVals[insertPos] = topVals[insertPos - 1];
+                                topFreqs[insertPos] = topFreqs[insertPos - 1];
+                                insertPos--;
+                            }
+                            topVals[insertPos] = v;
+                            topFreqs[insertPos] = f;
+                            candCount++;
+                        }
+                        else
+                        {
+                            int insertPos = MaxPeaksPerFrame - 1;
+                            while (insertPos > 0 && topVals[insertPos - 1] < v)
+                            {
+                                topVals[insertPos] = topVals[insertPos - 1];
+                                topFreqs[insertPos] = topFreqs[insertPos - 1];
+                                insertPos--;
+                            }
+                            topVals[insertPos] = v;
+                            topFreqs[insertPos] = f;
+                        }
                     }
                 }
 
-                cands.Sort((a, b) => b.val.CompareTo(a.val));
-                int take = Math.Min(MaxPeaksPerFrame, cands.Count);
-                for (int k = 0; k < take; k++)
+                for (int k = 0; k < candCount; k++)
                 {
-                    result[ch].Add(new Landmark(t, cands[k].f));
+                    result[ch].Add(new Landmark(t, topFreqs[k]));
                 }
             }
         }
@@ -233,13 +432,51 @@ public static class AcousticFingerprintExtractor
         return result;
     }
 
-    public static byte[] PackPart1(List<int> times)
+    public static void _pkP1D(List<int> times, Stream outStream)
     {
         int n = times.Count;
-        if (n == 0) return [0, 0, 0, 0];
+        if (n == 0)
+        {
+            outStream.Write([0, 0, 0, 0]);
+            return;
+        }
 
-        var blocks = new List<(int t0, int mode, List<int> diffs)>();
+        int blockCount = 0;
         int currIdx = 0;
+        while (currIdx < n)
+        {
+            int chosenMode = 7;
+            for (int m = 0; m < 8; m++)
+            {
+                int cnt = _mic[m];
+                int maxVal = _mxd[m];
+                bool valid = true;
+                for (int k = 0; k < cnt; k++)
+                {
+                    int idx2 = currIdx + 1 + k;
+                    int diff = (idx2 < n) ? (times[idx2] - times[idx2 - 1]) : 0;
+                    if (diff > maxVal)
+                    {
+                        valid = false;
+                        break;
+                    }
+                }
+                if (valid)
+                {
+                    chosenMode = m;
+                    break;
+                }
+            }
+
+            blockCount++;
+            currIdx += 1 + _mic[chosenMode];
+        }
+
+        var bw = new _bWr();
+        bw._wB(n, 16);
+        bw._wB(blockCount, 16);
+
+        currIdx = 0;
         while (currIdx < n)
         {
             int t0 = times[currIdx];
@@ -266,72 +503,71 @@ public static class AcousticFingerprintExtractor
                 }
             }
 
+            bw._wB(t0 & 0x1FF, 9);
+            bw._wB(chosenMode & 7, 3);
+            int w = _mbw[chosenMode];
             int blockCnt = _mic[chosenMode];
-            var blockDiffs = new List<int>(blockCnt);
             for (int k = 0; k < blockCnt; k++)
             {
                 int idx2 = currIdx + 1 + k;
                 int diff = (idx2 < n) ? (times[idx2] - times[idx2 - 1]) : 0;
-                blockDiffs.Add(diff);
+                bw._wB(diff, w);
             }
-
-            blocks.Add((t0, chosenMode, blockDiffs));
-            currIdx += 1 + blockCnt;
-        }
-
-        var bw = new _bWr();
-        bw._wB(n, 16);
-        bw._wB(blocks.Count, 16);
-
-        foreach (var (t0, mode, diffs) in blocks)
-        {
-            bw._wB(t0 & 0x1FF, 9);
-            bw._wB(mode & 7, 3);
-            int w = _mbw[mode];
-            foreach (var d in diffs)
-            {
-                bw._wB(d, w);
-            }
-            if (_mpb[mode] > 0)
+            if (_mpb[chosenMode] > 0)
             {
                 bw._wB(0, 1);
             }
+
+            currIdx += 1 + blockCnt;
         }
 
-        return bw._tB();
+        bw.WriteTo(outStream);
+    }
+
+    public static void _pkP2D(List<int> freqs, Stream outStream)
+    {
+        var bw = new _bWr();
+        bw._wB(freqs.Count, 16);
+        for (int i = 0; i < freqs.Count; i++)
+        {
+            bw._wB(freqs[i] & 0x1FF, 9);
+        }
+        bw.WriteTo(outStream);
+    }
+
+    public static byte[] PackPart1(List<int> times)
+    {
+        using var ms = new MemoryStream();
+        _pkP1D(times, ms);
+        return ms.ToArray();
     }
 
     public static byte[] PackPart2(List<int> freqs)
     {
-        var bw = new _bWr();
-        bw._wB(freqs.Count, 16);
-        foreach (var f in freqs)
-        {
-            bw._wB(f & 0x1FF, 9);
-        }
-        return bw._tB();
+        using var ms = new MemoryStream();
+        _pkP2D(freqs, ms);
+        return ms.ToArray();
     }
 
     public static byte[] PackLandmarks(List<Landmark>[] channelPeaks)
     {
         using var ms = new MemoryStream();
+        var times = new List<int>(256);
+        var freqs = new List<int>(256);
 
         for (int b = 0; b < ChannelCount; b++)
         {
+            times.Clear();
+            freqs.Clear();
             var peaks = b < channelPeaks.Length ? channelPeaks[b] : [];
-            var times = new List<int>(peaks.Count);
-            var freqs = new List<int>(peaks.Count);
             for (int p = 0; p < peaks.Count; p++)
             {
                 times.Add(peaks[p].Time);
                 freqs.Add(peaks[p].Freq);
             }
 
-            var p1 = PackPart1(times);
-            var p2 = PackPart2(freqs);
-
-            ms.Write(p1);
-            ms.Write(p2);
+            _pkP1D(times, ms);
+            _pkP2D(freqs, ms);
         }
 
         return ms.ToArray();
@@ -347,18 +583,35 @@ public static class AcousticFingerprintExtractor
         }
 
         int stage = 0;
-        for (int l = 1; l < FftSize; l <<= 1)
+        int l = 1;
+        while (l < FftSize)
         {
-            var stageTwiddles = _tw[stage++];
+            var stageRe = _twRe[stage];
+            var stageIm = _twIm[stage];
+            stage++;
             int step = l << 1;
-            for (int m = 0; m < FftSize; m += step)
-            {
-                for (int k = 0; k < l; k++)
-                {
-                    int p = m + k;
-                    int q = p + l;
 
-                    var (curRe, curIm) = stageTwiddles[k];
+            int p0 = 0;
+            while (p0 < FftSize)
+            {
+                int q = p0 + l;
+                float tRe = re[q];
+                float tIm = im[q];
+                re[q] = re[p0] - tRe;
+                im[q] = im[p0] - tIm;
+                re[p0] += tRe;
+                im[p0] += tIm;
+                p0 += step;
+            }
+
+            for (int k = 1; k < l; k++)
+            {
+                float curRe = stageRe[k];
+                float curIm = stageIm[k];
+                int p = k;
+                while (p < FftSize)
+                {
+                    int q = p + l;
                     float tRe = curRe * re[q] - curIm * im[q];
                     float tIm = curRe * im[q] + curIm * re[q];
 
@@ -366,44 +619,68 @@ public static class AcousticFingerprintExtractor
                     im[q] = im[p] - tIm;
                     re[p] += tRe;
                     im[p] += tIm;
+                    p += step;
                 }
             }
+
+            l <<= 1;
         }
     }
 
     private sealed class _bWr
     {
-        private byte[] _buffer = new byte[256];
-        private int _bitCount;
+        private byte[] _buffer;
+        private int _byteCount;
+        private ulong _bitBuf;
+        private int _bitsInBuf;
+
+        public _bWr(int initialCapacity = 256)
+        {
+            _buffer = new byte[initialCapacity];
+        }
 
         public void _wB(int val, int numBits)
         {
-            for (int i = numBits - 1; i >= 0; i--)
+            _bitBuf = (_bitBuf << numBits) | ((ulong)val & ((1UL << numBits) - 1));
+            _bitsInBuf += numBits;
+            while (_bitsInBuf >= 8)
             {
-                int bit = (val >> i) & 1;
-                int byteIdx = _bitCount >> 3;
-                int bitPos = 7 - (_bitCount & 7);
-
-                if (byteIdx >= _buffer.Length)
+                _bitsInBuf -= 8;
+                if (_byteCount >= _buffer.Length)
                 {
                     Array.Resize(ref _buffer, _buffer.Length * 2);
                 }
-
-                if (bit != 0)
-                {
-                    _buffer[byteIdx] |= (byte)(1 << bitPos);
-                }
-
-                _bitCount++;
+                _buffer[_byteCount++] = (byte)((_bitBuf >> _bitsInBuf) & 0xFF);
             }
+        }
+
+        public void WriteTo(Stream stream)
+        {
+            FlushPadBits();
+            stream.Write(_buffer, 0, _byteCount);
         }
 
         public byte[] _tB()
         {
-            int totalBytes = (_bitCount + 7) >> 3;
-            var outBytes = new byte[totalBytes];
-            Array.Copy(_buffer, outBytes, totalBytes);
+            FlushPadBits();
+            var outBytes = new byte[_byteCount];
+            Array.Copy(_buffer, outBytes, _byteCount);
             return outBytes;
+        }
+
+        private void FlushPadBits()
+        {
+            if (_bitsInBuf > 0)
+            {
+                int padBits = 8 - _bitsInBuf;
+                byte finalByte = (byte)((_bitBuf << padBits) & 0xFF);
+                if (_byteCount >= _buffer.Length)
+                {
+                    Array.Resize(ref _buffer, _buffer.Length * 2);
+                }
+                _buffer[_byteCount++] = finalByte;
+                _bitsInBuf = 0;
+            }
         }
     }
 }
