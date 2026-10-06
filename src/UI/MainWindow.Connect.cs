@@ -80,7 +80,7 @@ public sealed partial class MainWindow
                             _preferredQualityTier = AudioQualityHelper.Parse(cmd.QualityTier);
                         }
 
-                        // 对齐作者移动端流媒体中转与直连策略：
+                        // 对齐移动端流媒体中转与直连策略：
                         // 1. AudioSource STREAM_PROXY
                         // 2. Song.MediaMid 为 http/https 流
                         // 3. Song.LocalFilePath 为 http/https 流或本地有效文件
