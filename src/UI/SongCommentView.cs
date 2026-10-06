@@ -578,7 +578,10 @@ public sealed class SongCommentView : View
 
     public void SetSong(Song? song)
     {
-        if (_currentSong?.Mid == song?.Mid && song != null) return;
+        if (_currentSong?.Mid == song?.Mid && song != null && (_hotComments.Count > 0 || _normalComments.Count > 0 || _isLoading))
+        {
+            return;
+        }
 
         try
         {
@@ -590,7 +593,8 @@ public sealed class SongCommentView : View
 
         _currentSong = song;
 
-        if (song != null && _sharedSnapshot != null && _sharedSnapshot.Song?.Mid == song.Mid)
+        if (song != null && _sharedSnapshot != null && _sharedSnapshot.Song?.Mid == song.Mid &&
+            (_sharedSnapshot.HotComments.Count > 0 || _sharedSnapshot.NormalComments.Count > 0))
         {
             RestoreSnapshot(_sharedSnapshot);
             return;
@@ -644,7 +648,8 @@ public sealed class SongCommentView : View
         SetFocus();
         _scrollBar.TriggerActivity();
 
-        if (_currentSong != null && _sharedSnapshot != null && _sharedSnapshot.Song?.Mid == _currentSong.Mid)
+        if (_currentSong != null && _sharedSnapshot != null && _sharedSnapshot.Song?.Mid == _currentSong.Mid &&
+            (_sharedSnapshot.HotComments.Count > 0 || _sharedSnapshot.NormalComments.Count > 0))
         {
             if (_normalComments.Count == 0 || _sharedSnapshot.NormalComments.Count > _normalComments.Count || _sharedSnapshot.ViewportY != _listView.Viewport.Y)
             {
@@ -703,14 +708,64 @@ public sealed class SongCommentView : View
 
         try
         {
-            var pageResult = await MusicApi.GetSongCommentsAsync(
-                song.Id,
-                song.Mid,
-                targetPage,
-                pageSize: 25,
-                lastCommentSeqNo: isInitial ? "" : _lastSeqNo,
-                ct: ct
-            ).ConfigureAwait(false);
+            if (song.Id <= 0 && !string.IsNullOrEmpty(song.Mid))
+            {
+                try
+                {
+                    var resolvedId = await MusicApi.ResolveSongIdAsync(song.Mid, ct).ConfigureAwait(false);
+                    if (resolvedId > 0)
+                    {
+                        song.Id = resolvedId;
+                    }
+                }
+                catch { }
+            }
+
+            CommentPage? pageResult = null;
+            int maxAttempts = isInitial ? 3 : 1;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                if (ct.IsCancellationRequested) return;
+
+                try
+                {
+                    pageResult = await MusicApi.GetSongCommentsAsync(
+                        song.Id,
+                        song.Mid,
+                        targetPage,
+                        pageSize: 25,
+                        lastCommentSeqNo: isInitial ? "" : _lastSeqNo,
+                        ct: ct
+                    ).ConfigureAwait(false);
+
+                    if (ct.IsCancellationRequested) return;
+
+                    if (pageResult != null)
+                    {
+                        break;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("SongCommentView", $"LoadCommentsAsync attempt {attempt}/{maxAttempts} error for {song.Title}: {ex.Message}");
+                }
+
+                if (attempt < maxAttempts)
+                {
+                    try
+                    {
+                        await Task.Delay(attempt * 400, ct).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+                }
+            }
 
             if (ct.IsCancellationRequested) return;
 
@@ -786,9 +841,13 @@ public sealed class SongCommentView : View
 
                 _isLoading = false;
                 RebuildDisplayItems();
-                if (_currentSong != null)
+                if (_currentSong != null && (_hotComments.Count > 0 || _normalComments.Count > 0))
                 {
                     _sharedSnapshot = CreateSnapshot();
+                }
+                else if (_sharedSnapshot?.Song?.Mid == _currentSong?.Mid && _hotComments.Count == 0 && _normalComments.Count == 0)
+                {
+                    _sharedSnapshot = null;
                 }
             });
         }
@@ -1496,7 +1555,7 @@ public sealed class SongCommentView : View
     {
         if (other == null) return;
         var snapshot = other.CreateSnapshot();
-        if (snapshot.Song != null)
+        if (snapshot.Song != null && (snapshot.HotComments.Count > 0 || snapshot.NormalComments.Count > 0))
         {
             _sharedSnapshot = snapshot;
             RestoreSnapshot(snapshot);
