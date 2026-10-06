@@ -410,14 +410,14 @@ public sealed partial class MusicApi
         return $"{{\"ct\":11,\"cv\":14090008,\"v\":14090008,\"chid\":\"10003505\",\"tmeAppID\":\"qqmusic\",\"tmeLoginType\":{loginType},\"qq\":\"{escapedUin}\",\"authst\":\"{escapedKey}\"}}";
     }
 
-    private static async Task<string> PostAppMusicuAsync(string jsonPayload, CancellationToken ct = default)
+    private static async Task<string> PostAppMusicuAsync(string jsonPayload, string? customCookieHeader = null, CancellationToken ct = default)
     {
         var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
         using var req = new HttpRequestMessage(HttpMethod.Post, url);
         req.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
         req.Headers.TryAddWithoutValidation("User-Agent", "QQMusic 14090008(android 14)");
 
-        var cookieHeader = UserSession.Current.GetCookieHeader();
+        var cookieHeader = customCookieHeader ?? UserSession.Current.GetCookieHeader();
         if (!string.IsNullOrEmpty(cookieHeader))
         {
             req.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
@@ -451,7 +451,7 @@ public sealed partial class MusicApi
         try
         {
             AppLogger.Info("MusicApi", $"AddSongToPlaylistAsync (App-CGI) requesting: dirId={dirId}, songId={songId}");
-            var json = await PostAppMusicuAsync(payload, ct).ConfigureAwait(false);
+            var json = await PostAppMusicuAsync(payload, customCookieHeader: "", ct).ConfigureAwait(false);
             AppLogger.Info("MusicApi", $"AddSongToPlaylistAsync (App-CGI) response: {json}");
 
             using var doc = JsonDocument.Parse(json);
@@ -532,7 +532,7 @@ public sealed partial class MusicApi
         try
         {
             AppLogger.Info("MusicApi", $"RemoveSongFromPlaylistAsync (App-CGI) requesting: dirId={dirId}, songId={songId}");
-            var json = await PostAppMusicuAsync(payload, ct).ConfigureAwait(false);
+            var json = await PostAppMusicuAsync(payload, customCookieHeader: "", ct).ConfigureAwait(false);
             AppLogger.Info("MusicApi", $"RemoveSongFromPlaylistAsync (App-CGI) response: {json}");
 
             using var doc = JsonDocument.Parse(json);
@@ -663,14 +663,17 @@ public sealed partial class MusicApi
     /// <summary>
     /// 创建自建歌单
     /// </summary>
-    public static async Task<(bool Success, long DissId, string Message)> CreatePlaylistAsync(string name, CancellationToken ct = default)
+    public static Task<(bool Success, long DissId, string Message)> CreatePlaylistAsync(string name, CancellationToken ct = default) =>
+        CreatePlaylistInternalAsync(name, canRetryWithRenew: true, ct);
+
+    private static async Task<(bool Success, long DissId, string Message)> CreatePlaylistInternalAsync(string name, bool canRetryWithRenew, CancellationToken ct)
     {
         if (!UserSession.Current.IsLoggedIn || string.IsNullOrWhiteSpace(name))
         {
             return (false, 0, "用户未登录或歌单名称为空");
         }
 
-        await LoginService.EnsureMusicKeyAsync(ct).ConfigureAwait(false);
+        await LoginService.EnsureMusicKeyAsync(false, ct).ConfigureAwait(false);
 
         var escapedName = JsonEncodedText.Encode(name.Trim()).ToString();
         var comm = BuildAppCommJson();
@@ -694,7 +697,7 @@ public sealed partial class MusicApi
         try
         {
             AppLogger.Info("MusicApi", $"CreatePlaylistAsync (App-CGI) requesting: name={name}");
-            var json = await PostAppMusicuAsync(payload, ct).ConfigureAwait(false);
+            var json = await PostAppMusicuAsync(payload, customCookieHeader: "", ct).ConfigureAwait(false);
             AppLogger.Info("MusicApi", $"CreatePlaylistAsync (App-CGI) response: {json}");
 
             using var doc = JsonDocument.Parse(json);
@@ -725,6 +728,16 @@ public sealed partial class MusicApi
                     return (true, dissId, "创建成功");
                 }
 
+                if ((code == 1000 || code == 10000 || code == 80105) && canRetryWithRenew)
+                {
+                    AppLogger.Info("MusicApi", $"CreatePlaylistAsync returned auth/rate error {code}, attempting credential renewal...");
+                    var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
+                    if (renewed)
+                    {
+                        return await CreatePlaylistInternalAsync(name, canRetryWithRenew: false, ct).ConfigureAwait(false);
+                    }
+                }
+
                 string msg = "";
                 if (addObj.TryGetProperty("data", out var dObj) && dObj.TryGetProperty("msg", out var mProp))
                 {
@@ -745,14 +758,17 @@ public sealed partial class MusicApi
     /// <summary>
     /// 删除歌单（自建歌单调用 DelPlaylist，收藏歌单调用 CancelFavPlaylist）
     /// </summary>
-    public static async Task<bool> DeletePlaylistAsync(Playlist playlist, CancellationToken ct = default)
+    public static Task<bool> DeletePlaylistAsync(Playlist playlist, CancellationToken ct = default) =>
+        DeletePlaylistInternalAsync(playlist, canRetryWithRenew: true, ct);
+
+    private static async Task<bool> DeletePlaylistInternalAsync(Playlist playlist, bool canRetryWithRenew, CancellationToken ct)
     {
         if (!UserSession.Current.IsLoggedIn || playlist.IsMyFavorite)
         {
             return false;
         }
 
-        await LoginService.EnsureMusicKeyAsync(ct).ConfigureAwait(false);
+        await LoginService.EnsureMusicKeyAsync(false, ct).ConfigureAwait(false);
 
         try
         {
@@ -775,14 +791,24 @@ public sealed partial class MusicApi
                 """;
 
                 AppLogger.Info("MusicApi", $"DeletePlaylistAsync (App-CGI/created) requesting: dirId={dirId}");
-                var json = await PostAppMusicuAsync(payload, ct).ConfigureAwait(false);
+                var json = await PostAppMusicuAsync(payload, customCookieHeader: "", ct).ConfigureAwait(false);
                 AppLogger.Info("MusicApi", $"DeletePlaylistAsync (App-CGI/created) response: {json}");
 
                 using var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.TryGetProperty("deletePlayList", out var delObj) &&
                     delObj.TryGetProperty("code", out var codeProp) && codeProp.ValueKind == JsonValueKind.Number)
                 {
-                    return codeProp.GetInt32() == 0;
+                    int code = codeProp.GetInt32();
+                    if (code == 0) return true;
+                    if ((code == 1000 || code == 10000 || code == 80105) && canRetryWithRenew)
+                    {
+                        var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
+                        if (renewed)
+                        {
+                            return await DeletePlaylistInternalAsync(playlist, canRetryWithRenew: false, ct).ConfigureAwait(false);
+                        }
+                    }
+                    return false;
                 }
                 return false;
             }
@@ -804,14 +830,24 @@ public sealed partial class MusicApi
                 """;
 
                 AppLogger.Info("MusicApi", $"DeletePlaylistAsync (App-CGI/fav) requesting: dissId={dissId}");
-                var json = await PostAppMusicuAsync(payload, ct).ConfigureAwait(false);
+                var json = await PostAppMusicuAsync(payload, customCookieHeader: "", ct).ConfigureAwait(false);
                 AppLogger.Info("MusicApi", $"DeletePlaylistAsync (App-CGI/fav) response: {json}");
 
                 using var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.TryGetProperty("deleteFavPlayList", out var favObj) &&
                     favObj.TryGetProperty("code", out var codeProp) && codeProp.ValueKind == JsonValueKind.Number)
                 {
-                    return codeProp.GetInt32() == 0;
+                    int code = codeProp.GetInt32();
+                    if (code == 0) return true;
+                    if ((code == 1000 || code == 10000 || code == 80105) && canRetryWithRenew)
+                    {
+                        var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
+                        if (renewed)
+                        {
+                            return await DeletePlaylistInternalAsync(playlist, canRetryWithRenew: false, ct).ConfigureAwait(false);
+                        }
+                    }
+                    return false;
                 }
                 return false;
             }
