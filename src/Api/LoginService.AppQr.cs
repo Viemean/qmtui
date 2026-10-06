@@ -194,7 +194,8 @@ public sealed partial class LoginService
 
     private static async Task<bool> ExchangeOfficialCredentialAsync(string qrId, string musicId, string token, CancellationToken ct)
     {
-        if (!long.TryParse(musicId, out var numericId)) return false;
+        var cleanId = musicId.TrimStart('o');
+        if (!long.TryParse(cleanId, out var numericId)) return false;
         var id = JsonEncodedText.Encode(qrId).ToString();
         var key = JsonEncodedText.Encode(token).ToString();
         var payload = "{\"comm\":{\"ct\":11,\"cv\":14090008,\"v\":14090008,\"chid\":\"10003505\",\"tmeAppID\":\"qqmusic\",\"tmeLoginType\":6}," +

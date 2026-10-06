@@ -142,7 +142,7 @@ public sealed partial class LoginService
 
     private static async Task<QrCodeResult> FetchOfficialAppQrCodeAsync(CancellationToken ct)
     {
-        const string payload = "{\"comm\":{\"ct\":23,\"cv\":0},\"req_0\":{\"module\":\"music.login.LoginServer\",\"method\":\"CreateQRCode\",\"param\":{\"tmeAppID\":\"qqmusic\",\"ct\":11,\"cv\":14090008}}}";
+        const string payload = "{\"comm\":{\"ct\":11,\"cv\":14090008},\"req_0\":{\"module\":\"music.login.LoginServer\",\"method\":\"CreateQRCode\",\"param\":{\"tmeAppID\":\"qqmusic\",\"ct\":11,\"cv\":14090008}}}";
         using var req = new HttpRequestMessage(HttpMethod.Post, "https://u.y.qq.com/cgi-bin/musicu.fcg");
         req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
         req.Headers.TryAddWithoutValidation("User-Agent", "QQMusic 14090008(android 14)");
