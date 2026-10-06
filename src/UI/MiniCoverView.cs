@@ -195,4 +195,13 @@ public sealed class MiniCoverView : FrameView
             _placeholderLabel.Visible = true;
         }
     }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            ClearCover();
+        }
+        base.Dispose(disposing);
+    }
 }
