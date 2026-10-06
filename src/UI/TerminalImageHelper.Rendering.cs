@@ -376,6 +376,7 @@ public static partial class TerminalImageHelper
     public const uint ImageIdNowPlaying = 2;
     public const uint ImageIdArtistDetail = 3;
     public const uint ImageIdCommentPreview = 4;
+    public const uint ImageIdAcrCover = 5;
     public const uint ImageIdCommentBase = 100;
     public const int MaxConcurrentCommentImages = 4;
 

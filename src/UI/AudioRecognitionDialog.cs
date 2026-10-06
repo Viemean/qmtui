@@ -21,6 +21,7 @@ public sealed class AudioRecognitionDialog : Dialog
     private readonly Action<Song>? _onSongSelected;
     private CancellationTokenSource _cts = new();
 
+    private readonly MiniCoverView _coverView;
     private readonly Label _statusLabel;
     private readonly Label _detailLabel1;
     private readonly Label _detailLabel2;
@@ -91,6 +92,15 @@ public sealed class AudioRecognitionDialog : Dialog
         }
 
         SetScheme(TransparentDialogScheme);
+
+        _coverView = new MiniCoverView(TerminalImageHelper.ImageIdAcrCover)
+        {
+            X = 2,
+            Y = 0,
+            Width = 14,
+            Height = 8,
+            Visible = false
+        };
 
         _statusLabel = new Label
         {
@@ -190,7 +200,7 @@ public sealed class AudioRecognitionDialog : Dialog
         _cancelBtn.SetScheme(TransparentDialogScheme);
         _cancelBtn.Accepting += (s, e) => { e.Handled = true; HandleCancel(); };
 
-        Add(_statusLabel, _detailLabel1, _detailLabel2, _detailLabel3, _sourceLabel, _actionBtn, _sourceBtn, _preRollBtn, _cancelBtn);
+        Add(_coverView, _statusLabel, _detailLabel1, _detailLabel2, _detailLabel3, _sourceLabel, _actionBtn, _sourceBtn, _preRollBtn, _cancelBtn);
 
         KeyDown += (s, k) =>
         {
@@ -245,6 +255,15 @@ public sealed class AudioRecognitionDialog : Dialog
         _cancelBtn.KeyBindings.Remove(Key.Space);
 
         MikuTheme.ApplyTo(this, TransparentDialogScheme);
+        _coverView.SetScheme(MikuTheme.FrameBorderDim);
+
+        ViewportChanged += (s, e) =>
+        {
+            if (_isRecognized && _coverView.Visible)
+            {
+                _coverView.TriggerRenderDelayed();
+            }
+        };
 
         Application.AddTimeout(TimeSpan.FromMilliseconds(150), () =>
         {
@@ -309,6 +328,7 @@ public sealed class AudioRecognitionDialog : Dialog
     {
         if (_isDismissed) return;
         _isDismissed = true;
+        _coverView.ClearCover();
         StopAllProcesses();
         Application.RequestStop(this);
     }
@@ -320,6 +340,7 @@ public sealed class AudioRecognitionDialog : Dialog
         if (_isRecognized)
         {
             _isDismissed = true;
+            _coverView.ClearCover();
             var songToPlay = _recognizedSong;
             StopAllProcesses();
             if (songToPlay != null)
@@ -342,19 +363,27 @@ public sealed class AudioRecognitionDialog : Dialog
         _isRecognized = false;
         _recognizedSong = null;
 
+        _coverView.ClearCover();
+        _coverView.Visible = false;
+
+        _statusLabel.X = 3;
         _statusLabel.Text = _currentSource == AudioRecordSource.SystemInternal
             ? "[系统内录] 音频识别中..."
             : "[麦克风] 音频识别中...";
         _statusLabel.Y = 1;
         _statusLabel.Visible = true;
 
+        _detailLabel1.X = 3;
         _detailLabel1.Text = "[░░░░░░░░░░░░░░░░] 0.0s / 15s";
         _detailLabel1.Y = 3;
         _detailLabel1.Visible = true;
 
+        _detailLabel2.X = 3;
         _detailLabel2.Text = "";
         _detailLabel2.Visible = false;
+        _detailLabel3.X = 3;
         _detailLabel3.Visible = false;
+        _sourceLabel.X = 3;
         _sourceLabel.Visible = false;
 
         _actionBtn.Text = "重试 (R)";
@@ -572,29 +601,67 @@ public sealed class AudioRecognitionDialog : Dialog
 
         AppLogger.Force("AudioRecognitionDialog", $"Recognition success: Title='{result.Title}', Artist='{result.Artist}', Source={_currentSource}, Elapsed={elapsedSeconds:F2}s");
 
+        bool showCover = TerminalImageHelper.IsImageSupported;
+        int contentLeft = showCover ? 18 : 3;
+
+        _statusLabel.X = contentLeft;
         _statusLabel.Y = 0;
         _statusLabel.Text = "识别成功！已匹配：";
 
+        _detailLabel1.X = contentLeft;
         _detailLabel1.Text = $"曲名: {result.Title}";
         _detailLabel1.Y = 2;
         _detailLabel1.Visible = true;
 
+        _detailLabel2.X = contentLeft;
         _detailLabel2.Text = $"歌手: {result.Artist}";
         _detailLabel2.Y = 3;
         _detailLabel2.Visible = true;
 
+        _detailLabel3.X = contentLeft;
         _detailLabel3.Text = string.IsNullOrWhiteSpace(result.Album) ? "" : $"专辑: {result.Album}";
         _detailLabel3.Y = 4;
         _detailLabel3.Visible = !string.IsNullOrWhiteSpace(result.Album);
 
-        string sourceName = (result.Source == "Official" || result.Source == "QQMusic" || result.Source == "Native" || result.Source == "原生")
-            ? "原生声学引擎"
-            : result.Source;
-
-        string timeInfo = elapsedSeconds > 0 ? $"  耗时: {elapsedSeconds:F1}s" : "";
-        _sourceLabel.Text = $"来源: {sourceName}{timeInfo}";
+        string timeInfo = elapsedSeconds > 0 ? $"耗时: {elapsedSeconds:F1}s" : "";
+        _sourceLabel.X = contentLeft;
+        _sourceLabel.Text = timeInfo;
         _sourceLabel.Y = string.IsNullOrWhiteSpace(result.Album) ? 4 : 5;
-        _sourceLabel.Visible = true;
+        _sourceLabel.Visible = !string.IsNullOrWhiteSpace(timeInfo);
+
+        if (showCover)
+        {
+            _coverView.Visible = true;
+            _coverView.SetSong(result.MatchedSong);
+            if (result.MatchedSong != null)
+            {
+                var song = result.MatchedSong;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var coverPath = await TerminalImageHelper.EnsureSongCoverAsync(song).ConfigureAwait(false);
+                        if (!string.IsNullOrEmpty(coverPath) && File.Exists(coverPath))
+                        {
+                            Application.Invoke(() =>
+                            {
+                                if (_isDismissed || !_isRecognized || !_coverView.Visible) return;
+                                _coverView.UpdateCover(coverPath);
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("AudioRecognitionDialog", $"Failed to load acr cover: {ex.Message}");
+                    }
+                });
+            }
+        }
+        else
+        {
+            _coverView.Visible = false;
+            _coverView.ClearCover();
+        }
 
         _sourceBtn.Visible = false;
         _preRollBtn.Visible = false;
@@ -629,20 +696,28 @@ public sealed class AudioRecognitionDialog : Dialog
         _isRecognized = false;
         _recognizedSong = null;
 
+        _coverView.ClearCover();
+        _coverView.Visible = false;
+
         AppLogger.Force("AudioRecognitionDialog", $"Recognition failed for Source={_currentSource}. Reason: {message}");
 
+        _statusLabel.X = 3;
         _statusLabel.Text = _currentSource == AudioRecordSource.SystemInternal
             ? "[系统内录] 识曲失败 (未匹配到歌曲)"
             : "[麦克风] 识曲失败 (未匹配到歌曲)";
         _statusLabel.Y = 1;
 
+        _detailLabel1.X = 3;
         _detailLabel1.Text = _currentSource == AudioRecordSource.SystemInternal
             ? "建议调大系统音量，或按 T 切换为麦克风外录"
             : "建议靠近声源，或按 T 切换为系统内录";
         _detailLabel1.Y = 3;
         _detailLabel1.Visible = true;
+        _detailLabel2.X = 3;
         _detailLabel2.Visible = false;
+        _detailLabel3.X = 3;
         _detailLabel3.Visible = false;
+        _sourceLabel.X = 3;
         _sourceLabel.Visible = false;
 
         _actionBtn.Text = "重试 (R)";
@@ -672,16 +747,25 @@ public sealed class AudioRecognitionDialog : Dialog
         _isRecognized = false;
         _recognizedSong = null;
 
+        _coverView.ClearCover();
+        _coverView.Visible = false;
+
         AppLogger.Force("AudioRecognitionDialog", $"Device unavailable for Source={_currentSource}: {title} | {hint}");
 
+        _statusLabel.X = 3;
         _statusLabel.Text = $"[设备不可用] {title}";
         _statusLabel.Y = 1;
 
+        _detailLabel1.X = 3;
         _detailLabel1.Text = hint;
         _detailLabel1.Y = 3;
         _detailLabel1.Visible = true;
+        _detailLabel2.X = 3;
         _detailLabel2.Visible = false;
+        _detailLabel3.X = 3;
         _detailLabel3.Visible = false;
+        _sourceLabel.X = 3;
+        _sourceLabel.Visible = false;
 
         _actionBtn.Text = "重试 (R)";
         _actionBtn.X = 2;
@@ -703,19 +787,19 @@ public sealed class AudioRecognitionDialog : Dialog
         SetNeedsDraw();
     }
 
-
-
     private void StopAllProcesses()
     {
         try { _cts.Cancel(); } catch { }
         _recordingSession?.Dispose();
         _recordingSession = null;
+        _coverView?.ClearCover();
     }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
+            _coverView?.ClearCover();
             StopAllProcesses();
             _cts.Dispose();
         }
