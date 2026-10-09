@@ -9,8 +9,11 @@ namespace QmTui.Utils;
 public static class HttpHelper
 {
     /// <summary>
-    /// 创建配置统一连接池生命周期、连接超时与自动解压缩支持的 SocketsHttpHandler
+    /// 创建配置统一连接池生命周期、连接超时与自动解压缩支持的 SocketsHttpHandler。
     /// </summary>
+    /// <param name="pooledLifetime">连接在连接池中的最大复用生命周期，默认 10 分钟。</param>
+    /// <param name="connectTimeout">套接字建立连接的超时时间，默认 8 秒。</param>
+    /// <returns>配置就绪的 <see cref="SocketsHttpHandler"/> 实例。</returns>
     public static SocketsHttpHandler CreateDefaultHandler(TimeSpan? pooledLifetime = null, TimeSpan? connectTimeout = null)
     {
         return new SocketsHttpHandler

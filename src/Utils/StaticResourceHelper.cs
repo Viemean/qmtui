@@ -11,8 +11,10 @@ public static class StaticResourceHelper
     private static readonly Assembly s_assembly = typeof(StaticResourceHelper).Assembly;
 
     /// <summary>
-    /// 读取静态 Web 文件内容（优先物理磁盘，缺失时自动回退至二进制内嵌资源）
+    /// 读取静态 Web 文件内容（优先物理磁盘，缺失时自动回退至二进制内嵌资源）。
     /// </summary>
+    /// <param name="fileName">相对静态资源目录的文件名称。</param>
+    /// <returns>读取到的文件文本；未找到或读取失败返回空字符串。</returns>
     public static string LoadStaticText(string fileName)
     {
         var filePath = ResolveDiskFilePath(fileName);
@@ -32,8 +34,10 @@ public static class StaticResourceHelper
     }
 
     /// <summary>
-    /// 从当前程序集资源流中读取内嵌文本
+    /// 从当前程序集资源流中读取内嵌文本。
     /// </summary>
+    /// <param name="fileName">内嵌资源文件名称。</param>
+    /// <returns>内嵌文本内容；读取失败返回空字符串。</returns>
     public static string LoadEmbeddedText(string fileName)
     {
         var resourceName = $"QmTui.www.{fileName}";
@@ -55,8 +59,10 @@ public static class StaticResourceHelper
     }
 
     /// <summary>
-    /// 解析外部物理磁盘文件路径
+    /// 解析外部物理磁盘文件绝对路径。
     /// </summary>
+    /// <param name="fileName">相对静态资源目录的文件名称。</param>
+    /// <returns>存在时的物理绝对路径；不存在返回 <see langword="null"/>。</returns>
     public static string? ResolveDiskFilePath(string fileName)
     {
         var baseDir = AppContext.BaseDirectory;

@@ -21,6 +21,10 @@ public static class QrCodeEncoder
     /// <summary>
     /// 将文本编码为终端半块字符行列表（上黑下黑/上黑下白/上白下黑/全白）
     /// </summary>
+    /// <param name="content">待编码的文本内容。</param>
+    /// <param name="ecc">纠错等级，默认为 <see cref="EccLevel.M"/>。</param>
+    /// <param name="quietZone">四周静区模块宽度，默认为 2。</param>
+    /// <returns>渲染后的终端半块字符行列表。</returns>
     public static List<string> EncodeToBlockText(string content, EccLevel ecc = EccLevel.M, int quietZone = 2)
     {
         var grid = GenerateMatrix(content, ecc, quietZone);
@@ -30,6 +34,10 @@ public static class QrCodeEncoder
     /// <summary>
     /// 生成 QR 模块布尔矩阵（true = 黑色模块，false = 白色模块）
     /// </summary>
+    /// <param name="content">待编码的文本内容。</param>
+    /// <param name="ecc">纠错等级，默认为 <see cref="EccLevel.M"/>。</param>
+    /// <param name="quietZone">四周静区模块宽度，默认为 2。</param>
+    /// <returns>表示二维码模块的二维布尔矩阵（true 为黑色模块，false 为白色背景）。</returns>
     public static bool[,] GenerateMatrix(string content, EccLevel ecc = EccLevel.M, int quietZone = 2)
     {
         ArgumentNullException.ThrowIfNull(content);

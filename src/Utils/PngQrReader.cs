@@ -8,6 +8,8 @@ public static class PngQrReader
     /// 将二维码图像解码为适合终端显示的半块字符。
     /// 支持登录接口返回的 PNG 与 JPEG，并保留四周静区。
     /// </summary>
+    /// <param name="imageBytes">包含图像数据的字节数组。</param>
+    /// <returns>终端可直接打印的半块字符行列表；若识别失败则返回包含提示信息的单行列表。</returns>
     public static List<string> DecodeToBlockText(byte[] imageBytes)
     {
         try

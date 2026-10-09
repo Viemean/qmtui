@@ -7,8 +7,10 @@ namespace QmTui.Utils;
 public static partial class LyricParser
 {
     /// <summary>
-    /// Base64 安全解码为 UTF-8 文本
+    /// Base64 安全解码为 UTF-8 文本。
     /// </summary>
+    /// <param name="b64">待解码的 Base64 字符串。</param>
+    /// <returns>解码后的 UTF-8 字符串；解码失败返回空字符串。</returns>
     public static string DecodeBase64(string? b64)
     {
         if (string.IsNullOrWhiteSpace(b64)) return "";
@@ -76,8 +78,10 @@ public static partial class LyricParser
     }
 
     /// <summary>
-    /// 解析本地 LRC 文本为 LyricLine 列表（识别同时间戳双语原歌词与翻译）
+    /// 解析本地 LRC 文本为 LyricLine 列表（识别同时间戳双语原歌词与翻译）。
     /// </summary>
+    /// <param name="lrcText">原始 LRC 文本内容。</param>
+    /// <returns>结构化歌词行列表；若内容为空返回空列表。</returns>
     public static List<LyricLine> ParseSingleLrc(string? lrcText)
     {
         var items = ParseLrc(lrcText);
@@ -148,8 +152,11 @@ public static partial class LyricParser
     }
 
     /// <summary>
-    /// 双语时间轴对齐算法
+    /// 将原语言歌词与翻译歌词按时间戳对齐合并。
     /// </summary>
+    /// <param name="rawLyric">原始语言歌词文本。</param>
+    /// <param name="rawTrans">翻译语言歌词文本。</param>
+    /// <returns>合并对齐后的歌词行列表。</returns>
     public static List<LyricLine> MergeLyrics(string rawLyric, string rawTrans)
     {
         var origItems = ParseLrc(rawLyric);
@@ -264,8 +271,10 @@ public static partial class LyricParser
     ];
 
     /// <summary>
-    /// 判断歌词是否为纯音乐、暂无歌词等无效占位内容
+    /// 判断歌词是否为纯音乐、暂无歌词等无效占位内容。
     /// </summary>
+    /// <param name="lyrics">待检查的歌词行序列。</param>
+    /// <returns>若属于占位歌词返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static bool IsPlaceholderLyrics(IEnumerable<LyricLine>? lyrics)
     {
         if (lyrics == null) return true;
@@ -292,8 +301,10 @@ public static partial class LyricParser
     }
 
     /// <summary>
-    /// 判断当前歌词列表中是否包含有效翻译
+    /// 判断当前歌词列表中是否包含有效翻译。
     /// </summary>
+    /// <param name="lyrics">待检查的歌词行序列。</param>
+    /// <returns>若存在有效翻译返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static bool HasTranslation(IEnumerable<LyricLine>? lyrics)
     {
         if (lyrics == null) return false;
@@ -305,8 +316,10 @@ public static partial class LyricParser
     }
 
     /// <summary>
-    /// 判断歌词是否主要为外文（日韩文或英文等），确实需要中文辅助翻译
+    /// 判断歌词是否主要为外文（日韩文或英文等），确实需要中文辅助翻译。
     /// </summary>
+    /// <param name="lyrics">待检查的歌词行序列。</param>
+    /// <returns>若外文字符显著多于中文字符返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static bool NeedsTranslation(IEnumerable<LyricLine>? lyrics)
     {
         if (lyrics == null) return false;

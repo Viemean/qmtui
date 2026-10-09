@@ -15,8 +15,9 @@ public static class AudioDeviceHelper
     private static readonly Lock s_lock = new();
 
     /// <summary>
-    /// 检测系统是否存在可用的物理/虚拟音频输出通道 (Sink)
+    /// 检测系统是否存在可用的物理/虚拟音频输出通道 (Sink)。
     /// </summary>
+    /// <returns>若存在可用的音频输出设备返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static bool HasAudioOutputDevice()
     {
         RefreshDeviceCacheIfNeeded();
@@ -24,8 +25,9 @@ public static class AudioDeviceHelper
     }
 
     /// <summary>
-    /// 检测系统是否存在可用的系统内录源 (Monitor of Sink)
+    /// 检测系统是否存在可用的系统内录源 (Monitor of Sink)。
     /// </summary>
+    /// <returns>若存在可用的系统内录源返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static bool HasInternalRecordDevice()
     {
         RefreshDeviceCacheIfNeeded();
@@ -33,8 +35,9 @@ public static class AudioDeviceHelper
     }
 
     /// <summary>
-    /// 检测系统是否存在可用的物理麦克风输入源
+    /// 检测系统是否存在可用的物理麦克风输入源。
     /// </summary>
+    /// <returns>若检测到有效的物理麦克风返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static bool HasMicrophoneDevice()
     {
         RefreshDeviceCacheIfNeeded();
@@ -42,9 +45,9 @@ public static class AudioDeviceHelper
     }
 
     /// <summary>
-    /// 检测系统是否存在活跃的音频播放流
-    /// 基于 Linux 原生 /proc/asound 接口直接扫描 PCM 播放状态，无需拉起外部进程
+    /// 检测系统是否存在活跃的音频播放流（基于 /proc/asound 直接扫描 PCM 播放状态）。
     /// </summary>
+    /// <returns>若存在活跃的 PCM 播放流返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static bool HasActiveAudioPlayback()
     {
         if (!OperatingSystem.IsLinux()) return false;
@@ -84,18 +87,18 @@ public static class AudioDeviceHelper
     }
 
     /// <summary>
-    /// 获取当前默认输出设备的物理 Monitor 名称
-    /// 使用 PulseAudio / PipeWire 原生支持的标准规范别名 @DEFAULT_SINK@.monitor
+    /// 获取当前默认输出设备的物理 Monitor 名称（@DEFAULT_SINK@.monitor）。
     /// </summary>
+    /// <returns>默认音频输出监视设备别名。</returns>
     public static string GetDefaultSinkMonitorDevice()
     {
         return "@DEFAULT_SINK@.monitor";
     }
 
     /// <summary>
-    /// 获取当前默认麦克风的物理 Source 名称
-    /// 使用 PulseAudio / PipeWire 原生支持的默认别名 default
+    /// 获取当前默认麦克风的物理 Source 名称（default）。
     /// </summary>
+    /// <returns>默认麦克风设备别名。</returns>
     public static string GetDefaultMicrophoneDevice()
     {
         return "default";

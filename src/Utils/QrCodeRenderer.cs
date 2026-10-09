@@ -10,6 +10,8 @@ public static class QrCodeRenderer
     /// <summary>
     /// 将 2D 矩阵转换为适合终端等宽字体的半块字符行列表
     /// </summary>
+    /// <param name="grid">二维码布尔矩阵（true 为黑色模块，false 为白色背景）。</param>
+    /// <returns>适合终端显示的半块字符行列表。</returns>
     public static List<string> RenderToBlockText(bool[,] grid)
     {
         int height = grid.GetLength(0);

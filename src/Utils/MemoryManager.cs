@@ -18,9 +18,9 @@ public static partial class MemoryManager
     private static partial int NativeMallocTrim(nuint pad);
 
     /// <summary>
-    /// 触发一次防抖异步内存修剪。连续快速切歌时将自动顺延，
-    /// 若防抖顺延超过 3 秒则触发保底修剪，避免饿死。
+    /// 触发一次防抖异步内存修剪（若防抖顺延超过 3 秒则触发保底修剪）。
     /// </summary>
+    /// <param name="delayMs">异步防抖延迟时间（毫秒），默认 2500ms。</param>
     public static void ScheduleTrim(int delayMs = 2500)
     {
         lock (s_lock)
