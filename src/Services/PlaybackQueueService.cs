@@ -222,7 +222,6 @@ public sealed class PlaybackQueueService
                 return CurrentSong;
             }
 
-            // 随机播放模式
             if (Mode == PlaybackMode.Shuffle && _activeSongs.Count > 1)
             {
                 EnsureShuffleQueue();

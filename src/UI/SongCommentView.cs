@@ -975,7 +975,6 @@ public sealed class SongCommentView : View
             _displayItems.Add(new DisplayItem(ItemType.CommentContent, $"  {line}", c, isHot));
         }
 
-        // 图片标签
         if (!string.IsNullOrEmpty(c.PicUrl))
         {
             var picText = TerminalImageHelper.IsImageSupported

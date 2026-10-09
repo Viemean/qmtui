@@ -97,7 +97,6 @@ public sealed class ThinScrollBarView : View
                 }
                 else
                 {
-                    // 直接拖拽或点中滑块
                     if (maxThumbTop > 0)
                     {
                         double ratio = (double)clickY / trackHeight;

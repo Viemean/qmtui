@@ -307,7 +307,6 @@ public static partial class WebDavService
 
                 var itemPath = Uri.UnescapeDataString(itemUri.AbsolutePath).TrimEnd('/');
 
-                // 排除当前请求目录自身
                 if (string.Equals(itemPath, reqPath, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;

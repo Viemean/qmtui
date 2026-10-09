@@ -180,7 +180,6 @@ public static class AudioRecognitionService
                 score += 40;
             }
 
-            // 专辑匹配
             if (!string.IsNullOrWhiteSpace(targetAlbum) && !string.IsNullOrWhiteSpace(song.Album))
             {
                 if (song.Album.Contains(targetAlbum, StringComparison.OrdinalIgnoreCase) ||

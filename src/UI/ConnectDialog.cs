@@ -258,7 +258,6 @@ public sealed class ConnectDialog : Dialog
         _closeBtn.Accepting += (s, e) => Application.RequestStop();
         _rightPane.Add(_closeBtn);
 
-        // 填充初始二维码
         if (initialQrLines.Count > 0)
         {
             _qrView.SetSource(new ObservableCollection<string>(initialQrLines));

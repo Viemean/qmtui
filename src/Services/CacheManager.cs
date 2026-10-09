@@ -206,7 +206,6 @@ public static class CacheManager
             var nowTicks = DateTime.UtcNow.Ticks;
             foreach (var fi in fileList)
             {
-                // 跳过临时文件
                 if (fi.Name.Contains(".tmp", StringComparison.OrdinalIgnoreCase)) continue;
 
                 var rel = Path.GetRelativePath(s_baseDir, fi.FullName).Replace('\\', '/');

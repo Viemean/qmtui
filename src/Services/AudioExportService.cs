@@ -211,7 +211,6 @@ public static class AudioExportService
             AppLogger.Debug("AudioExportService", $"Failed to read audio magic bytes: {ex.Message}");
         }
 
-        // 兜底按品质判断
         return AudioQualityHelper.GetExtension(tier);
     }
 

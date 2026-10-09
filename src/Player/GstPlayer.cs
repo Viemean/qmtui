@@ -468,7 +468,6 @@ public sealed partial class GstPlayer : IPlayer
                     var sec = posNs / 1_000_000_000.0;
                     CurrentPositionSeconds = sec;
 
-                    // 检测进度是否前进
                     if (sec > _lastHealthyPosition + 0.05)
                     {
                         // 若成功推进超过 2 秒且曾经重试过，重置重试计数

@@ -162,7 +162,6 @@ public sealed class QualityDialog : Dialog
         _qualityListView.SetFocus();
         Application.Invoke(() => _qualityListView.SetFocus());
 
-        // 异步探测真实音源状态
         if (activeSong != null)
         {
             Task.Run(async () =>
