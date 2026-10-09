@@ -48,6 +48,11 @@ public sealed partial class LoginService
 
     public sealed record PollStatus(QrLoginEvent Event, int Code, string Message);
 
+    /// <summary>
+    /// 获取登录方式的可读显示名称。
+    /// </summary>
+    /// <param name="type">扫码登录方式枚举。</param>
+    /// <returns>登录方式的中文标识名称。</returns>
     public static string GetLoginTypeName(QrLoginType type) => type switch
     {
         QrLoginType.Qq => "QQ",
@@ -56,9 +61,20 @@ public sealed partial class LoginService
         _ => "QQ"
     };
 
+    /// <summary>
+    /// 拉取默认 QQ 渠道登录二维码。
+    /// </summary>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>二维码元数据模型；失败或取消时返回 <see langword="null"/>。</returns>
     public static Task<QrCodeResult?> FetchQrCodeAsync(CancellationToken ct = default) =>
         FetchQrCodeAsync(QrLoginType.Qq, ct);
 
+    /// <summary>
+    /// 拉取指定渠道的登录二维码图像与会话标识。
+    /// </summary>
+    /// <param name="type">登录渠道枚举类型。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>二维码元数据模型；失败或取消时返回 <see langword="null"/>。</returns>
     public static async Task<QrCodeResult?> FetchQrCodeAsync(QrLoginType type, CancellationToken ct = default)
     {
         try
@@ -83,6 +99,12 @@ public sealed partial class LoginService
         }
     }
 
+    /// <summary>
+    /// 轮询查询指定二维码的扫码状态与授权结果。
+    /// </summary>
+    /// <param name="qr">待轮询的二维码模型。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>轮询状态模型，包含事件类型、状态码与描述提示。</returns>
     public static async Task<PollStatus> PollQrStatusAsync(QrCodeResult qr, CancellationToken ct = default)
     {
         try
@@ -739,6 +761,11 @@ public sealed partial class LoginService
         return false;
     }
 
+    /// <summary>
+    /// 计算 QQ 网页端防跨站请求伪造令牌（g_tk / bkn）。
+    /// </summary>
+    /// <param name="p_skey">用户会话密钥。</param>
+    /// <returns>计算得出的数值型 CSRF 令牌。</returns>
     public static int GetACSRFToken(string p_skey)
     {
         var hash = 5381;
@@ -750,8 +777,10 @@ public sealed partial class LoginService
     }
 
     /// <summary>
-    /// 手动导入 Cookie 字符串
+    /// 手动导入 Cookie 字符串并持久化保存。
     /// </summary>
+    /// <param name="rawCookie">分号分隔的原始 HTTP Cookie 字符串。</param>
+    /// <returns>解析并保存成功返回 <see langword="true"/>；若缺少关键登录标识返回 <see langword="false"/>。</returns>
     public static bool ImportCookieString(string rawCookie)
     {
         if (string.IsNullOrWhiteSpace(rawCookie)) return false;
@@ -797,12 +826,20 @@ public sealed partial class LoginService
         return true;
     }
 
+    /// <summary>
+    /// 清除当前登录凭证并退出账号。
+    /// </summary>
     public static void Logout()
     {
         AppLogger.Info("LoginService", "User requested logout");
         UserSession.Current.Clear();
     }
 
+    /// <summary>
+    /// 计算 ptqr 扫码轮询接口校验哈希值。
+    /// </summary>
+    /// <param name="qrsig">Cookie 中返回的二维码签名字符串。</param>
+    /// <returns>计算得出的数值型校验哈希。</returns>
     public static int HashPtqrToken(string qrsig)
     {
         int e = 0;

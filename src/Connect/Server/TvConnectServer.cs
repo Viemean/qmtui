@@ -99,6 +99,11 @@ public sealed class TvConnectServer : IDisposable
     public Func<string, Task<string?>>? CoverPathByMidProvider { get; set; }
     public Func<string?>? CurrentLyricsTextProvider { get; set; }
 
+    /// <summary>
+    /// 初始化伴生多端互联 WebSocket 与 HTTP 流媒体服务服务端。
+    /// </summary>
+    /// <param name="storage">互联设备配置存储管理实例。</param>
+    /// <param name="port">期望绑定的服务端口号，默认 8765。</param>
     public TvConnectServer(ConnectStorage storage, int port = 8765)
     {
         _storage = storage;
@@ -124,6 +129,9 @@ public sealed class TvConnectServer : IDisposable
         return startPort;
     }
 
+    /// <summary>
+    /// 启动 HTTP 与 WebSocket 监听服务，处理跨端消息接入。
+    /// </summary>
     public void Start()
     {
         if (_listener != null && _listener.IsListening) return;
@@ -517,6 +525,10 @@ public sealed class TvConnectServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// 向所有已连接的远程客户端广播播放器状态变更事件（播放、暂停、进度）。
+    /// </summary>
+    /// <param name="evt">播放器状态事件模型。</param>
     public void BroadcastPlayerState(PlayerStateEvent evt)
     {
         try
@@ -529,6 +541,10 @@ public sealed class TvConnectServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// 向所有已连接的远程客户端广播播放队列变更事件。
+    /// </summary>
+    /// <param name="evt">播放队列快照事件模型。</param>
     public void BroadcastQueueState(QueueStateEvent evt)
     {
         try
@@ -541,6 +557,10 @@ public sealed class TvConnectServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// 向所有已连接的远程客户端广播当前播放曲目的歌词行同步数据。
+    /// </summary>
+    /// <param name="payload">歌词同步载荷模型。</param>
     public void BroadcastLyrics(LyricsSyncPayload payload)
     {
         try
@@ -554,6 +574,10 @@ public sealed class TvConnectServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// 向所有已连接客户端广播播放指定曲目的指令。
+    /// </summary>
+    /// <param name="song">互联协议曲目传输模型。</param>
     public void BroadcastPlaySong(ConnectSong song)
     {
         try
@@ -566,11 +590,17 @@ public sealed class TvConnectServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// 向所有已连接客户端广播切下一首播放指令。
+    /// </summary>
     public void BroadcastNext()
     {
         BroadcastAction(ConnectActions.CmdNext);
     }
 
+    /// <summary>
+    /// 向所有已连接客户端广播切上一首播放指令。
+    /// </summary>
     public void BroadcastPrevious()
     {
         BroadcastAction(ConnectActions.CmdPrevious);
@@ -630,6 +660,9 @@ public sealed class TvConnectServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// 停止服务监听并断开所有已连接的 WebSocket 客户端。
+    /// </summary>
     public void Stop()
     {
         _cts?.Cancel();
@@ -901,6 +934,9 @@ public sealed class TvConnectServer : IDisposable
         ctx.Response.Close();
     }
 
+    /// <summary>
+    /// 释放互联服务端监听器与后台会话资源。
+    /// </summary>
     public void Dispose()
     {
         Stop();

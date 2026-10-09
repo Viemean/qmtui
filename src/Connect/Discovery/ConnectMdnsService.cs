@@ -15,12 +15,21 @@ public sealed class ConnectMdnsService : IDisposable
     private CancellationTokenSource? _cts;
     private UdpClient? _udpClient;
 
+    /// <summary>
+    /// 初始化 mDNS 局域网广播发现服务。
+    /// </summary>
+    /// <param name="storage">互联设备持久化存储组件。</param>
+    /// <param name="port">本机流媒体与控制服务端口号。</param>
     public ConnectMdnsService(ConnectStorage storage, int port = 8765)
     {
         _storage = storage;
         _port = port;
     }
 
+    /// <summary>
+    /// 遍历系统活动网卡，按局域网优先级算法选取最优的本机 IPv4 地址。
+    /// </summary>
+    /// <returns>选出的最佳局域网 IPv4 字符串；若无可用网卡则回退至 127.0.0.1。</returns>
     public static string GetBestLocalIpAddress()
     {
         try
@@ -72,6 +81,9 @@ public sealed class ConnectMdnsService : IDisposable
         }
     }
 
+    /// <summary>
+    /// 启动 UDP 5353 组播监听与周期性 mDNS 心跳广播。
+    /// </summary>
     public void Start()
     {
         if (_cts != null) return;
@@ -341,6 +353,9 @@ public sealed class ConnectMdnsService : IDisposable
         bw.Write((byte)0);
     }
 
+    /// <summary>
+    /// 停止 mDNS 广播并关闭组播套接字连接。
+    /// </summary>
     public void Stop()
     {
         _cts?.Cancel();
@@ -354,6 +369,9 @@ public sealed class ConnectMdnsService : IDisposable
         _udpClient = null;
     }
 
+    /// <summary>
+    /// 释放 mDNS 广播服务所占用的网络资源。
+    /// </summary>
     public void Dispose()
     {
         Stop();

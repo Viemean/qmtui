@@ -8,6 +8,14 @@ namespace QmTui.Api;
 
 public sealed partial class MusicApi
 {
+    /// <summary>
+    /// 检索歌曲曲库。
+    /// </summary>
+    /// <param name="query">搜索关键词。</param>
+    /// <param name="page">分页页码，默认 1。</param>
+    /// <param name="pageSize">单页条数，默认 25。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>匹配的曲目列表；若未检索到结果或请求失败返回空列表。</returns>
     public static async Task<List<Song>> SearchAsync(string query, int page = 1, int pageSize = 25, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
@@ -62,6 +70,14 @@ public sealed partial class MusicApi
         }
     }
 
+    /// <summary>
+    /// 检索歌单列表。
+    /// </summary>
+    /// <param name="query">搜索关键词。</param>
+    /// <param name="page">分页页码，默认 1。</param>
+    /// <param name="pageSize">单页条数，默认 30。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>匹配的歌单列表；若未检索到结果或请求失败返回空列表。</returns>
     public static async Task<List<Playlist>> SearchPlaylistsAsync(string query, int page = 1, int pageSize = 30, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
@@ -132,11 +148,20 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 并发探测指定歌曲在 4 档品质下的真实可用状态及直链
+    /// 收藏歌曲列表查询结果。
     /// </summary>
-
+    /// <param name="Songs">当前页返回的歌曲列表。</param>
+    /// <param name="Total">收藏歌曲总数。</param>
+    /// <param name="HasMore">是否还有更多未拉取的分页数据。</param>
     public sealed record FavoriteSongsResult(List<Song> Songs, int Total, bool HasMore);
 
+    /// <summary>
+    /// 分页获取当前登录用户的收藏歌曲列表。
+    /// </summary>
+    /// <param name="page">分页页码，默认 1。</param>
+    /// <param name="pageSize">单页数据量，默认 100。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>收藏歌曲查询结果；若未登录或请求失败返回空结果集。</returns>
     public static async Task<FavoriteSongsResult> GetFavoriteSongsAsync(int page = 1, int pageSize = 100, CancellationToken ct = default)
     {
         if (!UserSession.Current.IsLoggedIn) return new FavoriteSongsResult([], 0, false);
@@ -221,9 +246,10 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 获取用户每日推荐歌单（每日30首）
+    /// 获取当前用户自建与收藏的所有歌单列表。
     /// </summary>
-
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>歌单列表；若未登录或请求失败返回空列表。</returns>
     public static async Task<List<Playlist>> GetPlaylistsAsync(CancellationToken ct = default)
     {
         if (!UserSession.Current.IsLoggedIn) return [];
@@ -305,8 +331,13 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 获取指定歌单内的所有歌曲（自建歌单与外部收藏歌单均支持）
+    /// 获取指定歌单内的所有歌曲（自建歌单与外部收藏歌单均支持）。
     /// </summary>
+    /// <param name="playlist">目标歌单实例。</param>
+    /// <param name="page">分页页码，默认 1。</param>
+    /// <param name="pageSize">单页条数，默认 100。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>解析后的曲目列表；若未登录或请求失败返回空列表。</returns>
     public static async Task<List<Song>> GetPlaylistSongsAsync(Playlist playlist, int page = 1, int pageSize = 100, CancellationToken ct = default)
     {
         if (!playlist.IsFav)
@@ -395,8 +426,12 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 添加歌曲到指定歌单（dirId: 201 即为“我喜欢”）
+    /// 添加歌曲到指定歌单（dirId: 201 即为“我喜欢”）。
     /// </summary>
+    /// <param name="dirId">目标歌单目录标识。</param>
+    /// <param name="songId">曲目数值标识。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>操作成功返回 <see langword="true"/>；失败返回 <see langword="false"/>。</returns>
     public static async Task<bool> AddSongToPlaylistAsync(long dirId, long songId, CancellationToken ct = default)
     {
         return await AddSongToPlaylistInternalAsync(dirId, songId, canRetryWithRenew: true, ct).ConfigureAwait(false);
@@ -511,8 +546,12 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 从指定歌单中移除歌曲（dirId: 201 即为“我喜欢”）
+    /// 从指定歌单中移除歌曲（dirId: 201 即为“我喜欢”）。
     /// </summary>
+    /// <param name="dirId">目标歌单目录标识。</param>
+    /// <param name="songId">曲目数值标识。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>操作成功返回 <see langword="true"/>；失败返回 <see langword="false"/>。</returns>
     public static async Task<bool> RemoveSongFromPlaylistAsync(long dirId, long songId, CancellationToken ct = default)
     {
         return await RemoveSongFromPlaylistInternalAsync(dirId, songId, canRetryWithRenew: true, ct).ConfigureAwait(false);
@@ -583,8 +622,12 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 添加歌曲到指定歌单（Playlist 模型重载）
+    /// 添加歌曲到指定歌单。
     /// </summary>
+    /// <param name="playlist">目标歌单模型。</param>
+    /// <param name="song">待添加的歌曲模型。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>操作成功返回 <see langword="true"/>；解析失败或接口报错返回 <see langword="false"/>。</returns>
     public static async Task<bool> AddSongToPlaylistAsync(Playlist playlist, Song song, CancellationToken ct = default)
     {
         long songId = song.Id;
@@ -599,8 +642,12 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 从指定歌单中移除歌曲（Playlist 模型重载）
+    /// 从指定歌单中移除歌曲。
     /// </summary>
+    /// <param name="playlist">目标歌单模型。</param>
+    /// <param name="song">待移除的歌曲模型。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>操作成功返回 <see langword="true"/>；解析失败或接口报错返回 <see langword="false"/>。</returns>
     public static async Task<bool> RemoveSongFromPlaylistAsync(Playlist playlist, Song song, CancellationToken ct = default)
     {
         long songId = song.Id;
@@ -615,8 +662,11 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 添加歌曲到“我喜欢”
+    /// 添加歌曲到当前用户的“我喜欢”收藏列表。
     /// </summary>
+    /// <param name="song">待收藏的歌曲模型。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>收藏成功返回 <see langword="true"/>；失败返回 <see langword="false"/>。</returns>
     public static async Task<bool> AddSongToFavoriteAsync(Song song, CancellationToken ct = default)
     {
         long songId = song.Id;
@@ -637,8 +687,11 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 从“我喜欢”中移除歌曲
+    /// 从当前用户的“我喜欢”收藏列表中移除歌曲。
     /// </summary>
+    /// <param name="song">待取消收藏的歌曲模型。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>取消成功返回 <see langword="true"/>；失败返回 <see langword="false"/>。</returns>
     public static async Task<bool> RemoveSongFromFavoriteAsync(Song song, CancellationToken ct = default)
     {
         long songId = song.Id;
@@ -661,8 +714,11 @@ public sealed partial class MusicApi
 
 
     /// <summary>
-    /// 创建自建歌单
+    /// 创建自建歌单。
     /// </summary>
+    /// <param name="name">歌单名称。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>三元组：Success 表示是否成功，DissId 为新创建歌单标识，Message 为响应说明。</returns>
     public static Task<(bool Success, long DissId, string Message)> CreatePlaylistAsync(string name, CancellationToken ct = default) =>
         CreatePlaylistInternalAsync(name, canRetryWithRenew: true, ct);
 
@@ -756,8 +812,11 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 删除歌单（自建歌单调用 DelPlaylist，收藏歌单调用 CancelFavPlaylist）
+    /// 删除指定歌单（自建歌单执行物理删除，外部歌单执行取消收藏）。
     /// </summary>
+    /// <param name="playlist">待删除的歌单模型。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>删除或取消收藏成功返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static Task<bool> DeletePlaylistAsync(Playlist playlist, CancellationToken ct = default) =>
         DeletePlaylistInternalAsync(playlist, canRetryWithRenew: true, ct);
 

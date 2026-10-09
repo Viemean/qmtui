@@ -10,6 +10,13 @@ namespace QmTui.Api;
 
 public sealed partial class MusicApi
 {
+    /// <summary>
+    /// 探测指定曲目在各音质档位下的可用状态及播放参数。
+    /// </summary>
+    /// <param name="songMid">歌曲唯一字符串标识。</param>
+    /// <param name="mediaMid">媒体文件标识，为空时使用 <paramref name="songMid"/> 兜底。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>各音质候选选项列表；若请求失败返回空列表。</returns>
     public static async Task<List<QualityOption>> ProbeSongQualitiesAsync(string songMid, string mediaMid = "", CancellationToken ct = default)
     {
         return await ProbeSongQualitiesInternalAsync(songMid, mediaMid, canRetryWithRenew: true, ct).ConfigureAwait(false);
@@ -439,8 +446,13 @@ public sealed partial class MusicApi
         return 0;
     }
     /// <summary>
-    /// 根据用户指定或偏好的音质获取直链，支持梯度回退
+    /// 根据用户指定或偏好的音质获取直链，支持梯度回退。
     /// </summary>
+    /// <param name="songMid">歌曲唯一字符串标识。</param>
+    /// <param name="mediaMid">媒体文件标识，为空时使用 <paramref name="songMid"/> 兜底。</param>
+    /// <param name="preferred">首选期望的目标音质档位。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>三元组：Url 为直链地址（无音源时为 <see langword="null"/>），Quality 为音质徽标名称，Tier 为最终匹配的音质档位。</returns>
     public static async Task<(string? Url, string Quality, AudioQualityTier Tier)> GetPlayUrlForTierAsync(string songMid, string mediaMid = "", AudioQualityTier preferred = AudioQualityTier.SQ, CancellationToken ct = default)
     {
         var options = await ProbeSongQualitiesAsync(songMid, mediaMid, ct).ConfigureAwait(false);
@@ -481,8 +493,12 @@ public sealed partial class MusicApi
 
 
     /// <summary>
-    /// 获取歌曲直链播放 URL 与对应音质档位（自动读取用户偏好音质）
+    /// 获取歌曲直链播放 URL 与对应音质档位（自动读取用户偏好音质）。
     /// </summary>
+    /// <param name="songMid">歌曲唯一字符串标识。</param>
+    /// <param name="mediaMid">媒体文件标识，为空时使用 <paramref name="songMid"/> 兜底。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>二元组：Url 为直链地址（无音源时为 <see langword="null"/>），Quality 为音质名称。</returns>
     public static async Task<(string? Url, string Quality)> GetPlayUrlWithQualityAsync(string songMid, string mediaMid = "", CancellationToken ct = default)
     {
         var preferredTier = AudioQualityHelper.Parse(UserSession.Current.PreferredQuality);
@@ -491,8 +507,11 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 获取歌曲直链播放 URL
+    /// 获取歌曲直链播放 URL。
     /// </summary>
+    /// <param name="songMid">歌曲唯一字符串标识。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>音频播放直链；无音源可用时返回 <see langword="null"/>。</returns>
     public static async Task<string?> GetPlayUrlAsync(string songMid, CancellationToken ct = default)
     {
         var (url, _) = await GetPlayUrlWithQualityAsync(songMid, songMid, ct).ConfigureAwait(false);
@@ -550,8 +569,11 @@ public sealed partial class MusicApi
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> s_visualMidCache = new();
 
     /// <summary>
-    /// 获取单曲专属视觉封面 MID（track_info.vs[1]），用于无 AlbumMid 单曲的封面获取
+    /// 获取单曲专属视觉封面标识（track_info.vs[1]）。
     /// </summary>
+    /// <param name="songMid">歌曲唯一字符串标识。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>封面视觉标识；若无专属封面或查询失败返回 <see langword="null"/>。</returns>
     public static async Task<string?> GetSongVisualMidAsync(string songMid, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(songMid)) return null;
@@ -616,8 +638,11 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 获取同步 LRC 歌词与翻译（解析 Base64 并进行双语时间轴对齐）
+    /// 获取同步 LRC 歌词与翻译（解析 Base64 并进行双语时间轴对齐）。
     /// </summary>
+    /// <param name="songMid">歌曲唯一字符串标识。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>对齐后的歌词行列表；若无歌词返回包含提示行的列表。</returns>
     public static async Task<List<LyricLine>> GetLyricsAsync(string songMid, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(songMid))

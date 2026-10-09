@@ -7,6 +7,11 @@ namespace QmTui.Api;
 
 public sealed partial class MusicApi
 {
+    /// <summary>
+    /// 刷新并更新当前登录用户的个人资料与 VIP 身份信息。
+    /// </summary>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>刷新成功返回 <see langword="true"/>；未登录或请求失败返回 <see langword="false"/>。</returns>
     public static async Task<bool> RefreshCurrentUserProfileAsync(CancellationToken ct = default)
     {
         return await RefreshCurrentUserProfileInternalAsync(canRetryWithRenew: true, ct).ConfigureAwait(false);

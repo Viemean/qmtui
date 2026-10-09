@@ -8,6 +8,13 @@ namespace QmTui.Api;
 
 public sealed partial class LoginService
 {
+    /// <summary>
+    /// 维持长连接监听官方移动端 APP 扫码登录状态与授权票据回传。
+    /// </summary>
+    /// <param name="qr">包含连接标识的二维码结果模型。</param>
+    /// <param name="changed">扫码状态变更回调委托。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>最终轮询状态模型（成功、超时或失败）。</returns>
     public static async Task<PollStatus> WaitForOfficialAppQrLoginAsync(QrCodeResult qr, Action<PollStatus>? changed = null, CancellationToken ct = default)
     {
         if (qr.Type != QrLoginType.OfficialApp) return new(QrLoginEvent.Error, -1, "二维码类型不匹配");

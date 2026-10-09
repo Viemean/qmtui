@@ -8,6 +8,11 @@ namespace QmTui.Api;
 
 public sealed partial class MusicApi
 {
+    /// <summary>
+    /// 获取当前用户的“每日30首”个性化推荐歌曲列表。
+    /// </summary>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>推荐歌曲列表；若未登录或接口无数据返回空列表。</returns>
     public static Task<List<Song>> GetDailyRecommendSongsAsync(CancellationToken ct = default) =>
         GetFeedRecommendDissSongsAsync(
             title => title.Contains("30首", StringComparison.OrdinalIgnoreCase) ||
@@ -18,6 +23,11 @@ public sealed partial class MusicApi
             featureName: "每日30首",
             ct: ct);
 
+    /// <summary>
+    /// 获取当前用户的“百万收藏”精选推荐歌曲列表。
+    /// </summary>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>推荐歌曲列表；若未登录或接口无数据返回空列表。</returns>
     public static Task<List<Song>> GetMillionRecommendSongsAsync(CancellationToken ct = default) =>
         GetFeedRecommendDissSongsAsync(
             title => title.Contains("百万", StringComparison.OrdinalIgnoreCase) ||
@@ -160,8 +170,11 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 获取用户“猜你喜欢”个性化电台歌曲列表（单次按去重策略累积拉取指定数量）
+    /// 获取用户“猜你喜欢”个性化电台歌曲列表。
     /// </summary>
+    /// <param name="count">期望获取的单批歌曲数量，默认 25。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>电台推荐歌曲列表；若未登录或接口失败返回空列表。</returns>
     public static async Task<List<Song>> GetGuessRecommendSongsAsync(int count = 25, CancellationToken ct = default)
     {
         if (!UserSession.Current.IsLoggedIn) return [];

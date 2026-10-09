@@ -32,8 +32,10 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 计算现代网关 zzc 签名
+    /// 计算现代网关 zzc 签名。
     /// </summary>
+    /// <param name="text">待计算签名的原始文本载荷。</param>
+    /// <returns>计算得出的 zzc 签名字符串。</returns>
     public static string ComputeZzcSign(string text)
     {
         var hashBytes = SHA1.HashData(Encoding.UTF8.GetBytes(text));
@@ -65,8 +67,10 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 对明文 JSON 使用 AG-1（AES-128-GCM）进行载荷加密
+    /// 对明文 JSON 使用 AG-1（AES-128-GCM）进行载荷加密。
     /// </summary>
+    /// <param name="jsonPayload">待加密的明文 JSON 载荷字符串。</param>
+    /// <returns>Base64 编码的加密结果数据包（Nonce + Ciphertext + Tag）。</returns>
     public static string EncryptAg1Request(string jsonPayload)
     {
         var plainBytes = Encoding.UTF8.GetBytes(jsonPayload);
@@ -90,8 +94,10 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 解密 AG-1 响应密文流
+    /// 解密 AG-1 响应密文流。
     /// </summary>
+    /// <param name="responseBytes">网关返回的原始密文字节数组。</param>
+    /// <returns>解密后的 UTF-8 明文字符串。</returns>
     public static string DecryptAg1Response(byte[] responseBytes)
     {
         var decrypted = new byte[responseBytes.Length];
@@ -103,8 +109,11 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 向 u6 安全网关发送 AG-1 加密请求并自动解密返回 JSON
+    /// 向 u6 安全网关发送 AG-1 加密请求并自动解密返回 JSON。
     /// </summary>
+    /// <param name="jsonPayload">请求的明文 JSON 载荷。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>网关解密后的 JSON 响应文本。</returns>
     public static async Task<string> PostAg1Async(string jsonPayload, CancellationToken ct = default)
     {
         var sign = ComputeZzcSign(jsonPayload);

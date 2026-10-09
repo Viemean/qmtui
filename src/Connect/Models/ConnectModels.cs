@@ -44,9 +44,23 @@ public sealed record ConnectMessage(
     [property: JsonPropertyName("timestamp")] long Timestamp = 0
 )
 {
+    /// <summary>
+    /// 构建指定动作与纯文本载荷的互联控制消息。
+    /// </summary>
+    /// <param name="action">控制动作指令名称。</param>
+    /// <param name="payload">原始文本载荷内容。</param>
+    /// <returns>封装完毕的 <see cref="ConnectMessage"/> 实例。</returns>
     public static ConnectMessage Create(string action, string payload = "") =>
         new(action, payload, null, Guid.NewGuid().ToString(), DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
+    /// <summary>
+    /// 构建指定动作与结构化泛型数据的互联控制消息。
+    /// </summary>
+    /// <typeparam name="T">载荷数据模型类型。</typeparam>
+    /// <param name="action">控制动作指令名称。</param>
+    /// <param name="data">结构化业务数据实体。</param>
+    /// <param name="jsonTypeInfo">AOT 兼容的 JSON 类型元数据契约。</param>
+    /// <returns>封装完毕且携带 <see cref="JsonElement"/> 数据的互联消息。</returns>
     public static ConnectMessage Create<T>(string action, T data, JsonTypeInfo<T> jsonTypeInfo)
     {
         var jsonStr = JsonSerializer.Serialize(data, jsonTypeInfo);
@@ -60,6 +74,12 @@ public sealed record ConnectMessage(
         );
     }
 
+    /// <summary>
+    /// 反序列化提取互联消息内部的泛型业务数据。
+    /// </summary>
+    /// <typeparam name="T">期望解析的目标实体类型。</typeparam>
+    /// <param name="jsonTypeInfo">AOT 兼容的 JSON 类型元数据契约。</param>
+    /// <returns>解析成功的业务对象；解析失败或数据缺失时返回 <see langword="null"/>。</returns>
     public T? DecodeData<T>(JsonTypeInfo<T> jsonTypeInfo)
     {
         if (Data.HasValue && Data.Value.ValueKind is not JsonValueKind.Null and not JsonValueKind.Undefined)
@@ -162,6 +182,10 @@ public sealed record ConnectSong(
     [property: JsonPropertyName("isWebDav")] bool IsWebDav = false
 )
 {
+    /// <summary>
+    /// 将跨端传输协议曲目模型转换为内部核心领域 <see cref="Song"/> 对象。
+    /// </summary>
+    /// <returns>转换后的领域曲目实体。</returns>
     public Song ToDomainSong()
     {
         var mid = SongMid ?? "";
@@ -221,6 +245,13 @@ public sealed record ConnectSong(
         return song;
     }
 
+    /// <summary>
+    /// 将内部领域曲目实体转换为多端互联协议曲目传输模型。
+    /// </summary>
+    /// <param name="song">源曲目实体。</param>
+    /// <param name="tier">期望输出的音频质量档位。</param>
+    /// <param name="port">本机流媒体服务端口号。</param>
+    /// <returns>适用于网络广播与多端同步的 <see cref="ConnectSong"/> 模型。</returns>
     public static ConnectSong FromDomainSong(Song song, AudioQualityTier tier = AudioQualityTier.SQ, int port = 8765)
     {
         var singerList = song.Singers.Select(s => new ConnectArtist(s.Id, s.Mid, s.Name, "")).ToList();
@@ -281,6 +312,12 @@ public sealed record ConnectSong(
         );
     }
 
+    /// <summary>
+    /// 解析并生成曲目的全量封面网络访问 URL。
+    /// </summary>
+    /// <param name="song">源曲目实体。</param>
+    /// <param name="port">本机流媒体服务端口号。</param>
+    /// <returns>封面的绝对网络 URL 地址。</returns>
     public static string ResolveCoverUrl(Song song, int port = 8765)
     {
         if (!string.IsNullOrEmpty(song.AlbumMid))
