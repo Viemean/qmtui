@@ -129,12 +129,10 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// <summary>
-    /// 搜索歌曲（支持分页，每页默认 25 首）
+    /// 从 JSON 元素解析标准 Song 对象（自适应 track 嵌套结构与标准结构）。
     /// </summary>
-
-    /// 从任意 JSON 元素解析标准 Song 对象（自适应 track 嵌套结构与标准结构）
-    /// </summary>
+    /// <param name="item">待解析的 JSON 元素节点。</param>
+    /// <returns>若解析成功返回 <see cref="Song"/> 实例；若缺少必要标识字段则返回 <see langword="null"/>。</returns>
     public static Song? ParseSongFromElement(JsonElement item)
     {
         var track = item.TryGetProperty("track", out var tr) ? tr : item;
@@ -255,6 +253,4 @@ public sealed partial class MusicApi
 
         return null;
     }
-
-    /// <summary>
 }

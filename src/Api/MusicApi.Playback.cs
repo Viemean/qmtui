@@ -255,7 +255,8 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-
+    /// 补充完善音质候选项的元数据大小与时长信息。
+    /// </summary>
     private static async Task RefineQualityMetadataAsync(List<QualityOption> options, JsonElement root, string songMid, CancellationToken ct)
     {
         long interval = 0;
@@ -499,7 +500,11 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-
+    /// 根据歌曲 mid 查询解析对应的数值型 songId。
+    /// </summary>
+    /// <param name="songMid">歌曲唯一字符串标识。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>若解析成功返回对应的数值型标识；若解析失败或未匹配返回 0。</returns>
     public static async Task<long> ResolveSongIdAsync(string songMid, CancellationToken ct = default)
     {
         try

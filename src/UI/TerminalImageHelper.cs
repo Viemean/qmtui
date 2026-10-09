@@ -96,6 +96,4 @@ public static partial class TerminalImageHelper
             return false;
         }
     }
-
-    /// <summary>
 }

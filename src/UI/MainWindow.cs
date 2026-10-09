@@ -1238,7 +1238,6 @@ public sealed partial class MainWindow : Window
         };
 
         // 全局顶层按键预捕获，除搜索框文字输入外，统一拦截分发全局播放与视图快捷键
-        // 全局顶层按键预捕获，除搜索框文字输入外，统一拦截分发全局播放与视图快捷键
         Application.KeyDown += async (s, k) => await HandleGlobalKeyDownAsync(k);
 
         // 绑定播放器回调

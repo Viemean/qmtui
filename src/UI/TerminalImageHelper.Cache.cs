@@ -168,8 +168,11 @@ public static partial class TerminalImageHelper
         }
     }
 
-    /// 校验 PNG 文件头魔数与 IEND 尾部，确保文件完整有效
+    /// <summary>
+    /// 校验 PNG 文件头魔数与 IEND 尾部签名，检测文件是否完整有效。
     /// </summary>
+    /// <param name="path">待校验的本地文件路径。</param>
+    /// <returns>若文件存在且魔数与尾部签名完整返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static bool IsValidPngFile(string? path)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;

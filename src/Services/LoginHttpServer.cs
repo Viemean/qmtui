@@ -102,6 +102,9 @@ public sealed class LoginHttpServer : IDisposable
     }
 
     /// <summary>
+    /// 更新当前登录方式标识。
+    /// </summary>
+    /// <param name="loginType">登录渠道标识名称。</param>
     public void UpdateLoginType(string loginType)
     {
         lock (_lock)
@@ -110,8 +113,12 @@ public sealed class LoginHttpServer : IDisposable
         }
     }
 
-    /// 更新当前扫码流程状态（供网页端同步提示）
+    /// <summary>
+    /// 更新当前扫码流程状态（供网页端同步提示）。
     /// </summary>
+    /// <param name="status">当前状态描述文本。</param>
+    /// <param name="isSuccess">是否已成功完成登录。</param>
+    /// <param name="nick">登录成功后的用户昵称。</param>
     public void UpdateStatus(string status, bool isSuccess = false, string nick = "")
     {
         lock (_lock)

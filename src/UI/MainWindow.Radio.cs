@@ -94,7 +94,7 @@ public sealed partial class MainWindow
     }
 
     /// <summary>
-    /// 电台模式：跳至下一首（单曲播完或按 ] / N / D 触发）
+    /// 电台模式：切换至下一首曲目（单曲播放结束或按 L 键触发）。
     /// </summary>
     private async Task PlayNextRadioTrackAsync()
     {
