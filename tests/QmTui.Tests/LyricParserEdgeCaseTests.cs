@@ -64,7 +64,7 @@ public class LyricParserEdgeCaseTests
     [Fact]
     public void MergeLyrics_MatchingTimestamps_AttachesTranslation()
     {
-        var orig  = "[00:05.00]Hello world\n[00:10.00]Goodbye";
+        var orig = "[00:05.00]Hello world\n[00:10.00]Goodbye";
         var trans = "[00:05.00]你好世界\n[00:10.00]再见";
 
         var merged = LyricParser.MergeLyrics(orig, trans);
@@ -77,7 +77,7 @@ public class LyricParserEdgeCaseTests
     [Fact]
     public void MergeLyrics_EmptyTranslation_LeavesOriginalIntact()
     {
-        var orig   = "[00:05.00]Hello";
+        var orig = "[00:05.00]Hello";
         var merged = LyricParser.MergeLyrics(orig, "");
 
         Assert.Single(merged);
@@ -87,7 +87,7 @@ public class LyricParserEdgeCaseTests
     [Fact]
     public void MergeLyrics_NullTranslation_DoesNotThrow()
     {
-        var orig   = "[00:05.00]Hello";
+        var orig = "[00:05.00]Hello";
         var merged = LyricParser.MergeLyrics(orig, null!);
         Assert.Single(merged);
     }
@@ -97,7 +97,7 @@ public class LyricParserEdgeCaseTests
     [Fact]
     public void ParseLrc_HtmlQuote_AposIsReplaced()
     {
-        var lrc    = "[00:01.00]It&apos;s fine";
+        var lrc = "[00:01.00]It&apos;s fine";
         var result = LyricParser.ParseLrc(lrc);
         Assert.Single(result);
         Assert.Equal("It\u2019s fine", result[0].Text);
