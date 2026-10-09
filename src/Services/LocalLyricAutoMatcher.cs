@@ -64,6 +64,7 @@ public static class LocalLyricAutoMatcher
     /// <summary>
     /// 判断当前歌曲是否需要进行歌词匹配
     /// </summary>
+    /// <returns>若曲目为本地/WebDAV且本地尚无精确在线歌词缓存返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static bool NeedsMatching(Song song, List<LyricLine> currentLyrics)
     {
         if (LyricParser.IsPlaceholderLyrics(currentLyrics)) return true;

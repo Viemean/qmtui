@@ -250,6 +250,7 @@ public sealed class AudioRecordingSession : IDisposable
     /// 检查最近 0.5 秒内是否存在有效声音信号（RMS > 80）
     /// 用于在静音段跳过无效识别请求
     /// </summary>
+    /// <returns>若录制音频能量超过有效声音阈值返回 <see langword="true"/>；全静音返回 <see langword="false"/>。</returns>
     public bool HasMeaningfulSignal()
     {
         lock (_lock)
@@ -280,6 +281,7 @@ public sealed class AudioRecordingSession : IDisposable
     /// 提升目标频带的 SNR，使早期切片具备有效指纹识别能力。
     /// AGC 仅基于最后 1.5 秒样本计算 RMS，避免录音初始静音段拉偏增益系数。
     /// </summary>
+    /// <returns>最新环形缓冲区内的音频 PCM 采样切片数组。</returns>
     public short[] GetSnapshotSamples()
     {
         lock (_lock)
@@ -384,6 +386,7 @@ public static class AudioRecordingService
     /// <summary>
     /// 启动流式录音会话
     /// </summary>
+    /// <returns>音频录制会话管理控制实例。</returns>
     public static AudioRecordingSession StartRecordingSession(AudioRecordSource source, byte[]? initialPreRollBytes = null)
     {
         return new AudioRecordingSession(source, initialPreRollBytes);

@@ -11,6 +11,7 @@ public static class ClipboardService
     /// <summary>
     /// 将指定文本复制到系统剪贴板（支持 Wayland wl-copy、X11 xclip/xsel 及终端 OSC 52 转义序列）
     /// </summary>
+    /// <returns>向系统剪贴板写入文本成功返回 <see langword="true"/>；失败返回 <see langword="false"/>。</returns>
     public static bool SetText(string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -58,6 +59,7 @@ public static class ClipboardService
     /// <summary>
     /// 从系统剪贴板读取文本（支持 Wayland wl-paste、X11 xclip/xsel）
     /// </summary>
+    /// <returns>从系统剪贴板读取的纯文本内容；若读取失败或无文本返回空字符串。</returns>
     /// <param name="primary">是否优先读取鼠标选区 (Primary Selection，通常用于鼠标中键粘贴)</param>
     public static string GetText(bool primary = false)
     {

@@ -16,6 +16,7 @@ public static class AcousticRecognitionService
     /// <summary>
     /// 识别 16000Hz PCM 采样切片并检索曲库
     /// </summary>
+    /// <returns>听歌识曲服务端识别匹配结果；未命中返回 <see langword="null"/>。</returns>
     public static async Task<RecognitionResult?> RecognizePcmSamplesAsync(
         short[] pcm16k,
         CancellationToken cancellationToken = default)
@@ -75,6 +76,7 @@ public static class AcousticRecognitionService
     /// <summary>
     /// 16000Hz PCM 简单降采样至 8000Hz
     /// </summary>
+    /// <returns>由 16kHz 降采样至 8kHz 后的音频采样样本数组。</returns>
     public static short[] Downsample16kTo8k(short[] pcm16k)
     {
         int targetLength = pcm16k.Length / 2;

@@ -43,6 +43,9 @@ public sealed partial class GstPlayer : IPlayer
     public event Action<double>? PositionUpdated;
     public event Action? PlaybackFinished;
 
+    /// <summary>
+    /// 初始化 GStreamer 原生运行库与 playbin3 解码管道。
+    /// </summary>
     public void Initialize()
     {
         try
@@ -103,6 +106,12 @@ public sealed partial class GstPlayer : IPlayer
         }
     }
 
+    /// <summary>
+    /// 加载音频媒体流并驱动底层 GStreamer 管道进入播放状态。
+    /// </summary>
+    /// <param name="url">音频绝对文件路径或 HTTP/HTTPS 流地址。</param>
+    /// <param name="duration">预估音频总时长（秒）。</param>
+    /// <param name="startPosition">起播起始偏移量（秒）。</param>
     public async Task PlayAsync(string url, double duration, double startPosition = 0)
     {
         // 若当前正在发声，先执行 100ms 软淡出以消除爆音
@@ -188,6 +197,9 @@ public sealed partial class GstPlayer : IPlayer
         StartFadeIn(Volume, 120);
     }
 
+    /// <summary>
+    /// 切换 GStreamer 管道状态（PAUSED 与 PLAYING 相互切换）。
+    /// </summary>
     public Task TogglePauseAsync()
     {
         lock (_lock)
@@ -211,6 +223,9 @@ public sealed partial class GstPlayer : IPlayer
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// 软淡出并重置 GStreamer 管道状态至 NULL，清理缓冲与看门狗计数。
+    /// </summary>
     public async Task StopAsync()
     {
         if (IsPlaying && Volume > 0)
@@ -233,6 +248,10 @@ public sealed partial class GstPlayer : IPlayer
         }
     }
 
+    /// <summary>
+    /// 跳转播放进度至指定秒数（具备 200ms 防抖与重复定位抑制）。
+    /// </summary>
+    /// <param name="seconds">跳转目标时间位置（秒）。</param>
     public Task SeekAsync(double seconds)
     {
         lock (_lock)
@@ -264,6 +283,10 @@ public sealed partial class GstPlayer : IPlayer
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// 设置底层音频管线输出音量百分比。
+    /// </summary>
+    /// <param name="vol">音量值（0 到 100）。</param>
     public void SetVolume(int vol)
     {
         Volume = Math.Clamp(vol, 0, 100);

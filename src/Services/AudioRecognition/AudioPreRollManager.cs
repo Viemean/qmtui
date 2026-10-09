@@ -129,6 +129,7 @@ public static class AudioPreRollManager
     /// <summary>
     /// 获取当前预录缓冲区中是否有足够时长（>= 2.5s）且具有有效能量的切片
     /// </summary>
+    /// <returns>预录缓冲区是否已累积满足起步识别所需的有效样本数据。</returns>
     public static bool HasReadyPreRoll(double minSeconds = 2.5)
     {
         int requiredBytes = (int)(16000 * 2 * minSeconds);
@@ -138,6 +139,7 @@ public static class AudioPreRollManager
     /// <summary>
     /// 提取最近的历史预录字节（按需取出用于注入新录音会话）
     /// </summary>
+    /// <returns>提取并清空当前预录音频环形缓冲区的 PCM 字节数组。</returns>
     public static byte[] TakePreRollBytes(int maxBytes = 16000 * 2 * 3)
     {
         if (!s_isEnabled) return Array.Empty<byte>();

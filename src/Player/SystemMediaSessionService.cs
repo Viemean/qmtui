@@ -101,9 +101,16 @@ public sealed class SystemMediaSessionService : IDisposable
     public Action<bool>? ShuffleSetHandler { set { if (_linux != null) _linux.ShuffleSetHandler = value; } }
     public Action? QuitHandler { set { if (_linux != null) _linux.QuitHandler = value; } }
 
+    /// <summary>
+    /// 启动适配当前操作系统的多媒体控制会话监听服务。
+    /// </summary>
     public Task StartAsync() =>
         _linux?.StartAsync() ?? _windows?.StartAsync() ?? _mac?.StartAsync() ?? Task.CompletedTask;
 
+    /// <summary>
+    /// 同步播放状态（播放中/暂停）至系统媒体控制面板。
+    /// </summary>
+    /// <param name="isPlaying">当前是否处于播放中状态。</param>
     public void UpdatePlaybackStatus(bool isPlaying)
     {
         _linux?.UpdatePlaybackStatus(isPlaying);
@@ -111,6 +118,11 @@ public sealed class SystemMediaSessionService : IDisposable
         _mac?.UpdatePlaybackStatus(isPlaying);
     }
 
+    /// <summary>
+    /// 同步当前曲目元数据与本地封面路径至系统媒体中心。
+    /// </summary>
+    /// <param name="song">当前播放的歌曲实体。</param>
+    /// <param name="coverPath">本地封面图像绝对路径。</param>
     public void UpdateSong(Song? song, string? coverPath = null)
     {
         CurrentSong = song;
@@ -119,6 +131,10 @@ public sealed class SystemMediaSessionService : IDisposable
         _mac?.UpdateSong(song, coverPath);
     }
 
+    /// <summary>
+    /// 异步更新曲目封面显示。
+    /// </summary>
+    /// <param name="coverPath">本地封面文件路径。</param>
     public void UpdateCover(string? coverPath)
     {
         _linux?.UpdateCover(coverPath);
@@ -131,6 +147,11 @@ public sealed class SystemMediaSessionService : IDisposable
     public void UpdateVolume(int volumePercent) => _linux?.UpdateVolume(volumePercent);
     public void UpdatePlaybackMode(PlaybackMode mode) => _linux?.UpdatePlaybackMode(mode);
 
+    /// <summary>
+    /// 同步当前播放时间戳与总时长至系统媒体部件。
+    /// </summary>
+    /// <param name="seconds">当前已播放秒数。</param>
+    /// <param name="durationSeconds">曲目总时长秒数。</param>
     public void UpdatePosition(double seconds, double durationSeconds = 0)
     {
         _linux?.UpdatePosition(seconds);
@@ -138,6 +159,10 @@ public sealed class SystemMediaSessionService : IDisposable
         _mac?.UpdatePosition(seconds);
     }
 
+    /// <summary>
+    /// 广播手动 Seek 定位事件至系统媒体会话。
+    /// </summary>
+    /// <param name="seconds">跳转后的目标时间点（秒）。</param>
     public void EmitSeeked(double seconds)
     {
         _linux?.EmitSeeked(seconds);

@@ -215,6 +215,7 @@ public static partial class WebDavService
     /// <summary>
     /// 构建包含 BasicAuth 用户名密码凭据的流式直链 URI（供 GStreamer playbin 直接流式秒播）
     /// </summary>
+    /// <returns>包含 Basic Auth 授权凭据的 WebDAV 音频流直链地址。</returns>
     public static string BuildStreamingUriWithAuth(WebDavServer server, string relativeHref)
     {
         var fullUri = BuildFullUri(server, relativeHref);
@@ -400,6 +401,7 @@ public static partial class WebDavService
     /// <summary>
     /// 获取 WebDAV 曲目的封面（支持本地封面缓存直读、已缓存音频直读、自适应 Range 完整拉取内嵌封面、同目录 cover.jpg 及在线匹配）
     /// </summary>
+    /// <returns>本地持久化缓存的 WebDAV 封面图像绝对路径；未提取到封面返回 <see langword="null"/>。</returns>
     public static async Task<string?> EnsureCoverAsync(WebDavServer server, Song song, CancellationToken ct = default)
     {
         if (server == null || string.IsNullOrEmpty(song.WebDavHref)) return null;
@@ -710,6 +712,7 @@ public static partial class WebDavService
     /// 4. 远端同名 .lrc 文件探测
     /// 5. HTTP Range 头部内嵌歌词提取（4MB，与封面提取共用路径）
     /// </summary>
+    /// <returns>解析后的同步歌词行列表；若无歌词返回空列表。</returns>
     public static async Task<List<LyricLine>> EnsureLyricsAsync(
         WebDavServer server, Song song, CancellationToken ct = default)
     {

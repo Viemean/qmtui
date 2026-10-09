@@ -45,6 +45,7 @@ public static class CacheManager
     /// <summary>
     /// 全局统一缓存容量上限（根据磁盘可用剩余空间自适应，最大上限封顶 8GB）
     /// </summary>
+    /// <returns>根据当前磁盘剩余可用空间自适应计算的缓存容量上限字节数。</returns>
     public static long MaxTotalSizeBytes { get; set; } = GetAdaptiveMaxSizeBytes();
 
     /// <summary>
@@ -56,6 +57,7 @@ public static class CacheManager
     /// - 剩余空间 3GB ~ 10GB：512MB
     /// - 剩余空间 3GB 以下：按可用空间 10% 限制 (最低 128MB)，保留系统安全缓冲
     /// </summary>
+    /// <returns>根据当前磁盘剩余可用空间自适应计算的缓存容量上限字节数。</returns>
     public static long GetAdaptiveMaxSizeBytes(string? targetDir = null)
     {
         const long gb = 1024L * 1024 * 1024;
@@ -79,6 +81,7 @@ public static class CacheManager
     /// <summary>
     /// 根据给定的可用空间字节数计算缓存配额
     /// </summary>
+    /// <returns>根据磁盘剩余空间阶梯规则计算出的容量限制字节数。</returns>
     public static long CalculateLimitByFreeBytes(long freeBytes)
     {
         const long gb = 1024L * 1024 * 1024;

@@ -35,6 +35,7 @@ public sealed unsafe partial class DesktopNotificationService : IDisposable
     /// <summary>
     /// 检查当前环境是否具备 D-Bus 会话总线连接条件
     /// </summary>
+    /// <returns>若当前环境存在有效的 DBUS_SESSION_BUS_ADDRESS 环境变量返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static bool HasSessionBusAddress()
     {
         if (!OperatingSystem.IsLinux()) return false;

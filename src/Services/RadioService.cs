@@ -69,6 +69,7 @@ public sealed class RadioService
     /// <summary>
     /// 重置并启动新电台流，拉取首批歌曲
     /// </summary>
+    /// <returns>电台启动的首支播放曲目；获取失败返回 <see langword="null"/>。</returns>
     public async Task<Song?> StartRadioAsync(int batchSize = 5)
     {
         lock (_lock)
@@ -99,6 +100,7 @@ public sealed class RadioService
     /// <summary>
     /// 获取下一首电台歌曲；若队列不足自动缓冲下一批
     /// </summary>
+    /// <returns>电台模式下的下一首推荐曲目；获取失败返回 <see langword="null"/>。</returns>
     public async Task<Song?> GetNextRadioTrackAsync()
     {
         int count;
@@ -159,6 +161,7 @@ public sealed class RadioService
     /// <summary>
     /// 窥探下一首歌曲（不移动播放游标，用于提前缓存音频）
     /// </summary>
+    /// <returns>预拉取缓冲中的下一首电台曲目快照；若缓冲区为空返回 <see langword="null"/>。</returns>
     public Song? PeekNextRadioTrack()
     {
         lock (_lock)
@@ -206,6 +209,7 @@ public sealed class RadioService
     /// <summary>
     /// 向电台队列追加歌曲并基于 Mid 去重
     /// </summary>
+    /// <returns>成功去重追加至电台播放列表的歌曲数量。</returns>
     public int AppendUniqueSongs(IEnumerable<Song> songs)
     {
         lock (_lock)

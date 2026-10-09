@@ -34,6 +34,7 @@ public sealed class LoginHttpServer : IDisposable
     /// <summary>
     /// 启动本地 HTTP 服务
     /// </summary>
+    /// <returns>服务启动并成功绑定监听端口返回 <see langword="true"/>；失败返回 <see langword="false"/>。</returns>
     /// <param name="initialQrBytes">初始二维码图像数据（可为空）</param>
     public bool Start(byte[]? initialQrBytes)
     {

@@ -125,6 +125,9 @@ public sealed unsafe partial class MprisService : IDisposable
         """;
 
 
+    /// <summary>
+    /// 初始化 GIO D-Bus 会话总线连接并注册 org.mpris.MediaPlayer2 服务。
+    /// </summary>
     public Task StartAsync()
     {
         if (!OperatingSystem.IsLinux())
@@ -250,6 +253,10 @@ public sealed unsafe partial class MprisService : IDisposable
         }
     }
 
+    /// <summary>
+    /// 向 D-Bus 发送 PlaybackStatus 属性变更信号（Playing、Paused、Stopped）。
+    /// </summary>
+    /// <param name="isPlaying">当前是否为播放状态。</param>
     public void UpdatePlaybackStatus(bool isPlaying)
     {
         string status;
@@ -266,6 +273,11 @@ public sealed unsafe partial class MprisService : IDisposable
         });
     }
 
+    /// <summary>
+    /// 同步当前曲目与封面绝对路径至 MPRIS Metadata 字典属性。
+    /// </summary>
+    /// <param name="song">当前曲目实体。</param>
+    /// <param name="coverPath">本地封面图像路径。</param>
     public void UpdateSong(Song? song, string? coverPath = null)
     {
         lock (_lock)
@@ -281,6 +293,10 @@ public sealed unsafe partial class MprisService : IDisposable
         });
     }
 
+    /// <summary>
+    /// 更新当前曲目在 D-Bus 上的封面图像路径。
+    /// </summary>
+    /// <param name="coverPath">本地封面图像绝对路径。</param>
     public void UpdateCover(string? coverPath)
     {
         lock (_lock)
@@ -294,6 +310,10 @@ public sealed unsafe partial class MprisService : IDisposable
         });
     }
 
+    /// <summary>
+    /// 同步当前音量至 D-Bus Volume 属性（0.0 ~ 1.0）。
+    /// </summary>
+    /// <param name="volumePercent">音量百分比整数（0 到 100）。</param>
     public void UpdateVolume(int volumePercent)
     {
         double vol = Math.Clamp(volumePercent / 100.0, 0.0, 1.0);
@@ -309,6 +329,10 @@ public sealed unsafe partial class MprisService : IDisposable
         });
     }
 
+    /// <summary>
+    /// 同步当前播放循环模式至 D-Bus LoopStatus 与 Shuffle 属性。
+    /// </summary>
+    /// <param name="mode">内部播放模式枚举。</param>
     public void UpdatePlaybackMode(PlaybackMode mode)
     {
         lock (_lock)
@@ -325,6 +349,10 @@ public sealed unsafe partial class MprisService : IDisposable
         });
     }
 
+    /// <summary>
+    /// 同步当前内部播放进度秒数（供 D-Bus Position 属性查询）。
+    /// </summary>
+    /// <param name="seconds">当前已播放时间戳（秒）。</param>
     public void UpdatePosition(double seconds)
     {
         lock (_lock)
@@ -333,6 +361,10 @@ public sealed unsafe partial class MprisService : IDisposable
         }
     }
 
+    /// <summary>
+    /// 发射 MPRIS Seeked 信号通知系统桌面组件定位时间发生突变。
+    /// </summary>
+    /// <param name="seconds">跳转目标时间位置（秒）。</param>
     public void EmitSeeked(double seconds)
     {
         lock (_lock)

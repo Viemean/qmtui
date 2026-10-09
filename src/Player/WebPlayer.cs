@@ -32,12 +32,20 @@ public sealed class WebPlayer : IPlayer
     public event Action? PreviousRequested;
     public event Action? TogglePlayRequested;
 
+    /// <summary>
+    /// 初始化轻量 Web 协同播放器实例。
+    /// </summary>
+    /// <param name="preferredPort">期望绑定的服务监听端口，默认 9999。</param>
+    /// <param name="initialAudioEnabled">是否默认开启浏览器端 HTML5 音频输出。</param>
     public WebPlayer(int preferredPort = 9999, bool initialAudioEnabled = true)
     {
         _preferredPort = preferredPort;
         _initialAudioEnabled = initialAudioEnabled;
     }
 
+    /// <summary>
+    /// 注册内置 Web 播放服务器事件并启动 HTTP/SSE 监听服务。
+    /// </summary>
     public void Initialize()
     {
         _server.NextRequested += () => NextRequested?.Invoke();
@@ -97,6 +105,12 @@ public sealed class WebPlayer : IPlayer
         }
     }
 
+    /// <summary>
+    /// 广播新曲目播放状态并触发 Web 客户端加载音频流。
+    /// </summary>
+    /// <param name="url">音频直链 URL。</param>
+    /// <param name="duration">曲目总时长（秒）。</param>
+    /// <param name="startPosition">起播起始时间戳偏移（秒）。</param>
     public Task PlayAsync(string url, double duration, double startPosition = 0)
     {
         lock (_lock)
@@ -128,6 +142,9 @@ public sealed class WebPlayer : IPlayer
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// 切换播放器暂停与恢复播放状态，并向网页端广播状态同步。
+    /// </summary>
     public Task TogglePauseAsync()
     {
         lock (_lock)
@@ -152,6 +169,9 @@ public sealed class WebPlayer : IPlayer
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// 停止播放，重置虚拟计时器并向网页端同步 stop 状态。
+    /// </summary>
     public Task StopAsync()
     {
         lock (_lock)
@@ -170,6 +190,10 @@ public sealed class WebPlayer : IPlayer
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// 调整当前播放位置并向已连接客户端广播 seek 事件。
+    /// </summary>
+    /// <param name="seconds">跳转目标时间位置（秒）。</param>
     public Task SeekAsync(double seconds)
     {
         lock (_lock)
@@ -186,6 +210,10 @@ public sealed class WebPlayer : IPlayer
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// 设置并向已连接网页端广播音量变化。
+    /// </summary>
+    /// <param name="vol">音量百分比（0 到 100）。</param>
     public void SetVolume(int vol)
     {
         Volume = Math.Clamp(vol, 0, 100);
@@ -193,12 +221,20 @@ public sealed class WebPlayer : IPlayer
         _server.BroadcastState("volume");
     }
 
+    /// <summary>
+    /// 更新当前曲目元数据并向客户端广播曲目变更事件。
+    /// </summary>
+    /// <param name="song">当前曲目实体。</param>
     public void UpdateCurrentSong(Song? song)
     {
         _server.CurrentSong = song;
         _server.BroadcastState("song_change");
     }
 
+    /// <summary>
+    /// 同步当前动态歌词至网页端展示。
+    /// </summary>
+    /// <param name="lyrics">解析后的歌词行列表。</param>
     public void UpdateCurrentLyrics(List<LyricLine>? lyrics)
     {
         _server.CurrentLyrics = lyrics;

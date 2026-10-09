@@ -9,6 +9,7 @@ namespace QmTui.Services;
 /// <summary>
 /// 听歌识曲结果
 /// </summary>
+/// <returns>听歌识曲匹配结果模型。</returns>
 public record RecognitionResult(
     bool Success,
     string Title,
@@ -28,6 +29,7 @@ public static class AudioRecognitionService
     /// <summary>
     /// 识别本地音频文件，并联动检索曲库
     /// </summary>
+    /// <returns>听歌识曲匹配结果（包含匹配曲目信息与置信度）。</returns>
     public static async Task<RecognitionResult> RecognizeAndMatchAsync(string audioFilePath, CancellationToken cancellationToken = default)
     {
         if (!File.Exists(audioFilePath))
@@ -81,8 +83,9 @@ public static class AudioRecognitionService
     }
 
     /// <summary>
-    /// 识别 16000Hz PCM 采样切片并联动曲库 (仅使用原生声学算法引擎)
+    /// 识别 16000Hz PCM 采样切片并联动曲库
     /// </summary>
+    /// <returns>基于原始 PCM 采样识别的曲库匹配结果。</returns>
     public static async Task<RecognitionResult> RecognizeAndMatchPcmAsync(
         short[] pcmSamples,
         CancellationToken cancellationToken = default)

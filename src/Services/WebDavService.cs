@@ -535,6 +535,7 @@ public static partial class WebDavService
     /// <summary>
     /// 打开远端 WebDAV 音频流（带 Range 请求头转发与 Basic Auth 凭据，用于服务端透明流式代理）
     /// </summary>
+    /// <returns>打开的远程 WebDAV 音频文件 HTTP 响应报文。</returns>
     public static async Task<HttpResponseMessage> OpenAudioStreamAsync(WebDavServer server, string relativeHref, string? rangeHeader = null, CancellationToken ct = default)
     {
         var client = GetHttpClient(server);

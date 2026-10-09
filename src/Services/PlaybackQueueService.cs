@@ -139,6 +139,7 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 从队列中移除指定索引的歌曲
     /// </summary>
+    /// <returns>若索引合法且成功移除指定曲目返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public bool RemoveAt(int index)
     {
         lock (_lock)
@@ -208,6 +209,7 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 推演并切换至下一首播放曲目
     /// </summary>
+    /// <returns>播放队列中的下一首曲目；若队列为空或播放到达末尾返回 <see langword="null"/>。</returns>
     public Song? GetNextSong(bool isAutoPlayback = false)
     {
         lock (_lock)
@@ -252,6 +254,7 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 预先窥视下一首曲目（用于预加载，不改变内部游标）
     /// </summary>
+    /// <returns>下一首待播曲目快照（不移动队列游标指针）；若无下一首返回 <see langword="null"/>。</returns>
     public Song? PeekNextSong()
     {
         lock (_lock)
@@ -280,6 +283,7 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 预先窥视上一首曲目（用于上位机状态同步与前后卡片预渲染，不改变内部游标）
     /// </summary>
+    /// <returns>上一首待播曲目快照（不移动队列游标指针）；若无上一首返回 <see langword="null"/>。</returns>
     public Song? PeekPrevSong()
     {
         lock (_lock)
@@ -316,6 +320,7 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 推演并切换至上一首播放曲目
     /// </summary>
+    /// <returns>播放队列中的上一首曲目；若无上一首返回 <see langword="null"/>。</returns>
     public Song? GetPrevSong()
     {
         lock (_lock)
@@ -347,6 +352,7 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 定位至队列中的指定索引曲目
     /// </summary>
+    /// <returns>跳转切换后的当前曲目；若索引越界返回 <see langword="null"/>。</returns>
     public Song? SetCurrentIndex(int index)
     {
         Song? selected = null;

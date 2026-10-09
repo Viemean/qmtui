@@ -187,6 +187,7 @@ public static class LocalMusicService
     /// <summary>
     /// 获取当前扫描缓存的所有本地歌曲
     /// </summary>
+    /// <returns>内存缓存中已索引的全部本地曲目列表。</returns>
     public static List<Song> GetCachedSongs()
     {
         LoadConfig();
@@ -207,6 +208,7 @@ public static class LocalMusicService
     /// <summary>
     /// 异步扫描已配置的本地音乐文件夹
     /// </summary>
+    /// <returns>从本地已添加目录扫描发现并解析完成的歌曲列表。</returns>
     public static async Task<List<Song>> ScanAllFoldersAsync(Action<string>? onProgress = null)
     {
         LoadConfig();
@@ -398,6 +400,7 @@ public static class LocalMusicService
     /// <summary>
     /// 从 ATL.Track 实例中提取内嵌歌词（优先读取 Lyrics 标签，缺失则回退到 Vorbis Comment / ID3v2 常用字段）
     /// </summary>
+    /// <returns>从音频标签中提取到的内嵌歌词文本；若未内嵌返回 <see langword="null"/>。</returns>
     public static string? ExtractEmbeddedLyrics(ATL.Track track)
     {
         if (track.Lyrics != null && track.Lyrics.Count > 0)
@@ -477,6 +480,7 @@ public static class LocalMusicService
     /// <summary>
     /// 获取本地歌曲的歌词（优先同目录同名 .lrc 文件，其次内嵌歌词）
     /// </summary>
+    /// <returns>解析后的本地歌词行列表；若未找到有效歌词返回空列表。</returns>
     public static async Task<List<LyricLine>> GetLyricsAsync(Song song, string? fallbackAudioPath = null)
     {
         var targetPath = !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath)
@@ -536,6 +540,7 @@ public static class LocalMusicService
     /// <summary>
     /// 仅获取本地音频文件的内嵌原始歌词（忽略外挂 .lrc 文件，用于可逆撤销恢复）
     /// </summary>
+    /// <returns>解析后的内嵌歌词行列表；若无内嵌歌词返回空列表。</returns>
     public static async Task<List<LyricLine>> GetEmbeddedLyricsAsync(Song song, string? fallbackAudioPath = null)
     {
         var targetPath = !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath)
@@ -577,6 +582,7 @@ public static class LocalMusicService
     /// <summary>
     /// 获取或提取本地歌曲的封面图片（支持内嵌封面提取与同目录 cover.jpg，带 6px 圆角处理）
     /// </summary>
+    /// <returns>本地提取或已缓存的封面图像绝对路径；若无封面返回 <see langword="null"/>。</returns>
     public static async Task<string?> EnsureCoverAsync(Song song, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(song.LocalFilePath) || !File.Exists(song.LocalFilePath) || cancellationToken.IsCancellationRequested)
