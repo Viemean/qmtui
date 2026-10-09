@@ -20,6 +20,7 @@ public static class RecentPlayHistory
     /// <summary>
     /// 获取当前最近播放歌曲列表副本
     /// </summary>
+    /// <returns>包含最近播放曲目快照的列表。</returns>
     public static List<Song> GetSongs()
     {
         EnsureLoaded();
@@ -57,6 +58,8 @@ public static class RecentPlayHistory
     /// <summary>
     /// 从最近播放中移除指定曲目
     /// </summary>
+    /// <param name="song">待移除的曲目对象。</param>
+    /// <returns>若成功找到并移除曲目则为 true；若不存在或入参为空则为 false。</returns>
     public static bool Remove(Song song)
     {
         if (song == null) return false;

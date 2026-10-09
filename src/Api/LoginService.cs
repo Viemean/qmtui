@@ -480,6 +480,8 @@ public sealed partial class LoginService
     /// <summary>
     /// 确保存在有效的 musickey，若缺失则自动通过 OAuth2/RefreshToken 续期
     /// </summary>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>若成功确保或刷新 musickey 有效则为 true；否则为 false。</returns>
     public static Task<bool> EnsureMusicKeyAsync(CancellationToken ct = default) =>
         EnsureMusicKeyAsync(false, ct);
 
@@ -488,6 +490,9 @@ public sealed partial class LoginService
     /// <summary>
     /// 确保存在有效的 musickey，若缺失或强制刷新则自动执行 OAuth2/RefreshToken 续期
     /// </summary>
+    /// <param name="forceRefresh">是否强制刷新票据。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>若成功确保或刷新 musickey 有效则为 true；否则为 false。</returns>
     public static async Task<bool> EnsureMusicKeyAsync(bool forceRefresh, CancellationToken ct = default)
     {
         if (!forceRefresh && UserSession.Current.Cookies.TryGetValue("qm_keyst", out var mk) && !string.IsNullOrEmpty(mk))
@@ -532,6 +537,10 @@ public sealed partial class LoginService
     /// <summary>
     /// 通过 QQConnectLogin.LoginServer 使用 access_token 续期 musickey
     /// </summary>
+    /// <param name="openid">QQ 互联 openid。</param>
+    /// <param name="accessToken">QQ 互联 access_token。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>若续期成功则为 true；否则为 false。</returns>
     public static async Task<bool> RefreshQQLoginTokenAsync(string openid, string accessToken, CancellationToken ct = default)
     {
         try
@@ -621,6 +630,9 @@ public sealed partial class LoginService
     /// <summary>
     /// 第二阶段：自动通过 OAuth2 换取专属 musickey 完整 VIP Cookie
     /// </summary>
+    /// <param name="cookieDict">包含 p_skey 等认证信息的 Cookie 字典。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>若成功通过 OAuth2 换票则为 true；否则为 false。</returns>
     public static async Task<bool> ExchangeMusicKeyByOAuthAsync(Dictionary<string, string> cookieDict, CancellationToken ct = default)
     {
         try

@@ -11,6 +11,8 @@ public sealed partial class MusicApi
     /// <summary>
     /// 获取用户云端收藏的专辑列表
     /// </summary>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>收藏专辑列表。</returns>
     public static async Task<List<Album>> GetFavoriteAlbumsAsync(CancellationToken ct = default)
     {
         if (!UserSession.Current.IsLoggedIn) return [];
@@ -89,6 +91,9 @@ public sealed partial class MusicApi
     /// <summary>
     /// 获取指定专辑内的全部歌曲（曲目列表）
     /// </summary>
+    /// <param name="albumMid">专辑 mid 标识。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>专辑曲目列表。</returns>
     public static async Task<List<Song>> GetAlbumSongsAsync(string albumMid, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(albumMid)) return [];
@@ -146,6 +151,9 @@ public sealed partial class MusicApi
     /// <summary>
     /// 取消收藏指定专辑
     /// </summary>
+    /// <param name="albumMid">专辑 mid 标识。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>若成功取消收藏则为 true；否则为 false。</returns>
     public static async Task<bool> RemoveAlbumFromFavoriteAsync(string albumMid, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(albumMid) || !UserSession.Current.IsLoggedIn) return false;
@@ -200,6 +208,9 @@ public sealed partial class MusicApi
     /// <summary>
     /// 收藏指定专辑
     /// </summary>
+    /// <param name="albumMid">专辑 mid 标识。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>若成功收藏则为 true；否则为 false。</returns>
     public static async Task<bool> AddAlbumToFavoriteAsync(string albumMid, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(albumMid) || !UserSession.Current.IsLoggedIn) return false;
@@ -357,6 +368,11 @@ public sealed partial class MusicApi
     /// <summary>
     /// 获取歌手详情（歌手信息、生平简介、热门歌曲）
     /// </summary>
+    /// <param name="singerMid">歌手 mid 标识。</param>
+    /// <param name="singerId">歌手数字 ID。</param>
+    /// <param name="singerName">歌手姓名（用于辅助解析）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>歌手详情模型；若拉取失败则为 null。</returns>
     public static async Task<ArtistDetail?> GetSingerDetailAsync(string singerMid, long singerId = 0, string singerName = "", CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(singerMid) && singerId <= 0)
@@ -525,6 +541,11 @@ public sealed partial class MusicApi
     /// <summary>
     /// 分页获取歌手专辑列表
     /// </summary>
+    /// <param name="singerMid">歌手 mid 标识。</param>
+    /// <param name="begin">分页起始偏移量。</param>
+    /// <param name="pageSize">每页条数。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>歌手专辑列表。</returns>
     public static async Task<List<Album>> GetSingerAlbumListAsync(
         string singerMid,
         int begin = 0,
@@ -592,6 +613,9 @@ public sealed partial class MusicApi
     /// <summary>
     /// 获取专辑详细信息（基本信息、详细背景介绍、曲目列表）
     /// </summary>
+    /// <param name="albumMid">专辑 mid 标识。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>专辑详情模型；若拉取失败则为 null。</returns>
     public static async Task<AlbumDetail?> GetAlbumDetailInfoAsync(string albumMid, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(albumMid)) return null;
@@ -744,6 +768,9 @@ public sealed partial class MusicApi
     /// <summary>
     /// 查询歌手云端关注状态
     /// </summary>
+    /// <param name="singerMid">歌手 mid 标识。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>若已关注则为 true；否则为 false。</returns>
     public static async Task<bool> CheckSingerFollowStatusAsync(string singerMid, CancellationToken ct = default)
     {
         if (!UserSession.Current.IsLoggedIn || string.IsNullOrWhiteSpace(singerMid)) return false;
@@ -787,6 +814,10 @@ public sealed partial class MusicApi
     /// <summary>
     /// 上报关注或取消关注歌手
     /// </summary>
+    /// <param name="singerMid">歌手 mid 标识。</param>
+    /// <param name="isFollow">true 为关注，false 为取消关注。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>若操作成功则为 true；否则为 false。</returns>
     public static async Task<bool> ToggleSingerFollowAsync(string singerMid, bool isFollow, CancellationToken ct = default)
     {
         if (!UserSession.Current.IsLoggedIn || string.IsNullOrWhiteSpace(singerMid)) return false;

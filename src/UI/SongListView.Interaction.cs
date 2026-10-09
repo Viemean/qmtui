@@ -156,6 +156,8 @@ public sealed partial class SongListView
     /// <summary>
     /// 滚动到指定行并选中该行（居中视口与更新滚动条）
     /// </summary>
+    /// <param name="targetIdx">目标项目索引。</param>
+    /// <returns>若成功滚动并选中目标项则为 true；若处于电台模式或索引越界则为 false。</returns>
     public bool ScrollToAndSelectItem(int targetIdx)
     {
         if (_isRadioMode) return false;
@@ -177,6 +179,8 @@ public sealed partial class SongListView
     /// <summary>
     /// 在当前歌曲列表或自定义列表中执行即时行粒度查找与去重
     /// </summary>
+    /// <param name="keyword">搜索关键字。</param>
+    /// <returns>匹配项的行索引列表。</returns>
     public List<int> PerformInListSearch(string keyword)
     {
         _searchMatchedRows.Clear();

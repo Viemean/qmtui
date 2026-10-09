@@ -16,6 +16,13 @@ public sealed partial class MusicApi
     /// <summary>
     /// 获取歌曲评论区分页列表（优先走现代网关，降级使用传统 H5 接口）
     /// </summary>
+    /// <param name="songId">歌曲数字 ID。</param>
+    /// <param name="songMid">歌曲 Mid 标识。</param>
+    /// <param name="pageNum">分页页码，从 0 开始。</param>
+    /// <param name="pageSize">每页返回评论条数，默认为 25。</param>
+    /// <param name="lastCommentSeqNo">上一页末尾评论序列号游标。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>评论区分页模型对象；若拉取失败或无评论则为 null。</returns>
     public static async Task<CommentPage?> GetSongCommentsAsync(
         long songId,
         string songMid,

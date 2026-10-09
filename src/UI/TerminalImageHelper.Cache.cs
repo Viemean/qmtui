@@ -208,6 +208,8 @@ public static partial class TerminalImageHelper
     /// <summary>
     /// 校验 JPEG 文件头 SOI 与尾部 EOI
     /// </summary>
+    /// <param name="path">图片文件绝对路径。</param>
+    /// <returns>若文件存在且头部和尾部符合 JPEG 规范则为 true；否则为 false。</returns>
     public static bool IsValidJpgFile(string? path)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
@@ -235,6 +237,8 @@ public static partial class TerminalImageHelper
     /// <summary>
     /// 校验 WebP 文件头 RIFF 与 WEBP 标识
     /// </summary>
+    /// <param name="path">图片文件绝对路径。</param>
+    /// <returns>若文件存在且符合 WebP 规范则为 true；否则为 false。</returns>
     public static bool IsValidWebpFile(string? path)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
@@ -299,6 +303,9 @@ public static partial class TerminalImageHelper
     /// <summary>
     /// 获取专辑封面本地缓存路径，如未缓存则异步拉取并转为 Kitty 协议兼容的 6px 圆角 PNG 格式
     /// </summary>
+    /// <param name="albumMid">专辑 mid 标识。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>处理完成后的本地图片绝对路径；若失败或取消则为 null。</returns>
     public static async Task<string?> EnsureAlbumCoverAsync(string albumMid, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(albumMid) || cancellationToken.IsCancellationRequested) return null;
@@ -425,6 +432,10 @@ public static partial class TerminalImageHelper
     /// <summary>
     /// 处理本地图片（内嵌封面或本地 cover.jpg），添加 6px 抗锯齿圆角并转为 Kitty 协议兼容 PNG
     /// </summary>
+    /// <param name="localRawImagePath">原始本地图片绝对路径。</param>
+    /// <param name="cacheKey">缓存键标识。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>处理完成后的本地图片绝对路径；若失败或取消则为 null。</returns>
     public static async Task<string?> EnsureLocalImageProcessedAsync(string localRawImagePath, string cacheKey, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(localRawImagePath) || !File.Exists(localRawImagePath) || cancellationToken.IsCancellationRequested) return null;
@@ -473,6 +484,9 @@ public static partial class TerminalImageHelper
     /// <summary>
     /// 获取歌手写真本地缓存路径，如未缓存则异步拉取并转为 Kitty 协议兼容的 6px 圆角 PNG 格式
     /// </summary>
+    /// <param name="singerMid">歌手 mid 标识。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>处理完成后的本地图片绝对路径；若失败或取消则为 null。</returns>
     public static async Task<string?> EnsureSingerCoverAsync(string singerMid, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(singerMid) || cancellationToken.IsCancellationRequested) return null;
@@ -534,6 +548,10 @@ public static partial class TerminalImageHelper
     /// <summary>
     /// 获取单曲封面，优先拉取高分辨率版本
     /// </summary>
+    /// <param name="songMid">歌曲 mid 标识。</param>
+    /// <param name="vsMid">关联版本 mid 标识。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>处理完成后的本地图片绝对路径；若失败或取消则为 null。</returns>
     public static async Task<string?> EnsureSingleCoverAsync(string songMid, string vsMid, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(songMid) || string.IsNullOrWhiteSpace(vsMid) || cancellationToken.IsCancellationRequested) return null;
@@ -647,6 +665,9 @@ public static partial class TerminalImageHelper
     /// <summary>
     /// 获取 HTTP/HTTPS 直链封面（包含 Connect 协议下 App 提供的代理封面），并持久化到本地缓存与圆角处理
     /// </summary>
+    /// <param name="url">图片网络 URL 地址。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>处理完成后的本地图片绝对路径；若失败或取消则为 null。</returns>
     public static async Task<string?> EnsureHttpCoverAsync(string url, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(url) || cancellationToken.IsCancellationRequested) return null;
@@ -698,6 +719,9 @@ public static partial class TerminalImageHelper
     /// <summary>
     /// 获取歌曲播放封面（优先专辑 1200，单曲调用 T062 原画/1200，本地音频提取嵌入封面）
     /// </summary>
+    /// <param name="song">歌曲对象模型。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>处理完成后的本地图片绝对路径；若歌曲为空、失败或取消则为 null。</returns>
     public static async Task<string?> EnsureSongCoverAsync(Song? song, CancellationToken cancellationToken = default)
     {
         if (song == null || cancellationToken.IsCancellationRequested) return null;
