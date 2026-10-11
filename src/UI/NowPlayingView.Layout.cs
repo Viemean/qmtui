@@ -117,16 +117,22 @@ public sealed partial class NowPlayingView
         _songInfoContainer.Width = targetCols;
         _songInfoContainer.Height = 3;
 
-        // 第 0 行：歌手 - 歌曲名
-        _artistLink.X = 0;
-        _artistLink.Y = 0;
+        // 第 0 行：歌曲名 - 歌手
+        int containerW = targetCols > 0 ? targetCols : (_songInfoContainer.Frame.Width > 0 ? _songInfoContainer.Frame.Width : 40);
+        int artistW = _artistLink.ContentWidth;
+        int rawTitleW = MainWindow.GetDisplayWidth(_songTitleLabel.Text);
+        int maxTitleW = Math.Max(4, containerW - artistW - 3);
 
-        _hyphenLabel.X = Pos.Right(_artistLink);
-        _hyphenLabel.Y = 0;
-
-        _songTitleLabel.X = Pos.Right(_hyphenLabel);
+        _songTitleLabel.X = 0;
         _songTitleLabel.Y = 0;
-        _songTitleLabel.Width = Dim.Fill();
+        _songTitleLabel.Width = Math.Min(rawTitleW, maxTitleW);
+
+        _hyphenLabel.X = Pos.Right(_songTitleLabel);
+        _hyphenLabel.Y = 0;
+        _hyphenLabel.Width = 3;
+
+        _artistLink.X = Pos.Right(_hyphenLabel);
+        _artistLink.Y = 0;
 
         // 第 1 行：留空间隔一行
 

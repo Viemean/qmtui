@@ -187,6 +187,13 @@ public sealed partial class NowPlayingView
         _artistLink.SetText(string.IsNullOrWhiteSpace(song.Artist) ? "未知歌手" : song.Artist);
         _songTitleLabel.Text = song.Title ?? "未知曲目";
         _albumLink.SetText(string.IsNullOrWhiteSpace(song.Album) ? "未知专辑" : song.Album);
+
+        int containerW = _lastSongInfoTargetCols > 0 ? _lastSongInfoTargetCols : (_songInfoContainer.Frame.Width > 0 ? _songInfoContainer.Frame.Width : 40);
+        int artistW = _artistLink.ContentWidth;
+        int rawTitleW = MainWindow.GetDisplayWidth(_songTitleLabel.Text);
+        int maxTitleW = Math.Max(4, containerW - artistW - 3);
+        _songTitleLabel.Width = Math.Min(rawTitleW, maxTitleW);
+
         _songInfoContainer.Visible = true;
         _commentView.SetSong(song);
 

@@ -138,7 +138,7 @@ public sealed partial class NowPlayingView : View
         _coverContainer.Add(_unsupportedLabel1, _unsupportedLabel2, _unsupportedLabel3);
 
         // 封面下方歌曲信息展示区（两行纯净展示，歌手与专辑间隔一行距离，与封面始终保持绝对左对齐）
-        // 第 0 行：歌手 - 歌曲名
+        // 第 0 行：歌曲名 - 歌手
         // 第 1 行：留空（间隔一行）
         // 第 2 行：专辑名字
         _songInfoContainer = new View
@@ -152,14 +152,23 @@ public sealed partial class NowPlayingView : View
             MousePositionTracking = true
         };
 
-        _artistLink = new InteractiveLinkView("");
-        _artistLink.X = 0;
-        _artistLink.Y = 0;
+        _songTitleLabel = new Label
+        {
+            Text = "",
+            X = 0,
+            Y = 0,
+            Height = 1,
+            CanFocus = false
+        };
+        _songTitleLabel.SetScheme(new Scheme
+        {
+            Normal = new Attribute(Color.White, Color.None)
+        });
 
         _hyphenLabel = new Label
         {
             Text = " - ",
-            X = Pos.Right(_artistLink),
+            X = Pos.Right(_songTitleLabel),
             Y = 0,
             Width = 3,
             Height = 1,
@@ -170,19 +179,9 @@ public sealed partial class NowPlayingView : View
             Normal = new Attribute(MikuTheme.QqTextLyricDim, Color.None)
         });
 
-        _songTitleLabel = new Label
-        {
-            Text = "",
-            X = Pos.Right(_hyphenLabel),
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = 1,
-            CanFocus = false
-        };
-        _songTitleLabel.SetScheme(new Scheme
-        {
-            Normal = new Attribute(Color.White, Color.None)
-        });
+        _artistLink = new InteractiveLinkView("");
+        _artistLink.X = Pos.Right(_hyphenLabel);
+        _artistLink.Y = 0;
 
         _albumLink = new InteractiveLinkView("");
         _albumLink.X = 0;
@@ -227,7 +226,7 @@ public sealed partial class NowPlayingView : View
         _artistLink.MouseEnter += (s, e) => TriggerInteractiveActivity();
         _albumLink.MouseEnter += (s, e) => TriggerInteractiveActivity();
 
-        _songInfoContainer.Add(_artistLink, _hyphenLabel, _songTitleLabel, _albumLink);
+        _songInfoContainer.Add(_songTitleLabel, _hyphenLabel, _artistLink, _albumLink);
         _coverContainer.Add(_songInfoContainer);
         Add(_coverContainer);
 
