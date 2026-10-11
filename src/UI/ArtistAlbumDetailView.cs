@@ -33,10 +33,24 @@ public sealed class ArtistAlbumDetailView : View
         _descTextView.SetFocus();
     }
 
+    public void ApplyInnerScheme()
+    {
+        _descFrame.SetScheme(MikuTheme.FrameBorderActive);
+        _descTextView.SetScheme(new Scheme
+        {
+            Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextSoftWhite, Terminal.Gui.Drawing.Color.None),
+            Focus = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextSoftWhite, Terminal.Gui.Drawing.Color.None),
+            HotNormal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuPinkAccent, Terminal.Gui.Drawing.Color.None),
+            HotFocus = new Terminal.Gui.Drawing.Attribute(Terminal.Gui.Drawing.Color.White, MikuTheme.MikuPinkAccent),
+            ReadOnly = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextSoftWhite, Terminal.Gui.Drawing.Color.None)
+        });
+        _descFrame.SetNeedsDraw();
+        _descTextView.SetNeedsDraw();
+    }
+
     public void SetActiveBorder(bool active)
     {
-        _descFrame.SetScheme(active ? MikuTheme.FrameBorderActive : MikuTheme.FrameBorderDim);
-        _descFrame.SetNeedsDraw();
+        ApplyInnerScheme();
     }
 
     public ArtistAlbumDetailView()
@@ -99,14 +113,7 @@ public sealed class ArtistAlbumDetailView : View
             ReadOnly = true,
             WordWrap = true
         };
-        _descTextView.SetScheme(new Scheme
-        {
-            Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextWhite, Terminal.Gui.Drawing.Color.None),
-            Focus = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextWhite, Terminal.Gui.Drawing.Color.None),
-            HotNormal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuPinkAccent, Terminal.Gui.Drawing.Color.None),
-            HotFocus = new Terminal.Gui.Drawing.Attribute(Terminal.Gui.Drawing.Color.White, MikuTheme.MikuPinkAccent),
-            ReadOnly = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextWhite, Terminal.Gui.Drawing.Color.None)
-        });
+        ApplyInnerScheme();
 
         _descTextView.KeyDown += (s, k) =>
         {
@@ -252,6 +259,7 @@ public sealed class ArtistAlbumDetailView : View
     public void OnActivated()
     {
         Visible = true;
+        ApplyInnerScheme();
         TriggerImageRenderDelayed();
     }
 

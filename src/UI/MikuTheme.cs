@@ -31,6 +31,7 @@ public static class MikuTheme
 
     // 字体文本层级
     public static readonly Color MikuTextWhite = new(0xED, 0xF6, 0xF6); // #EDF6F6 正文字体颜色
+    public static readonly Color MikuTextSoftWhite = new(0xED, 0xED, 0xED); // #EDEDED
     public static readonly Color MikuTextSub = new(0xA2, 0xE8, 0xE2); // #A2E8E2 次级文字颜色
     public static readonly Color MikuTextMuted = new(0x62, 0x82, 0x8A); // #62828A 弱化文字颜色
 
@@ -182,7 +183,7 @@ public static class MikuTheme
 
     public static void Apply()
     {
-        // 将按钮外框括号统一为 ASCII 简洁半角中括号 [ ]，去除默认投影
+        // 将按钮外框括号统一为 ASCII半角中括号 [ ]
         GlyphSettings.Current = GlyphSettings.Current with
         {
             LeftBracket = new Rune('['),
@@ -258,6 +259,12 @@ public static class MikuTheme
 
     public static void ApplyTo(View view, Scheme? scheme = null)
     {
+        if (view is ArtistAlbumDetailView detailView)
+        {
+            detailView.ApplyInnerScheme();
+            return;
+        }
+
         scheme ??= Base;
         view.SetScheme(scheme);
         if (view is Terminal.Gui.Views.Button btn)

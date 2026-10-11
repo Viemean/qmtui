@@ -1285,6 +1285,7 @@ public sealed partial class MainWindow : Window
         _sidebarList.SetScheme(MikuTheme.Base);
         _lyricListView.SetScheme(MikuTheme.Lyric);
         MikuTheme.ApplyTo(_controlBar, MikuTheme.PlayerBar);
+        _artistAlbumDetailView.ApplyInnerScheme();
 
         // 统一监听各视窗焦点变化，动态高亮获焦激活面板的边框
         _sidebarList.HasFocusChanged += (s, e) => Application.Invoke(UpdateFrameBorderHighlights);
