@@ -25,8 +25,6 @@ public static partial class LyricParser
         }
     }
 
-    private static readonly char[] s_lineSeparators = ['\r', '\n'];
-
     /// <summary>
     /// 解析标准及多时间戳 LRC 文本
     /// </summary>
@@ -34,31 +32,78 @@ public static partial class LyricParser
     {
         if (string.IsNullOrWhiteSpace(lrcText)) return [];
 
-        var lines = lrcText.Split(s_lineSeparators, StringSplitOptions.RemoveEmptyEntries);
-        var list = new List<(TimeSpan Timestamp, string Text, int Order)>(lines.Length);
+        var list = new List<(TimeSpan Timestamp, string Text, int Order)>();
         int lineOrder = 0;
-        foreach (var line in lines)
+        Span<TimeSpan> tsBuf = stackalloc TimeSpan[8];
+
+        foreach (var line in lrcText.AsSpan().EnumerateLines())
         {
             var trimmed = line.Trim();
-            if (string.IsNullOrEmpty(trimmed)) continue;
+            if (trimmed.IsEmpty) continue;
 
-            var matches = TimestampRegex().Matches(trimmed);
-            if (matches.Count == 0) continue;
+            int matchCount = 0;
+            List<TimeSpan>? tsOverflow = null;
+            int lastMatchEnd = 0;
+            bool matchesContiguousAtStart = true;
 
-            // 剥离时间戳提取正文
-            var content = TimestampRegex().Replace(trimmed, "").Trim().Replace("&apos;", "’");
-            if (string.IsNullOrEmpty(content) || content == "//") continue;
-
-            foreach (Match m in matches)
+            foreach (var match in TimestampRegex().EnumerateMatches(trimmed))
             {
-                var min = int.Parse(m.Groups[1].Value);
-                var sec = int.Parse(m.Groups[2].Value);
-                var msStr = m.Groups[3].Value.PadRight(3, '0');
-                if (msStr.Length > 3) msStr = msStr[..3];
-                var ms = int.Parse(msStr);
+                var matchSpan = trimmed.Slice(match.Index, match.Length);
+                if (TryParseTimestampSpan(matchSpan, out var ts))
+                {
+                    if (matchCount < tsBuf.Length)
+                    {
+                        tsBuf[matchCount] = ts;
+                    }
+                    else
+                    {
+                        tsOverflow ??= new List<TimeSpan>(4);
+                        tsOverflow.Add(ts);
+                    }
+                    matchCount++;
 
-                var ts = new TimeSpan(0, 0, min, sec, ms);
-                list.Add((ts, content, lineOrder++));
+                    if (match.Index != lastMatchEnd)
+                    {
+                        matchesContiguousAtStart = false;
+                    }
+                    lastMatchEnd = match.Index + match.Length;
+                }
+            }
+
+            if (matchCount == 0) continue;
+
+            string content;
+            if (matchesContiguousAtStart)
+            {
+                var contentSpan = trimmed[lastMatchEnd..].Trim();
+                if (contentSpan.IsEmpty || contentSpan.SequenceEqual("//")) continue;
+
+                if (contentSpan.Contains("&apos;", StringComparison.Ordinal))
+                {
+                    content = contentSpan.ToString().Replace("&apos;", "’");
+                }
+                else
+                {
+                    content = contentSpan.ToString();
+                }
+            }
+            else
+            {
+                content = TimestampRegex().Replace(trimmed.ToString(), "").Trim().Replace("&apos;", "’");
+                if (string.IsNullOrEmpty(content) || content == "//") continue;
+            }
+
+            int directCount = Math.Min(matchCount, tsBuf.Length);
+            for (int i = 0; i < directCount; i++)
+            {
+                list.Add((tsBuf[i], content, lineOrder++));
+            }
+            if (tsOverflow != null)
+            {
+                for (int i = 0; i < tsOverflow.Count; i++)
+                {
+                    list.Add((tsOverflow[i], content, lineOrder++));
+                }
             }
         }
 
@@ -75,6 +120,46 @@ public static partial class LyricParser
             result.Add((item.Timestamp, item.Text));
         }
         return result;
+    }
+
+    private static bool TryParseTimestampSpan(ReadOnlySpan<char> span, out TimeSpan ts)
+    {
+        ts = default;
+        if (span.Length < 6 || span[0] != '[' || span[^1] != ']') return false;
+
+        var inner = span[1..^1];
+        int colon = inner.IndexOf(':');
+        if (colon <= 0 || !int.TryParse(inner[..colon], out int min)) return false;
+
+        var secPart = inner[(colon + 1)..];
+        int dot = secPart.IndexOfAny('.', ':');
+        int sec, ms = 0;
+        if (dot < 0)
+        {
+            if (!int.TryParse(secPart, out sec)) return false;
+        }
+        else
+        {
+            if (!int.TryParse(secPart[..dot], out sec)) return false;
+            var msSpan = secPart[(dot + 1)..];
+            if (msSpan.Length == 1)
+            {
+                if (!char.IsAsciiDigit(msSpan[0])) return false;
+                ms = (msSpan[0] - '0') * 100;
+            }
+            else if (msSpan.Length == 2)
+            {
+                if (!int.TryParse(msSpan, out ms)) return false;
+                ms *= 10;
+            }
+            else if (msSpan.Length >= 3)
+            {
+                if (!int.TryParse(msSpan[..3], out ms)) return false;
+            }
+        }
+
+        ts = new TimeSpan(0, 0, min, sec, ms);
+        return true;
     }
 
     /// <summary>
