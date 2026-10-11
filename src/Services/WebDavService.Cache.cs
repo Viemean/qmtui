@@ -96,7 +96,7 @@ public static partial class WebDavService
 
         var localPath = GetLocalCachePath(server, fileHref);
 
-        // 若本地完整缓存已存在且大于 4KB，秒开命中
+        // 若本地完整缓存已存在且大于 4KB，直接使用本地缓存
         if (File.Exists(localPath))
         {
             var existingFi = new FileInfo(localPath);

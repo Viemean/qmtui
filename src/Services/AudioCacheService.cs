@@ -10,7 +10,7 @@ using QmTui.Utils;
 namespace QmTui.Services;
 
 /// <summary>
-/// 音频本地磁盘 LRU 边播边存与秒开缓存服务
+/// 音频本地磁盘 LRU 边播边存与流式缓存服务
 /// 遵循 XDG 规范，存储于 ~/.cache/qmtui/audio/
 /// </summary>
 public static class AudioCacheService

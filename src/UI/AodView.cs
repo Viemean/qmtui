@@ -6,11 +6,8 @@ using QmTui.Models;
 namespace QmTui.UI;
 
 /// <summary>
-/// AOD (Always On Display) 极简后台息屏视图
-/// 类似手机 AOD 熄屏显示，纯黑静谧背景，仅在屏幕正中央居中显示：
-/// 歌曲名字
-/// 歌手 - 专辑
-/// 冻结一切界面高频重绘，进入低功耗待机状态
+/// AOD (Always On Display) 待机息屏视图。
+/// 居中显示当前曲目与歌手信息，挂起高频重绘。
 /// </summary>
 public sealed class AodView : View
 {

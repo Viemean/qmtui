@@ -129,7 +129,7 @@ public static partial class TerminalImageHelper
     }
 
     /// <summary>
-    /// 获取本地图像的像素宽高（解析头信息，开销极小）
+    /// 解析文件头信息获取本地图像的像素宽高
     /// </summary>
     /// <param name="filePath">图像文件绝对路径。</param>
     /// <returns>解析出的图像像素宽度与高度元组；若文件不存在或解析失败返回 <see langword="null"/>。</returns>

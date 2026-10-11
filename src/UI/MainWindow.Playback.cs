@@ -250,7 +250,7 @@ public sealed partial class MainWindow
             if (server != null && !string.IsNullOrEmpty(song.WebDavHref))
             {
                 var localCache = WebDavService.GetLocalCachePath(server, song.WebDavHref);
-                // 1. 若本地完整缓存已存在且有效，直接秒开本地文件
+                // 1. 若本地完整缓存已存在且有效，直接播放本地文件
                 if (File.Exists(localCache) && new FileInfo(localCache).Length > 4096)
                 {
                     playUrl = localCache;
@@ -311,7 +311,7 @@ public sealed partial class MainWindow
         }
         else
         {
-            // 优先探测本地磁盘音频缓存，实现 0 网络往返秒开
+            // 优先探测本地磁盘音频缓存，命中时直接读取本地文件
             var cachedAudio = AudioCacheService.GetCachedAudioPath(song.Mid, _preferredQualityTier);
             if (!string.IsNullOrEmpty(cachedAudio))
             {

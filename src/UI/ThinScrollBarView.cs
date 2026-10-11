@@ -8,10 +8,8 @@ using Terminal.Gui.Views;
 namespace QmTui.UI;
 
 /// <summary>
-/// 极简微型半透明自隐藏滚动条：
-/// 1. 宽 1 格，平时静止 3 秒后自动隐藏，保持界面清爽；
-/// 2. 列表/歌词滚动或鼠标滑动时光标亮起展示；
-/// 3. 支持鼠标点击滑块上下方分页跳转，以及鼠标直接点击/拖动滑块直达对应位置。
+/// 自隐藏细滚动条。
+/// 宽度为 1 单元格，超时自动隐藏，支持拖拽与分页点击跳转。
 /// </summary>
 public sealed class ThinScrollBarView : View
 {

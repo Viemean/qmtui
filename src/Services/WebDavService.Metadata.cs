@@ -213,7 +213,7 @@ public static partial class WebDavService
     }
 
     /// <summary>
-    /// 构建包含 BasicAuth 用户名密码凭据的流式直链 URI（供 GStreamer playbin 直接流式秒播）
+    /// 构建包含 BasicAuth 用户名密码凭据的流式直链 URI（供 GStreamer playbin 直接流式播放）
     /// </summary>
     /// <param name="server">目标 WebDAV 服务器配置实例。</param>
     /// <param name="relativeHref">WebDAV 远端音频资源的相对路径。</param>

@@ -333,7 +333,7 @@ public sealed class ConnectDialog : Dialog
 
     private async Task LoadDownloadQrCodeAsync()
     {
-        // 1. 若有 15 分钟内的有效缓存，直接秒开直链二维码
+        // 1. 若存在 15 分钟内的有效缓存，直接使用已缓存的直链二维码
         if (s_cachedRelease.HasValue && s_cachedRelease.Value.ExpireAt > DateTimeOffset.UtcNow)
         {
             var cached = s_cachedRelease.Value;
