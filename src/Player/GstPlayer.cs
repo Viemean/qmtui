@@ -33,6 +33,16 @@ public sealed partial class GstPlayer : IPlayer
     private int _retryCount;
     private bool _isRecovering;
     private CancellationTokenSource? _fadeCts;
+    private readonly SemaphoreSlim _loopSignal = new(0, 1);
+    private readonly CancellationTokenSource _disposeCts = new();
+
+    private void WakePollingLoop()
+    {
+        if (_loopSignal.CurrentCount == 0)
+        {
+            try { _loopSignal.Release(); } catch { }
+        }
+    }
 
     public bool IsAvailable => _pipeline != 0;
     public bool IsPlaying { get; private set; }
@@ -129,6 +139,7 @@ public sealed partial class GstPlayer : IPlayer
             CurrentPositionSeconds = startPosition;
             _lastHealthyPosition = startPosition;
             IsPlaying = true;
+            WakePollingLoop();
             _playbackFinishedTriggered = false;
             if (!_isRecovering)
             {
@@ -216,6 +227,7 @@ public sealed partial class GstPlayer : IPlayer
             {
                 gst_element_set_state(_pipeline, GST_STATE_PLAYING);
                 IsPlaying = true;
+                WakePollingLoop();
                 AppLogger.Info("GstPlayer", "Playback resumed");
             }
         }
@@ -408,9 +420,18 @@ public sealed partial class GstPlayer : IPlayer
 
     private async Task PollingLoopAsync()
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
-        while (await timer.WaitForNextTickAsync().ConfigureAwait(false))
+        while (!_disposed && !_disposeCts.IsCancellationRequested)
         {
+            int delayMs = IsPlaying ? 250 : 1000;
+            try
+            {
+                await _loopSignal.WaitAsync(delayMs, _disposeCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
             if (_disposed) break;
             if (!IsPlaying || _pipeline == 0) continue;
 
@@ -523,6 +544,10 @@ public sealed partial class GstPlayer : IPlayer
         {
             if (_disposed) return;
             _disposed = true;
+
+            _disposeCts.Cancel();
+            _disposeCts.Dispose();
+            _loopSignal.Dispose();
 
             _fadeCts?.Cancel();
             _fadeCts?.Dispose();
