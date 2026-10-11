@@ -19,8 +19,10 @@ public static class HttpHelper
         return new SocketsHttpHandler
         {
             PooledConnectionLifetime = pooledLifetime ?? TimeSpan.FromMinutes(10),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
             ConnectTimeout = connectTimeout ?? TimeSpan.FromSeconds(8),
-            AutomaticDecompression = System.Net.DecompressionMethods.All
+            AutomaticDecompression = System.Net.DecompressionMethods.All,
+            EnableMultipleHttp2Connections = true
         };
     }
 

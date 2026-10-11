@@ -10,11 +10,7 @@ namespace QmTui.Api;
 
 public sealed partial class MusicApi
 {
-    private static readonly HttpClient s_httpClient = new(new SocketsHttpHandler
-    {
-        PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-        AutomaticDecompression = System.Net.DecompressionMethods.All
-    })
+    private static readonly HttpClient s_httpClient = new(HttpHelper.CreateDefaultHandler(TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(8)))
     {
         Timeout = TimeSpan.FromSeconds(8)
     };

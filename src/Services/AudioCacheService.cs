@@ -103,20 +103,47 @@ public static class AudioCacheService
                 }
             }
 
-            using var req = new HttpRequestMessage(HttpMethod.Get, cdnUrl);
-            req.Headers.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-            req.Headers.Add("Referer", "https://y.qq.com/");
-
-            using var resp = await s_httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
-            if (!resp.IsSuccessStatusCode)
+            const int maxAttempts = 2;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                AppLogger.Warn("AudioCacheService", $"Audio download HTTP failed ({resp.StatusCode}): {cdnUrl}");
-                return null;
-            }
+                try
+                {
+                    using var req = new HttpRequestMessage(HttpMethod.Get, cdnUrl);
+                    req.Headers.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                    req.Headers.Add("Referer", "https://y.qq.com/");
 
-            await using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, useAsync: true))
-            {
-                await resp.Content.CopyToAsync(fs, ct);
+                    using var resp = await s_httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        if (attempt < maxAttempts && (resp.StatusCode == System.Net.HttpStatusCode.BadGateway ||
+                                                      resp.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable ||
+                                                      resp.StatusCode == System.Net.HttpStatusCode.GatewayTimeout))
+                        {
+                            AppLogger.Warn("AudioCacheService", $"Audio download transient HTTP {resp.StatusCode}, retrying in 500ms (attempt {attempt}/{maxAttempts})");
+                            await Task.Delay(500, ct).ConfigureAwait(false);
+                            continue;
+                        }
+
+                        AppLogger.Warn("AudioCacheService", $"Audio download HTTP failed ({resp.StatusCode}): {cdnUrl}");
+                        return null;
+                    }
+
+                    await using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 65536, useAsync: true))
+                    {
+                        await resp.Content.CopyToAsync(fs, ct).ConfigureAwait(false);
+                    }
+                    break;
+                }
+                catch (HttpRequestException ex) when (attempt < maxAttempts && !ct.IsCancellationRequested)
+                {
+                    AppLogger.Warn("AudioCacheService", $"Audio download transient network exception ({ex.Message}), retrying in 500ms (attempt {attempt}/{maxAttempts})");
+                    await Task.Delay(500, ct).ConfigureAwait(false);
+                }
+                catch (IOException ex) when (attempt < maxAttempts && !ct.IsCancellationRequested)
+                {
+                    AppLogger.Warn("AudioCacheService", $"Audio download transient IO exception ({ex.Message}), retrying in 500ms (attempt {attempt}/{maxAttempts})");
+                    await Task.Delay(500, ct).ConfigureAwait(false);
+                }
             }
 
             var fi = new FileInfo(tempFile);
