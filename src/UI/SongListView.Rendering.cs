@@ -427,7 +427,8 @@ public sealed partial class SongListView
         if (totalLen == 0) return "";
         offset %= totalLen;
 
-        var sb = new StringBuilder(targetWidth);
+        Span<char> buffer = targetWidth <= 256 ? stackalloc char[Math.Max(64, targetWidth * 2)] : new char[targetWidth * 2];
+        int charPos = 0;
         int curW = 0;
         for (int i = 0; i < totalLen * 2; i++)
         {
@@ -437,17 +438,26 @@ public sealed partial class SongListView
             {
                 break;
             }
-            sb.Append(rune);
+            charPos += rune.EncodeToUtf16(buffer[charPos..]);
             curW += runeW;
         }
 
         if (curW < targetWidth)
         {
-            sb.Append(GetPadding(targetWidth - curW));
+            string pad = GetPadding(targetWidth - curW);
+            pad.CopyTo(buffer[charPos..]);
+            charPos += pad.Length;
         }
-        return sb.ToString();
+
+        return new string(buffer[..charPos]);
     }
 
+    /// <summary>
+    /// 将文本截断并在右侧填充空格至指定的终端显示列宽。
+    /// </summary>
+    /// <param name="text">待对齐的原文本。</param>
+    /// <param name="targetWidth">目标终端显示列宽。</param>
+    /// <returns>符合目标列宽的格式化字符串。</returns>
     public static string TruncateAndPadWide(string text, int targetWidth)
     {
         if (targetWidth <= 0) return "";
@@ -456,39 +466,45 @@ public sealed partial class SongListView
             return GetPadding(targetWidth);
         }
 
-        int totalW = GetDisplayWidth(text);
-        if (totalW == targetWidth)
-        {
-            return text;
-        }
-        if (totalW < targetWidth)
-        {
-            return text + GetPadding(targetWidth - totalW);
-        }
-
         int limit = Math.Max(1, targetWidth - 2);
-        int currentW = 0;
-        var sb = new StringBuilder(targetWidth);
+        int cutCharIndex = -1;
+        int cutWidth = 0;
+        int totalWidth = 0;
+        int charIndex = 0;
 
         foreach (var rune in text.EnumerateRunes())
         {
             int runeW = rune.GetColumns();
-            if (currentW + runeW > limit)
+            if (cutCharIndex < 0 && totalWidth + runeW > limit)
+            {
+                cutCharIndex = charIndex;
+                cutWidth = totalWidth;
+            }
+            totalWidth += runeW;
+            charIndex += rune.Utf16SequenceLength;
+
+            if (totalWidth > targetWidth)
             {
                 break;
             }
-            sb.Append(rune);
-            currentW += runeW;
         }
 
-        sb.Append("..");
-        currentW += 2;
-
-        if (currentW < targetWidth)
+        if (totalWidth == targetWidth)
         {
-            sb.Append(GetPadding(targetWidth - currentW));
+            return text;
         }
 
-        return sb.ToString();
+        if (totalWidth < targetWidth)
+        {
+            return text + GetPadding(targetWidth - totalWidth);
+        }
+
+        int pad = targetWidth - cutWidth - 2;
+        if (pad <= 0)
+        {
+            return string.Concat(text.AsSpan(0, cutCharIndex), "..");
+        }
+
+        return string.Concat(text.AsSpan(0, cutCharIndex), "..", GetPadding(pad));
     }
 }

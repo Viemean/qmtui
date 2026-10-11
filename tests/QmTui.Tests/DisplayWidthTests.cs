@@ -77,4 +77,39 @@ public class DisplayWidthTests
         Assert.Equal(30 + 2 + 10, SongListView.GetDisplayWidth(item1));
         Assert.Equal(30 + 2 + 10, SongListView.GetDisplayWidth(item2));
     }
+
+    [Fact]
+    public void TruncateAndPadWide_OddTargetWidth_PadsTrailingSpaceCorrectly()
+    {
+        var text = "晴天";
+        var result = SongListView.TruncateAndPadWide(text, 5);
+
+        Assert.Equal(5, SongListView.GetDisplayWidth(result));
+        Assert.Equal("晴天 ", result);
+    }
+
+    [Fact]
+    public void TruncateAndPadWide_OddWidthTruncation_MaintainsExactTargetWidth()
+    {
+        var text = "周杰伦晴天音乐";
+        var result = SongListView.TruncateAndPadWide(text, 7);
+
+        Assert.Equal(7, SongListView.GetDisplayWidth(result));
+        Assert.EndsWith(" ", result);
+        Assert.Contains("..", result);
+    }
+
+    [Fact]
+    public void TruncateAndPadWide_ZeroOrNegativeWidth_ReturnsEmpty()
+    {
+        Assert.Equal("", SongListView.TruncateAndPadWide("晴天", 0));
+        Assert.Equal("", SongListView.TruncateAndPadWide("晴天", -5));
+    }
+
+    [Fact]
+    public void TruncateAndPadWide_EmptyText_ReturnsPadding()
+    {
+        Assert.Equal("     ", SongListView.TruncateAndPadWide("", 5));
+        Assert.Equal("     ", SongListView.TruncateAndPadWide(null!, 5));
+    }
 }
