@@ -69,6 +69,7 @@ public sealed class RadioService
     /// <summary>
     /// 重置并启动新电台流，拉取首批歌曲
     /// </summary>
+    /// <param name="batchSize">首次拉取电台歌曲的批次数量，默认 5 首。</param>
     /// <returns>电台启动的首支播放曲目；获取失败返回 <see langword="null"/>。</returns>
     public async Task<Song?> StartRadioAsync(int batchSize = 5)
     {
@@ -209,6 +210,7 @@ public sealed class RadioService
     /// <summary>
     /// 向电台队列追加歌曲并基于 Mid 去重
     /// </summary>
+    /// <param name="songs">待追加至电台队列的曲目序列。</param>
     /// <returns>成功去重追加至电台播放列表的歌曲数量。</returns>
     public int AppendUniqueSongs(IEnumerable<Song> songs)
     {

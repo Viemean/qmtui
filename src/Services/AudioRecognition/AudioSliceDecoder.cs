@@ -23,6 +23,9 @@ public static class AudioSliceDecoder
     /// <summary>
     /// 对本地音频文件或流式 URL 切片解码，返回 16000Hz 单声道 short[] PCM 样本
     /// </summary>
+    /// <param name="audioPathOrUrl">音频文件的本地路径或远程直链地址。</param>
+    /// <param name="durationSeconds">指定解码截取的切片秒数；默认 0 时使用系统默认切片时长。</param>
+    /// <param name="cancellationToken">用于取消异步操作的取消令牌。</param>
     /// <returns>指定音频片段解码提取的 8kHz 单声道 PCM 采样数据；解码失败返回 <see langword="null"/>。</returns>
     public static async Task<short[]?> ExtractSlicePcmAsync(string audioPathOrUrl, double durationSeconds = 0, CancellationToken cancellationToken = default)
     {

@@ -65,6 +65,9 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 装载新播放队列并定位起始播放索引与来源上下文
     /// </summary>
+    /// <param name="songs">加载至播放队列的曲目序列。</param>
+    /// <param name="startIndex">初始定位播放的曲目索引，默认从第 0 首开始。</param>
+    /// <param name="sourceContext">队列曲目的来源上下文信息；若无则为 null。</param>
     public void SetQueue(IEnumerable<Song> songs, int startIndex = 0, PlaybackSourceContext? sourceContext = null)
     {
         lock (_lock)
@@ -93,6 +96,7 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 将歌曲插队至下一顺位播放
     /// </summary>
+    /// <param name="song">插队至下一首顺位的曲目对象。</param>
     public void InsertNext(Song song)
     {
         lock (_lock)
@@ -139,6 +143,7 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 从队列中移除指定索引的歌曲
     /// </summary>
+    /// <param name="index">待移除曲目在队列中的从零开始索引位置。</param>
     /// <returns>若索引合法且成功移除指定曲目返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public bool RemoveAt(int index)
     {
@@ -209,6 +214,7 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 推演并切换至下一首播放曲目
     /// </summary>
+    /// <param name="isAutoPlayback">是否为播放完毕后的自动连续切歌模式。</param>
     /// <returns>播放队列中的下一首曲目；若队列为空或播放到达末尾返回 <see langword="null"/>。</returns>
     public Song? GetNextSong(bool isAutoPlayback = false)
     {
@@ -351,6 +357,7 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 定位至队列中的指定索引曲目
     /// </summary>
+    /// <param name="index">目标曲目在队列中的从零开始索引位置。</param>
     /// <returns>跳转切换后的当前曲目；若索引越界返回 <see langword="null"/>。</returns>
     public Song? SetCurrentIndex(int index)
     {
@@ -381,6 +388,7 @@ public sealed class PlaybackQueueService
     /// <summary>
     /// 对齐外部正在播放的歌曲
     /// </summary>
+    /// <param name="song">外部播放器正在播放的歌曲对象。</param>
     public void SyncCurrentSong(Song song)
     {
         lock (_lock)

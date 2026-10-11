@@ -61,6 +61,9 @@ public static partial class WebDavService
         }
     }
 
+    /// <summary>
+    /// 加载本地 WebDAV 服务器配置，若不存在则初始化空配置列表
+    /// </summary>
     public static void LoadConfig()
     {
         lock (s_lock)
@@ -94,6 +97,9 @@ public static partial class WebDavService
         }
     }
 
+    /// <summary>
+    /// 持久化保存 WebDAV 配置至本地 JSON 文件
+    /// </summary>
     public static void SaveConfig()
     {
         lock (s_lock)
@@ -110,6 +116,10 @@ public static partial class WebDavService
         }
     }
 
+    /// <summary>
+    /// 获取当前已配置的 WebDAV 服务器列表副本
+    /// </summary>
+    /// <returns>已保存的 WebDAV 服务器列表副本。</returns>
     public static List<WebDavServer> GetServers()
     {
         LoadConfig();
@@ -119,6 +129,10 @@ public static partial class WebDavService
         }
     }
 
+    /// <summary>
+    /// 获取当前激活选中的 WebDAV 服务器
+    /// </summary>
+    /// <returns>当前激活的 WebDAV 服务器实例；若未配置任何服务器返回 <see langword="null"/>。</returns>
     public static WebDavServer? GetActiveServer()
     {
         LoadConfig();
@@ -133,6 +147,10 @@ public static partial class WebDavService
         }
     }
 
+    /// <summary>
+    /// 切换当前激活的 WebDAV 服务器标识
+    /// </summary>
+    /// <param name="serverId">目标服务器唯一标识符。</param>
     public static void SetActiveServer(string serverId)
     {
         LoadConfig();
@@ -143,6 +161,10 @@ public static partial class WebDavService
         }
     }
 
+    /// <summary>
+    /// 新增或更新 WebDAV 服务器配置并重置其客户端连接缓存
+    /// </summary>
+    /// <param name="server">待保存的 WebDAV 服务器配置实例。</param>
     public static void SaveServer(WebDavServer server)
     {
         LoadConfig();
@@ -168,6 +190,10 @@ public static partial class WebDavService
         }
     }
 
+    /// <summary>
+    /// 根据标识符移除指定的 WebDAV 服务器并清理相关资源
+    /// </summary>
+    /// <param name="serverId">待移除的 WebDAV 服务器标识符。</param>
     public static void RemoveServer(string serverId)
     {
         LoadConfig();
@@ -216,6 +242,11 @@ public static partial class WebDavService
         });
     }
 
+    /// <summary>
+    /// 测试指定 WebDAV 服务器的连通性与认证凭据有效性
+    /// </summary>
+    /// <param name="server">待测试的 WebDAV 服务器配置实例。</param>
+    /// <returns>包含成功状态与提示信息的元组（Success 为 true 表示连接成功）。</returns>
     public static async Task<(bool Success, string Message)> TestConnectionAsync(WebDavServer server)
     {
         try
@@ -252,6 +283,12 @@ public static partial class WebDavService
         }
     }
 
+    /// <summary>
+    /// 发送 PROPFIND 请求获取指定远端 WebDAV 目录下的文件与子目录列表
+    /// </summary>
+    /// <param name="server">目标 WebDAV 服务器配置实例。</param>
+    /// <param name="relativeHref">相对根路径的目录相对地址。</param>
+    /// <returns>目录下的条目列表；请求失败或解析异常返回空列表。</returns>
     public static async Task<List<WebDavItem>> ListDirectoryAsync(WebDavServer server, string relativeHref)
     {
         var items = new List<WebDavItem>();
@@ -397,6 +434,13 @@ public static partial class WebDavService
         return items;
     }
 
+    /// <summary>
+    /// 递归扫描指定 WebDAV 目录下的所有音频资源条目并增量同步至服务器缓存
+    /// </summary>
+    /// <param name="server">目标 WebDAV 服务器配置实例。</param>
+    /// <param name="folderHref">相对根路径的起始扫描目录。</param>
+    /// <param name="progress">扫描进度状态回调委托；可为 null。</param>
+    /// <returns>扫描完成后的有效音频文件条目总数。</returns>
     public static async Task<int> ScanFolderRecursiveAsync(WebDavServer server, string folderHref, Action<string>? progress = null)
     {
         var discovered = new List<WebDavItem>();
@@ -534,6 +578,10 @@ public static partial class WebDavService
     /// <summary>
     /// 打开远端 WebDAV 音频流（带 Range 请求头转发与 Basic Auth 凭据，用于服务端透明流式代理）
     /// </summary>
+    /// <param name="server">目标 WebDAV 服务器配置实例。</param>
+    /// <param name="relativeHref">WebDAV 远端音频资源的相对路径。</param>
+    /// <param name="rangeHeader">HTTP Range 请求头值（如 bytes=0-1048575）；可为 null。</param>
+    /// <param name="ct">用于取消异步操作的取消令牌。</param>
     /// <returns>打开的远程 WebDAV 音频文件 HTTP 响应报文。</returns>
     public static async Task<HttpResponseMessage> OpenAudioStreamAsync(WebDavServer server, string relativeHref, string? rangeHeader = null, CancellationToken ct = default)
     {

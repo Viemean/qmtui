@@ -29,6 +29,10 @@ public static class AudioExportService
     /// <summary>
     /// 导出指定歌曲为自包含独立音频文件
     /// </summary>
+    /// <param name="song">待导出的歌曲对象。</param>
+    /// <param name="qualityTier">目标导出音质档位，默认为 SQ。</param>
+    /// <param name="customOutputDir">自定义导出保存目录绝对路径；若为 null 则使用默认目录。</param>
+    /// <param name="ct">用于取消异步操作的取消令牌。</param>
     /// <returns>音频导出结果模型（包含成功状态、输出路径与状态信息）。</returns>
     public static async Task<ExportResult> ExportSongAsync(
         Song song,
@@ -161,6 +165,8 @@ public static class AudioExportService
     /// <summary>
     /// 根据文件头部二进制魔数推断音频格式扩展名
     /// </summary>
+    /// <param name="filePath">本地音频文件绝对路径。</param>
+    /// <param name="tier">音质档位（无法通过魔数识别时的回退依据）。</param>
     /// <returns>基于音频文件头魔数推断的文件扩展名（如 .flac、.mp3、.m4a）。</returns>
     public static string InferAudioExtension(string filePath, AudioQualityTier tier)
     {
@@ -217,6 +223,9 @@ public static class AudioExportService
     /// <summary>
     /// 借助 ATL.NET 将标签元数据、内嵌高清封面及歌词写入目标文件（标准/HQ 嵌入 1200 高清，HQ 以上 SQ/Hi-Res/母带 优先拉取无损原图）
     /// </summary>
+    /// <param name="destPath">目标音频文件绝对路径。</param>
+    /// <param name="song">歌曲元数据对象。</param>
+    /// <param name="ct">用于取消异步操作的取消令牌。</param>
     public static Task InjectMetadataAndAssetsAsync(string destPath, Song song, CancellationToken ct = default)
         => InjectMetadataAndAssetsAsync(destPath, song, AudioQualityTier.SQ, ct);
 
@@ -315,6 +324,7 @@ public static class AudioExportService
     /// <summary>
     /// 清洗文件名非法字符
     /// </summary>
+    /// <param name="name">待清洗的原始文件名字符串。</param>
     /// <returns>去除操作系统非法字符后的规范文件名。</returns>
     public static string SanitizeFileName(string name)
     {
@@ -348,6 +358,7 @@ public static class AudioExportService
     /// <summary>
     /// 对超出体积安全阈值（2.5MB）的超大封面进行高质量 JPEG 88 内存重压缩，保持原始分辨率，避免内嵌元数据过大导致老式设备播放解析异常
     /// </summary>
+    /// <param name="rawBytes">原始封面图像二进制字节数组。</param>
     /// <returns>规范化后的封面图像二进制字节数据。</returns>
     public static byte[] SanitizeCoverArt(byte[] rawBytes)
     {
@@ -387,6 +398,7 @@ public static class AudioExportService
     /// <summary>
     /// 判断是否属于 HQ 以上音质（SQ、Hi-Res、母带等）
     /// </summary>
+    /// <param name="tier">待检测的音频音质档位。</param>
     /// <returns>若音质级别等于或高于 HQ 高品质返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static bool IsAboveHq(AudioQualityTier tier) =>
         tier != AudioQualityTier.Standard && tier != AudioQualityTier.HQ;
@@ -394,6 +406,9 @@ public static class AudioExportService
     /// <summary>
     /// 为导出音频解析封面图像字节（标准/HQ 拉取 1200/800 高清，HQ 以上优先拉取无损母版原图并限制在 2.5MB 内）
     /// </summary>
+    /// <param name="song">目标歌曲对象。</param>
+    /// <param name="tier">目标音质档位。</param>
+    /// <param name="ct">用于取消异步操作的取消令牌。</param>
     /// <returns>封面图像原始二进制字节数组；获取失败返回 <see langword="null"/>。</returns>
     public static async Task<byte[]?> ResolveCoverArtBytesAsync(Song song, AudioQualityTier tier, CancellationToken ct = default)
     {

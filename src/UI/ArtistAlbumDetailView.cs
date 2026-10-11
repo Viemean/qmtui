@@ -197,6 +197,9 @@ public sealed class ArtistAlbumDetailView : View
     /// <summary>
     /// 在歌手的专辑列表模式下预览当前高亮的专辑
     /// </summary>
+    /// <param name="detail">专辑详情模型。</param>
+    /// <param name="imagePath">本地已缓存的专辑封面图像文件路径；可为 null。</param>
+    /// <param name="isSingerFavorite">当前歌手是否已被收藏（当前视图保留标记）。</param>
     public void SetAlbumPreview(AlbumDetail detail, string? imagePath, bool isSingerFavorite)
     {
         _ = isSingerFavorite;

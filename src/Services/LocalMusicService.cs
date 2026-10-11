@@ -72,6 +72,9 @@ public static class LocalMusicService
         }
     }
 
+    /// <summary>
+    /// 加载本地音乐配置，若配置文件不存在则初始化默认配置
+    /// </summary>
     public static void LoadConfig()
     {
         lock (s_lock)
@@ -108,6 +111,9 @@ public static class LocalMusicService
         }
     }
 
+    /// <summary>
+    /// 持久化保存本地音乐配置至本地 JSON 文件
+    /// </summary>
     public static void SaveConfig()
     {
         lock (s_lock)
@@ -124,6 +130,10 @@ public static class LocalMusicService
         }
     }
 
+    /// <summary>
+    /// 获取当前已配置的本地音乐扫描文件夹列表
+    /// </summary>
+    /// <returns>包含所有已配置扫描目录绝对路径的列表。</returns>
     public static List<string> GetFolders()
     {
         LoadConfig();
@@ -133,6 +143,11 @@ public static class LocalMusicService
         }
     }
 
+    /// <summary>
+    /// 添加本地音乐扫描目录（支持波浪号 ~ 用户主目录展开）
+    /// </summary>
+    /// <param name="rawPath">待添加的本地文件夹路径字符串。</param>
+    /// <returns>目录存在且成功添加或已存在返回 <see langword="true"/>；目录不存在或入参为空返回 <see langword="false"/>。</returns>
     public static bool AddFolder(string rawPath)
     {
         if (string.IsNullOrWhiteSpace(rawPath)) return false;
@@ -159,6 +174,11 @@ public static class LocalMusicService
         }
     }
 
+    /// <summary>
+    /// 移除指定的本地音乐扫描目录并清理该目录下已缓存的歌曲数据
+    /// </summary>
+    /// <param name="rawPath">待移除的本地文件夹路径字符串。</param>
+    /// <returns>成功匹配并移除目录返回 <see langword="true"/>；不存在或入参为空返回 <see langword="false"/>。</returns>
     public static bool RemoveFolder(string rawPath)
     {
         if (string.IsNullOrWhiteSpace(rawPath)) return false;
@@ -208,6 +228,7 @@ public static class LocalMusicService
     /// <summary>
     /// 异步扫描已配置的本地音乐文件夹
     /// </summary>
+    /// <param name="onProgress">扫描进度变更通知回调，入参为当前扫描到的目录或文件路径。</param>
     /// <returns>从本地已添加目录扫描发现并解析完成的歌曲列表。</returns>
     public static async Task<List<Song>> ScanAllFoldersAsync(Action<string>? onProgress = null)
     {
@@ -400,6 +421,7 @@ public static class LocalMusicService
     /// <summary>
     /// 从 ATL.Track 实例中提取内嵌歌词（优先读取 Lyrics 标签，缺失则回退到 Vorbis Comment / ID3v2 常用字段）
     /// </summary>
+    /// <param name="track">ATL 音频轨道元数据解析实例。</param>
     /// <returns>从音频标签中提取到的内嵌歌词文本；若未内嵌返回 <see langword="null"/>。</returns>
     public static string? ExtractEmbeddedLyrics(ATL.Track track)
     {
@@ -480,6 +502,8 @@ public static class LocalMusicService
     /// <summary>
     /// 获取本地歌曲的歌词（优先同目录同名 .lrc 文件，其次内嵌歌词）
     /// </summary>
+    /// <param name="song">目标歌曲对象。</param>
+    /// <param name="fallbackAudioPath">当歌曲对象中本地路径为空时的回退音频文件路径。</param>
     /// <returns>解析后的本地歌词行列表；若未找到有效歌词返回空列表。</returns>
     public static async Task<List<LyricLine>> GetLyricsAsync(Song song, string? fallbackAudioPath = null)
     {
@@ -540,6 +564,8 @@ public static class LocalMusicService
     /// <summary>
     /// 仅获取本地音频文件的内嵌原始歌词（忽略外挂 .lrc 文件，用于可逆撤销恢复）
     /// </summary>
+    /// <param name="song">目标歌曲对象。</param>
+    /// <param name="fallbackAudioPath">当歌曲对象中本地路径为空时的回退音频文件路径。</param>
     /// <returns>解析后的内嵌歌词行列表；若无内嵌歌词返回空列表。</returns>
     public static async Task<List<LyricLine>> GetEmbeddedLyricsAsync(Song song, string? fallbackAudioPath = null)
     {
@@ -582,6 +608,8 @@ public static class LocalMusicService
     /// <summary>
     /// 获取或提取本地歌曲的封面图片（支持内嵌封面提取与同目录 cover.jpg，带 6px 圆角处理）
     /// </summary>
+    /// <param name="song">目标歌曲对象。</param>
+    /// <param name="cancellationToken">用于取消异步操作的取消令牌。</param>
     /// <returns>本地提取或已缓存的封面图像绝对路径；若无封面返回 <see langword="null"/>。</returns>
     public static async Task<string?> EnsureCoverAsync(Song song, CancellationToken cancellationToken = default)
     {

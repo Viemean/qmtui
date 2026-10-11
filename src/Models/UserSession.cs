@@ -202,6 +202,7 @@ public sealed class UserSession
     /// <summary>
     /// 异步防抖保存，调用线程生成内存快照后由后台工作线程写入磁盘
     /// </summary>
+    /// <param name="delayMs">防抖落盘延迟时间（毫秒），默认 15000 毫秒。</param>
     public static void SaveDebounced(int delayMs = 15000)
     {
         s_pendingJsonSnapshot = Current.ToJson();

@@ -386,6 +386,8 @@ public static class AudioRecordingService
     /// <summary>
     /// 启动流式录音会话
     /// </summary>
+    /// <param name="source">录音输入源类型（麦克风或系统监听回放）。</param>
+    /// <param name="initialPreRollBytes">录音启动前预录缓冲区保留的 PCM 历史字节数组；可为 null。</param>
     /// <returns>音频录制会话管理控制实例。</returns>
     public static AudioRecordingSession StartRecordingSession(AudioRecordSource source, byte[]? initialPreRollBytes = null)
     {

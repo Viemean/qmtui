@@ -49,7 +49,7 @@ public static class CacheManager
     public static long MaxTotalSizeBytes { get; set; } = GetAdaptiveMaxSizeBytes();
 
     /// <summary>
-    /// 根据磁盘剩余可用空间动态计算缓存容量上限（最大封顶 8GB，带低空间防爆盘门禁）：
+    /// 根据磁盘剩余可用空间动态计算缓存容量上限，最大封顶 8GB：
     /// - 剩余空间 300GB 以上：8GB（封顶）
     /// - 剩余空间 150GB ~ 300GB：4GB
     /// - 剩余空间 50GB ~ 150GB：2GB
@@ -57,6 +57,7 @@ public static class CacheManager
     /// - 剩余空间 3GB ~ 10GB：512MB
     /// - 剩余空间 3GB 以下：按可用空间 10% 限制 (最低 128MB)，保留系统安全缓冲
     /// </summary>
+    /// <param name="targetDir">目标缓存所在目录绝对路径；默认为空使用当前缓存根目录。</param>
     /// <returns>根据当前磁盘剩余可用空间自适应计算的缓存容量上限字节数。</returns>
     public static long GetAdaptiveMaxSizeBytes(string? targetDir = null)
     {
@@ -81,6 +82,7 @@ public static class CacheManager
     /// <summary>
     /// 根据给定的可用空间字节数计算缓存配额
     /// </summary>
+    /// <param name="freeBytes">磁盘驱动器当前剩余可用空间字节数。</param>
     /// <returns>根据磁盘剩余空间阶梯规则计算出的容量限制字节数。</returns>
     public static long CalculateLimitByFreeBytes(long freeBytes)
     {
@@ -162,6 +164,7 @@ public static class CacheManager
     /// <summary>
     /// 从账本中移除记录（例如文件被主动删除时）
     /// </summary>
+    /// <param name="relativePath">相对缓存根目录的文件路径。</param>
     public static void Forget(string relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath)) return;

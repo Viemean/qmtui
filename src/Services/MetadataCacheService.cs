@@ -31,15 +31,39 @@ public static class MetadataCacheService
 
     #region 每日推荐与百万收藏快照缓存
 
+    /// <summary>
+    /// 获取指定用户与日期的每日推荐歌曲缓存快照
+    /// </summary>
+    /// <param name="uin">用户唯一标识。</param>
+    /// <param name="date">目标日期字符串（格式为 yyyy-MM-dd）。</param>
+    /// <returns>包含推荐曲目的快照模型；未命中缓存返回 <see langword="null"/>。</returns>
     public static DailyRecommendCache? GetDailyRecommend(string uin, string date) =>
         GetDailyDatedSongsCache("daily", uin, date);
 
+    /// <summary>
+    /// 持久化保存指定用户与日期的每日推荐曲目快照
+    /// </summary>
+    /// <param name="uin">用户唯一标识。</param>
+    /// <param name="date">目标日期字符串（格式为 yyyy-MM-dd）。</param>
+    /// <param name="songs">推荐曲目列表。</param>
     public static void SaveDailyRecommend(string uin, string date, List<Song> songs) =>
         SaveDailyDatedSongsCache("daily", uin, date, songs);
 
+    /// <summary>
+    /// 获取指定用户与日期的百万收藏推荐歌曲缓存快照
+    /// </summary>
+    /// <param name="uin">用户唯一标识。</param>
+    /// <param name="date">目标日期字符串（格式为 yyyy-MM-dd）。</param>
+    /// <returns>包含推荐曲目的快照模型；未命中缓存返回 <see langword="null"/>。</returns>
     public static DailyRecommendCache? GetMillionRecommend(string uin, string date) =>
         GetDailyDatedSongsCache("million", uin, date);
 
+    /// <summary>
+    /// 持久化保存指定用户与日期的百万收藏推荐曲目快照
+    /// </summary>
+    /// <param name="uin">用户唯一标识。</param>
+    /// <param name="date">目标日期字符串（格式为 yyyy-MM-dd）。</param>
+    /// <param name="songs">推荐曲目列表。</param>
     public static void SaveMillionRecommend(string uin, string date, List<Song> songs) =>
         SaveDailyDatedSongsCache("million", uin, date, songs);
 
@@ -69,6 +93,13 @@ public static class MetadataCacheService
         return null;
     }
 
+    /// <summary>
+    /// 原子落盘指定类别的按日期推荐曲目快照并清理历史旧快照
+    /// </summary>
+    /// <param name="category">推荐分类标识（如 daily 或 million）。</param>
+    /// <param name="uin">用户唯一标识。</param>
+    /// <param name="date">目标日期字符串。</param>
+    /// <param name="songs">推荐曲目列表。</param>
     public static void SaveDailyDatedSongsCache(string category, string uin, string date, List<Song> songs)
     {
         if (string.IsNullOrWhiteSpace(uin) || string.IsNullOrWhiteSpace(date) || songs.Count == 0) return;
@@ -124,6 +155,11 @@ public static class MetadataCacheService
 
     #region “我的喜欢”歌单缓存
 
+    /// <summary>
+    /// 读取指定用户的“我喜欢”歌单本地快照缓存
+    /// </summary>
+    /// <param name="uin">用户唯一标识。</param>
+    /// <returns>本地持久化的我喜欢歌单快照模型；未命中缓存返回 <see langword="null"/>。</returns>
     public static FavoriteCache? GetFavoriteCache(string uin)
     {
         if (string.IsNullOrWhiteSpace(uin)) return null;
@@ -146,6 +182,13 @@ public static class MetadataCacheService
         return null;
     }
 
+    /// <summary>
+    /// 原子落盘指定用户的“我喜欢”歌单快照
+    /// </summary>
+    /// <param name="uin">用户唯一标识。</param>
+    /// <param name="totalCount">歌单收录曲目总数。</param>
+    /// <param name="firstSongMid">首曲 Mid（用于快速探测增量更新）。</param>
+    /// <param name="songs">当前快照包含的歌曲列表。</param>
     public static void SaveFavoriteCache(string uin, int totalCount, string firstSongMid, List<Song> songs)
     {
         if (string.IsNullOrWhiteSpace(uin)) return;
@@ -180,6 +223,11 @@ public static class MetadataCacheService
 
     #region 歌词不可变缓存
 
+    /// <summary>
+    /// 读取指定歌曲的本地不可变歌词缓存
+    /// </summary>
+    /// <param name="songMid">歌曲 Mid 唯一标识。</param>
+    /// <returns>解析后的歌词行列表；未命中有效缓存返回 <see langword="null"/>。</returns>
     public static List<LyricLine>? GetLyrics(string songMid)
     {
         if (string.IsNullOrWhiteSpace(songMid)) return null;
@@ -203,6 +251,11 @@ public static class MetadataCacheService
         return null;
     }
 
+    /// <summary>
+    /// 原子落盘指定歌曲的不可变歌词行数据
+    /// </summary>
+    /// <param name="songMid">歌曲 Mid 唯一标识。</param>
+    /// <param name="lyrics">解析后的歌词行列表。</param>
     public static void SaveLyrics(string songMid, List<LyricLine> lyrics)
     {
         if (string.IsNullOrWhiteSpace(songMid) || lyrics == null || lyrics.Count == 0) return;

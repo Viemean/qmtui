@@ -131,6 +131,8 @@ public static partial class TerminalImageHelper
     /// <summary>
     /// 获取本地图像的像素宽高（解析头信息，开销极小）
     /// </summary>
+    /// <param name="filePath">图像文件绝对路径。</param>
+    /// <returns>解析出的图像像素宽度与高度元组；若文件不存在或解析失败返回 <see langword="null"/>。</returns>
     public static (int width, int height)? GetImageDimensions(string? filePath)
     {
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return null;
@@ -671,6 +673,7 @@ public static partial class TerminalImageHelper
     /// <summary>
     /// 清除终端中指定 ID 的 Kitty 图像
     /// </summary>
+    /// <param name="imageId">Kitty 图形协议分配的图像数字标识符。</param>
     public static void DeleteKittyImage(uint imageId)
     {
         if (!IsImageSupported || imageId == 0) return;

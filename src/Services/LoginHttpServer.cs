@@ -88,6 +88,8 @@ public sealed class LoginHttpServer : IDisposable
     /// <summary>
     /// 动态更新二维码图像字节流
     /// </summary>
+    /// <param name="qrBytes">二维码图像原始二进制字节数组；为 null 时重置为空白状态。</param>
+    /// <param name="mimeType">二维码图像的 MIME 类型，默认为 image/png。</param>
     public void UpdateQrCode(byte[]? qrBytes, string mimeType = "image/png")
     {
         lock (_lock)

@@ -11,6 +11,7 @@ public static class ClipboardService
     /// <summary>
     /// 将指定文本复制到系统剪贴板（支持 Wayland wl-copy、X11 xclip/xsel 及终端 OSC 52 转义序列）
     /// </summary>
+    /// <param name="text">写入剪贴板的纯文本内容。</param>
     /// <returns>向系统剪贴板写入文本成功返回 <see langword="true"/>；失败返回 <see langword="false"/>。</returns>
     public static bool SetText(string text)
     {
@@ -196,6 +197,9 @@ public static class TextFieldClipboardExtensions
     /// <summary>
     /// 将剪贴板或 Primary 选区文本粘贴至输入框当前光标或指定位置
     /// </summary>
+    /// <param name="textField">目标文本输入框控件实例。</param>
+    /// <param name="preferPrimary">是否优先从 X11/Wayland Primary 选择区读取。</param>
+    /// <param name="targetPosition">指定插入文本的光标字符偏移位置；为 null 时插入到当前光标处。</param>
     public static void PasteFromClipboard(this Terminal.Gui.Views.TextField textField, bool preferPrimary = false, int? targetPosition = null)
     {
         var pasteText = ClipboardService.GetText(primary: preferPrimary);
@@ -223,6 +227,8 @@ public static class TextFieldClipboardExtensions
     /// <summary>
     /// 为 TextField 启用鼠标中键粘贴（Primary Selection 或系统剪贴板）并自动获焦
     /// </summary>
+    /// <param name="textField">目标文本输入框控件实例。</param>
+    /// <param name="onFocused">点击获焦时触发的可选回调委托。</param>
     public static void EnableMiddleClickPaste(this Terminal.Gui.Views.TextField textField, Action? onFocused = null)
     {
         textField.MouseEvent += (s, m) =>

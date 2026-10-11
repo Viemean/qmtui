@@ -219,6 +219,8 @@ public sealed partial class MusicApi
     /// <summary>
     /// 上报单曲播放记录到云端（优先使用数字 ID，对齐 Kotlin 端规范）
     /// </summary>
+    /// <param name="song">待上报播放记录的歌曲实例。</param>
+    /// <param name="ct">用于取消异步操作的取消令牌。</param>
     public static async Task ReportRecentSongAsync(Song song, CancellationToken ct = default)
     {
         if (!UserSession.Current.IsLoggedIn)
@@ -256,6 +258,8 @@ public sealed partial class MusicApi
     /// <summary>
     /// 上报歌单播放记录到云端（按歌单对象）
     /// </summary>
+    /// <param name="playlist">待上报播放记录的歌单实例。</param>
+    /// <param name="ct">用于取消异步操作的取消令牌。</param>
     public static async Task ReportRecentPlaylistAsync(Playlist playlist, CancellationToken ct = default)
     {
         string playlistId = playlist.Tid > 0 ? playlist.Tid.ToString() : playlist.DirId.ToString();
@@ -265,6 +269,9 @@ public sealed partial class MusicApi
     /// <summary>
     /// 上报歌单播放记录到云端（按歌单 ID 与标题）
     /// </summary>
+    /// <param name="playlistId">歌单标识符（Tid 或 DirId）。</param>
+    /// <param name="title">歌单标题。</param>
+    /// <param name="ct">用于取消异步操作的取消令牌。</param>
     public static async Task ReportRecentPlaylistAsync(string playlistId, string title = "", CancellationToken ct = default)
     {
         if (!UserSession.Current.IsLoggedIn || string.IsNullOrEmpty(playlistId) || playlistId == "0")
@@ -296,6 +303,8 @@ public sealed partial class MusicApi
     /// <summary>
     /// 上报专辑播放记录到云端（按专辑对象）
     /// </summary>
+    /// <param name="album">待上报播放记录的专辑实例。</param>
+    /// <param name="ct">用于取消异步操作的取消令牌。</param>
     public static async Task ReportRecentAlbumAsync(Album album, CancellationToken ct = default)
     {
         string albumId = album.Id > 0 ? album.Id.ToString() : album.Mid;
@@ -305,6 +314,10 @@ public sealed partial class MusicApi
     /// <summary>
     /// 上报专辑播放记录到云端（按专辑 ID/Mid 与标题）
     /// </summary>
+    /// <param name="albumReportId">专辑标识符（数字 ID 或 Mid）。</param>
+    /// <param name="albumMid">专辑 Mid 编码字符串。</param>
+    /// <param name="title">专辑标题。</param>
+    /// <param name="ct">用于取消异步操作的取消令牌。</param>
     public static async Task ReportRecentAlbumAsync(string albumReportId, string albumMid = "", string title = "", CancellationToken ct = default)
     {
         if (!UserSession.Current.IsLoggedIn || string.IsNullOrEmpty(albumReportId))
@@ -336,6 +349,10 @@ public sealed partial class MusicApi
     /// <summary>
     /// 上报单曲播放记录到云端，兼容调用接口
     /// </summary>
+    /// <param name="song">当前播放的歌曲实例。</param>
+    /// <param name="sourcePlaylist">曲目关联的来源歌单；若无则为 null。</param>
+    /// <param name="sourceAlbum">曲目关联的来源专辑；若无则为 null。</param>
+    /// <param name="ct">用于取消异步操作的取消令牌。</param>
     public static async Task ReportRecentHistoryAsync(
         Song song,
         Playlist? sourcePlaylist = null,

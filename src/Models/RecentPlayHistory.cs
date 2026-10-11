@@ -33,6 +33,7 @@ public static class RecentPlayHistory
     /// <summary>
     /// 添加曲目至最近播放（置顶且去重，最多保留 200 首）
     /// </summary>
+    /// <param name="song">待加入最近播放历史的曲目对象。</param>
     public static void Add(Song song)
     {
         if (song == null || (string.IsNullOrEmpty(song.Mid) && song.Id <= 0)) return;
@@ -95,6 +96,7 @@ public static class RecentPlayHistory
     /// <summary>
     /// 以云端拉取结果全量覆盖本地历史，云端为主数据源
     /// </summary>
+    /// <param name="cloudSongs">从云端同步拉取的最近播放曲目序列。</param>
     public static void OverwriteFromCloud(IEnumerable<Song> cloudSongs)
     {
         EnsureLoaded();

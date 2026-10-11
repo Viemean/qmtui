@@ -141,6 +141,8 @@ public static partial class TerminalImageHelper
     /// <summary>
     /// 读取 PNG 头部前 24 字节获取图像像素宽高（零堆分配）
     /// </summary>
+    /// <param name="path">PNG 图像文件绝对路径。</param>
+    /// <returns>解析出的像素宽度与高度元组；若文件不存在或非标准 PNG 格式返回 <see langword="null"/>。</returns>
     public static (int width, int height)? GetPngDimensions(string? path)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;

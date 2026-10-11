@@ -30,6 +30,8 @@ public static class AudioCacheService
     /// <summary>
     /// 尝试获取本地已缓存的音频文件路径。若命中且完整，更新最后访问时间并返回绝对路径。
     /// </summary>
+    /// <param name="songMid">歌曲 Mid 唯一标识。</param>
+    /// <param name="tier">目标音质档位。</param>
     /// <returns>本地已缓存的有效音频文件绝对路径；若未命中缓存返回 <see langword="null"/>。</returns>
     public static string? GetCachedAudioPath(string songMid, AudioQualityTier tier)
     {
@@ -60,6 +62,10 @@ public static class AudioCacheService
     /// <summary>
     /// 异步后台边播边存流式缓存音频文件并原子落盘
     /// </summary>
+    /// <param name="songMid">歌曲 Mid 唯一标识。</param>
+    /// <param name="tier">目标音质档位。</param>
+    /// <param name="cdnUrl">远程音频文件直链下载地址。</param>
+    /// <param name="ct">用于取消异步操作的取消令牌。</param>
     /// <returns>下载并缓存成功的本地音频绝对路径；若缓存失败返回 <see langword="null"/>。</returns>
     public static Task<string?> CacheAudioAsync(string songMid, AudioQualityTier tier, string cdnUrl, CancellationToken ct = default)
     {

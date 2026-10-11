@@ -23,6 +23,7 @@ public sealed partial class NowPlayingView
     /// <summary>
     /// 处理 Tab 键焦点切换：仅在交互项目（歌手/专辑）与底部控制台之间切换
     /// </summary>
+    /// <param name="forward">是否正向切换焦点（true 为正向，false 为反向）。</param>
     public void HandleTabNavigation(bool forward)
     {
         TriggerImmersiveActivity();
@@ -234,6 +235,7 @@ public sealed partial class NowPlayingView
     /// <summary>
     /// 接收主调度派发的封面就绪通知并同步渲染
     /// </summary>
+    /// <param name="coverPath">已就绪的封面图像本地绝对路径。</param>
     public void UpdateCover(string? coverPath)
     {
         if (string.IsNullOrEmpty(coverPath) || !File.Exists(coverPath)) return;
