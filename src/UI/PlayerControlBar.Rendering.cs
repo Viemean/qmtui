@@ -303,7 +303,7 @@ public sealed partial class PlayerControlBar
         if (song != null)
         {
             var albumText = string.IsNullOrWhiteSpace(song.Album) ? "单曲" : song.Album;
-            _persistentPlaybackStatus = $"{song.Artist} - {song.Title} - {albumText}";
+            _persistentPlaybackStatus = $"{song.Title} - {song.Artist} - {albumText}";
             SetLocalMode(song.IsLocal || song.IsWebDav);
         }
         else

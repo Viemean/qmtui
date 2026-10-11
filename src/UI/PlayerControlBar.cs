@@ -94,7 +94,7 @@ public sealed partial class PlayerControlBar : FrameView
         KeyBindings.Remove(Key.Tab);
         KeyBindings.Remove(Key.Tab.WithShift);
 
-        // 1. 左侧曲目信息：统一展示为“歌手 - 歌曲名字 - 专辑名字”，支持按列独立点击
+        // 1. 左侧曲目信息：统一展示为“歌曲名字 - 歌手 - 专辑名字”，支持按列独立点击
         _nowPlayingLabel = new Label
         {
             Text = "暂无播放曲目",
