@@ -296,7 +296,10 @@ public static class LocalLyricAutoMatcher
                 return JsonSerializer.Deserialize(json, MatchedLyricJsonContext.Default.CachedMatchedLyricData);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("LocalLyricAutoMatcher", $"ReadMasterCacheByMid failed for mid={songMid}: {ex.Message}");
+        }
 
         return null;
     }

@@ -718,9 +718,9 @@ public sealed partial class MusicApi
                 }
             }
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Ignore
+            AppLogger.Warn("MusicApi.Playback", $"GetLyricsAsync failed for mid={songMid}: {ex.Message}");
         }
 
         return [new LyricLine(TimeSpan.Zero, "暂无歌词")];

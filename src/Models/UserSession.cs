@@ -193,9 +193,9 @@ public sealed class UserSession
                 File.WriteAllText(s_configPath, json);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // 忽略写入异常
+            AppLogger.Warn("UserSession", $"Failed to save session: {ex.Message}");
         }
     }
 
@@ -232,9 +232,9 @@ public sealed class UserSession
                                 File.WriteAllText(s_configPath, snapshot);
                             }
                         }
-                        catch
+                        catch (Exception ex)
                         {
-                            // 忽略写入异常
+                            AppLogger.Warn("UserSession", $"Failed to save debounced session snapshot: {ex.Message}");
                         }
                     }
                 }
