@@ -83,7 +83,7 @@ chmod 755 "$STAGE_DIR/DEBIAN/postrm"
 # Debian Installed-Size 单位是 KiB
 INSTALLED_SIZE=$(du -sk "$STAGE_DIR/usr" | awk '{print $1}')
 
-DEBIAN_DEPS="libgstreamer1.0-0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, libpulse0"
+DEBIAN_DEPS="libgstreamer1.0-0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, libpulse0"
 
 echo "==> Generating DEBIAN/control metadata..."
 cat << EOF > "$STAGE_DIR/DEBIAN/control"

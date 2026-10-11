@@ -72,7 +72,6 @@ license = MIT
 depend = gstreamer
 depend = gst-plugins-base
 depend = gst-plugins-good
-depend = gst-plugins-bad
 depend = libpulse
 optdepend = gst-libav: additional audio codecs (AAC/M4A) support
 optdepend = wl-clipboard: Wayland clipboard support for copying song links
