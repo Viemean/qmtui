@@ -464,39 +464,7 @@ public static partial class TerminalImageHelper
                     fileBytes = downsampledMs.ToArray();
                 }
 
-                string base64 = Convert.ToBase64String(fileBytes);
-
-                using var ms = new MemoryStream();
-                using var writer = new StreamWriter(ms, Encoding.ASCII);
-
-                // Kitty escape sequence: f=100 (PNG), a=T (transmit and display)
-                // 若仅指定 cols (rows <= 0)，终端自动依据当前字体实际像素尺寸严格保持 1:1 原画宽高比
-                string sizePart;
-                if (cols > 0 && rows > 0) sizePart = $"c={cols},r={rows},";
-                else if (cols > 0) sizePart = $"c={cols},";
-                else sizePart = $"r={rows},";
-
-                int chunkSize = 4096;
-                for (int offset = 0; offset < base64.Length; offset += chunkSize)
-                {
-                    int len = Math.Min(chunkSize, base64.Length - offset);
-                    string chunk = base64.Substring(offset, len);
-                    bool isLast = (offset + len >= base64.Length);
-
-                    if (offset == 0)
-                    {
-                        int m = isLast ? 0 : 1;
-                        string idPart = imageId > 0 ? $"i={imageId}," : "";
-                        writer.Write($"\x1b_Ga=T,{idPart}q=2,f=100,{sizePart}m={m};{chunk}\x1b\\");
-                    }
-                    else
-                    {
-                        int m = isLast ? 0 : 1;
-                        writer.Write($"\x1b_Gq=2,m={m};{chunk}\x1b\\");
-                    }
-                }
-                writer.Flush();
-                cachedPayload = ms.ToArray();
+                cachedPayload = FormatKittyPayload(fileBytes, cols, rows, imageId);
 
                 lock (s_cacheLock)
                 {
@@ -537,6 +505,67 @@ public static partial class TerminalImageHelper
         {
             AppLogger.Error("TerminalImageHelper", $"RenderKittyImage failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 将图像二进制数据转换为符合 Kitty 图形协议的分块传输字节序列。
+    /// </summary>
+    /// <param name="fileBytes">图像文件的原始二进制字节数据。</param>
+    /// <param name="cols">占据终端网格列数。</param>
+    /// <param name="rows">占据终端网格行数。</param>
+    /// <param name="imageId">可选 Kitty 图像唯一 ID。</param>
+    /// <returns>Kitty 协议原生转义序列字节数组。</returns>
+    internal static byte[] FormatKittyPayload(byte[] fileBytes, int cols, int rows, uint imageId = 0)
+    {
+        if (fileBytes == null || fileBytes.Length == 0) return [];
+
+        string sizePart;
+        if (cols > 0 && rows > 0) sizePart = $"c={cols},r={rows},";
+        else if (cols > 0) sizePart = $"c={cols},";
+        else sizePart = $"r={rows},";
+
+        string idPart = imageId > 0 ? $"i={imageId}," : "";
+
+        const int RawChunkSize = 3072;
+        int totalRawChunks = (fileBytes.Length + RawChunkSize - 1) / RawChunkSize;
+        int estimatedSize = ((fileBytes.Length + 2) / 3) * 4 + totalRawChunks * 64;
+
+        using var ms = new MemoryStream(estimatedSize);
+        Span<byte> base64Chunk = stackalloc byte[4096];
+        Span<byte> headerBuf = stackalloc byte[128];
+
+        for (int chunkIndex = 0; chunkIndex < totalRawChunks; chunkIndex++)
+        {
+            int rawOffset = chunkIndex * RawChunkSize;
+            int rawLen = Math.Min(RawChunkSize, fileBytes.Length - rawOffset);
+            bool isLast = (rawOffset + rawLen >= fileBytes.Length);
+            int m = isLast ? 0 : 1;
+
+            var rawSlice = fileBytes.AsSpan(rawOffset, rawLen);
+            var status = System.Buffers.Text.Base64.EncodeToUtf8(rawSlice, base64Chunk, out _, out int bytesWritten, isFinalBlock: isLast);
+            if (status != System.Buffers.OperationStatus.Done)
+            {
+                throw new InvalidOperationException($"Base64.EncodeToUtf8 failed with status: {status}");
+            }
+
+            if (chunkIndex == 0)
+            {
+                string headerStr = $"\x1b_Ga=T,{idPart}q=2,f=100,{sizePart}m={m};";
+                int headerLen = Encoding.ASCII.GetBytes(headerStr, headerBuf);
+                ms.Write(headerBuf[..headerLen]);
+            }
+            else
+            {
+                string headerStr = $"\x1b_Gq=2,m={m};";
+                int headerLen = Encoding.ASCII.GetBytes(headerStr, headerBuf);
+                ms.Write(headerBuf[..headerLen]);
+            }
+
+            ms.Write(base64Chunk[..bytesWritten]);
+            ms.Write("\x1b\\"u8);
+        }
+
+        return ms.ToArray();
     }
 
     private static void WriteRawBytesToTerminal(byte[] header, byte[] payload)

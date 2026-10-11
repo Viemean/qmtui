@@ -94,4 +94,56 @@ public class NotificationAndCoverTests
             Assert.Equal(2 * 2 * 4, result.Value.pixelData.Length);
         }
     }
+
+    [Fact]
+    public void FormatKittyPayload_Empty_ReturnsEmpty()
+    {
+        var payload = TerminalImageHelper.FormatKittyPayload([], 10, 10);
+        Assert.Empty(payload);
+    }
+
+    [Fact]
+    public void FormatKittyPayload_SingleChunk_GeneratesValidSequence()
+    {
+        byte[] original = [1, 2, 3, 4, 5, 6, 7, 8];
+        var payload = TerminalImageHelper.FormatKittyPayload(original, 20, 10, imageId: 3);
+        string text = System.Text.Encoding.ASCII.GetString(payload);
+
+        Assert.StartsWith("\x1b_Ga=T,i=3,q=2,f=100,c=20,r=10,m=0;", text);
+        Assert.EndsWith("\x1b\\", text);
+
+        int start = text.IndexOf(';') + 1;
+        int end = text.LastIndexOf("\x1b\\", StringComparison.Ordinal);
+        string b64 = text[start..end];
+        byte[] decoded = Convert.FromBase64String(b64);
+        Assert.Equal(original, decoded);
+    }
+
+    [Fact]
+    public void FormatKittyPayload_MultiChunk_RecoversOriginalBytes()
+    {
+        byte[] original = new byte[7000];
+        Random.Shared.NextBytes(original);
+
+        var payload = TerminalImageHelper.FormatKittyPayload(original, 30, 0, imageId: 1);
+        string text = System.Text.Encoding.ASCII.GetString(payload);
+
+        Assert.Contains("m=1;", text);
+        Assert.EndsWith("\x1b\\", text);
+
+        var sb = new System.Text.StringBuilder();
+        int idx = 0;
+        while (idx < text.Length)
+        {
+            int semicolon = text.IndexOf(';', idx);
+            if (semicolon < 0) break;
+            int escEnd = text.IndexOf("\x1b\\", semicolon, StringComparison.Ordinal);
+            if (escEnd < 0) break;
+            sb.Append(text[(semicolon + 1)..escEnd]);
+            idx = escEnd + 2;
+        }
+
+        byte[] recovered = Convert.FromBase64String(sb.ToString());
+        Assert.Equal(original, recovered);
+    }
 }
