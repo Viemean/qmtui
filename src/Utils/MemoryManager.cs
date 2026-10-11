@@ -12,6 +12,11 @@ public static partial class MemoryManager
     private static CancellationTokenSource? s_trimCts;
     private static readonly Lock s_lock = new();
     private static long s_lastTrimTick;
+    private static long s_lastAllocatedBytes;
+    private static long s_lastWorkingSetBytes;
+
+    private const long ManagedGrowthThreshold = 8 * 1024 * 1024;
+    private const long WorkingSetGrowthThreshold = 16 * 1024 * 1024;
 
     [LibraryImport("libc", EntryPoint = "malloc_trim")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
@@ -28,8 +33,8 @@ public static partial class MemoryManager
             var now = Environment.TickCount64;
             if (s_lastTrimTick > 0 && now - s_lastTrimTick > 3000)
             {
-                // 连续切歌防抖已超过 3 秒未实际执行，立即在后台异步修剪一次
-                TrimBackground();
+                // 连续切歌防抖已超过 3 秒未实际执行，在后台异步修剪一次
+                TrimBackground(force: false);
             }
 
             s_trimCts?.Cancel();
@@ -44,7 +49,7 @@ public static partial class MemoryManager
                     await Task.Delay(delayMs, ct).ConfigureAwait(false);
                     if (ct.IsCancellationRequested) return;
 
-                    TrimNow();
+                    TrimNow(force: false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -59,21 +64,40 @@ public static partial class MemoryManager
     }
 
     /// <summary>
-    /// 在后台线程立即执行一次非阻塞的内存收敛与页归还
+    /// 在后台线程执行一次非阻塞的内存收敛与页归还。
     /// </summary>
-    public static void TrimBackground()
+    /// <param name="force">是否绕过增量水位检查强制修剪，默认 false。</param>
+    public static void TrimBackground(bool force = false)
     {
-        _ = Task.Run(TrimNow);
+        _ = Task.Run(() => TrimNow(force));
     }
 
     /// <summary>
-    /// 立即执行一次非阻塞的内存收敛与页归还
+    /// 执行一次非阻塞的内存收敛与页归还。
     /// </summary>
-    public static void TrimNow()
+    /// <param name="force">是否绕过增量水位检查强制修剪，默认 true。</param>
+    public static void TrimNow(bool force = true)
     {
         try
         {
-            s_lastTrimTick = Environment.TickCount64;
+            long nowTick = Environment.TickCount64;
+            long currentAllocated = GC.GetTotalAllocatedBytes();
+            long currentWorkingSet = Environment.WorkingSet;
+
+            if (!force && s_lastTrimTick > 0)
+            {
+                long managedDelta = currentAllocated - s_lastAllocatedBytes;
+                long workingSetDelta = currentWorkingSet - s_lastWorkingSetBytes;
+
+                if (managedDelta < ManagedGrowthThreshold && workingSetDelta < WorkingSetGrowthThreshold)
+                {
+                    return;
+                }
+            }
+
+            s_lastTrimTick = nowTick;
+            s_lastAllocatedBytes = currentAllocated;
+            s_lastWorkingSetBytes = currentWorkingSet;
 
             // 1. 触发包含 Gen 2 / LOH (大对象堆) 的强制非阻塞回收，及时释放解压图片与音频元数据字节块
             GC.Collect(2, GCCollectionMode.Forced, blocking: false, compacting: false);
