@@ -76,7 +76,7 @@ public static class ListeningFootprintCacheService
     {
         if (!UserSession.Current.IsLoggedIn)
         {
-            return new ListeningReportData(period, date ?? "", "", 0L, 0, 0, 0, 0, [], [], [], []);
+            return new ListeningReportData(period, date ?? "", "", 0L, 0, 0, 0, 0, [], [], [], [], [], []);
         }
 
         string dateKey = !string.IsNullOrWhiteSpace(date) ? date : "latest";
