@@ -38,9 +38,9 @@ public sealed class ListeningFootprintView : FrameView
     private string? _currentDateKey;
     private ListeningReportData? _currentData;
     private readonly List<ListeningRankSong> _rankSongs = [];
+    private long _lastNavTick;
 
     public event Func<Song, Task>? SongAccepted;
-    public event Action<Song>? SongLikedToggle;
     public event Action<bool>? TabNavigationRequested;
 
     public ListeningFootprintView()
@@ -62,10 +62,10 @@ public sealed class ListeningFootprintView : FrameView
             CanFocus = false
         };
 
-        _tabDayLabel = new Label { Text = "[ 日 ]", X = 1, Y = 0 };
-        _tabWeekLabel = new Label { Text = " 周 ", X = 8, Y = 0 };
-        _tabMonthLabel = new Label { Text = " 月 ", X = 13, Y = 0 };
-        _tabYearLabel = new Label { Text = " 年 ", X = 18, Y = 0 };
+        _tabDayLabel = new Label { Text = "[1]日", X = 1, Y = 0 };
+        _tabWeekLabel = new Label { Text = "[2]周", X = 6, Y = 0 };
+        _tabMonthLabel = new Label { Text = "[3]月", X = 11, Y = 0 };
+        _tabYearLabel = new Label { Text = "[4]年", X = 16, Y = 0 };
 
         _dateNavigatorLabel = new Label
         {
@@ -74,10 +74,11 @@ public sealed class ListeningFootprintView : FrameView
             Y = 0
         };
 
+        UpdateTabStyles();
         _headerBar.Add(_tabDayLabel, _tabWeekLabel, _tabMonthLabel, _tabYearLabel, _dateNavigatorLabel);
         _headerBar.MouseEvent += (sender, m) =>
         {
-            if (!m.Flags.HasFlag(MouseFlags.LeftButtonClicked) && !m.Flags.HasFlag(MouseFlags.LeftButtonPressed))
+            if (m.Flags != MouseFlags.LeftButtonClicked)
             {
                 return;
             }
@@ -89,15 +90,15 @@ public sealed class ListeningFootprintView : FrameView
             {
                 _ = LoadFootprintAsync(ListeningReportPeriod.Day, null, forceRefresh: false);
             }
-            else if (x is >= 7 and <= 11)
+            else if (x is >= 6 and <= 10)
             {
                 _ = LoadFootprintAsync(ListeningReportPeriod.Week, null, forceRefresh: false);
             }
-            else if (x is >= 12 and <= 16)
+            else if (x is >= 11 and <= 15)
             {
                 _ = LoadFootprintAsync(ListeningReportPeriod.Month, null, forceRefresh: false);
             }
-            else if (x is >= 17 and <= 21)
+            else if (x is >= 16 and <= 20)
             {
                 _ = LoadFootprintAsync(ListeningReportPeriod.Year, null, forceRefresh: false);
             }
@@ -174,12 +175,12 @@ public sealed class ListeningFootprintView : FrameView
         // 4. 单曲收听排行榜列表
         _rankingFrame = new FrameView
         {
-            Title = "单曲收听排行 (Enter 点播 / Space 收藏)",
+            Title = "单曲收听排行",
             X = 0,
             Y = Pos.Bottom(_singersFrame),
             Width = Dim.Fill(),
             Height = Dim.Fill(),
-            CanFocus = true
+            CanFocus = false
         };
 
         _rankingListView = new ListView
@@ -202,17 +203,6 @@ public sealed class ListeningFootprintView : FrameView
             {
                 k.Handled = true;
                 TabNavigationRequested?.Invoke(!k.IsShift);
-                return;
-            }
-
-            if (k == Key.Space)
-            {
-                var idx = _rankingListView.SelectedItem ?? 0;
-                if (idx >= 0 && idx < _rankSongs.Count)
-                {
-                    SongLikedToggle?.Invoke(_rankSongs[idx].Song);
-                    k.Handled = true;
-                }
                 return;
             }
 
@@ -291,10 +281,10 @@ public sealed class ListeningFootprintView : FrameView
 
     private void UpdateTabStyles()
     {
-        _tabDayLabel.Text = _currentPeriod == ListeningReportPeriod.Day ? "[ 日 ]" : "  日  ";
-        _tabWeekLabel.Text = _currentPeriod == ListeningReportPeriod.Week ? "[ 周 ]" : "  周  ";
-        _tabMonthLabel.Text = _currentPeriod == ListeningReportPeriod.Month ? "[ 月 ]" : "  月  ";
-        _tabYearLabel.Text = _currentPeriod == ListeningReportPeriod.Year ? "[ 年 ]" : "  年  ";
+        _tabDayLabel.Text = "[1]日";
+        _tabWeekLabel.Text = "[2]周";
+        _tabMonthLabel.Text = "[3]月";
+        _tabYearLabel.Text = "[4]年";
 
         _tabDayLabel.SetScheme(_currentPeriod == ListeningReportPeriod.Day ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
         _tabWeekLabel.SetScheme(_currentPeriod == ListeningReportPeriod.Week ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
@@ -431,7 +421,7 @@ public sealed class ListeningFootprintView : FrameView
             ListeningReportPeriod.Year => "本年单曲收听排行",
             _ => "单曲收听排行"
         };
-        _rankingFrame.Title = $"{periodRankTitle} (共 {_rankSongs.Count} 首，Enter 点播 / Space 收藏)";
+        _rankingFrame.Title = $"{periodRankTitle} (共 {_rankSongs.Count} 首)";
     }
 
     private static string FormatTrendText(ListeningReportPeriod period, int percent, int upOrDown)
@@ -703,6 +693,10 @@ public sealed class ListeningFootprintView : FrameView
 
     private async Task NavigateDateRelativeAsync(int delta)
     {
+        long now = Environment.TickCount64;
+        if (now - _lastNavTick < 250) return;
+        _lastNavTick = now;
+
         if (_currentData == null) return;
 
         var dates = _currentData.AvailableDates;
@@ -751,12 +745,16 @@ public sealed class ListeningFootprintView : FrameView
             _ = SwitchPeriodFromKeyAsync(ListeningReportPeriod.Year);
             return true;
         }
-        if (k.AsRune.Value == '<' || k.AsRune.Value == '[')
+
+        bool isPrev = k.AsRune.Value == '<' || k.AsRune.Value == ',' || k.AsRune.Value == '[';
+        bool isNext = k.AsRune.Value == '>' || k.AsRune.Value == '.' || k.AsRune.Value == ']';
+
+        if (isPrev)
         {
             _ = NavigateDateFromKeyAsync(-1);
             return true;
         }
-        if (k.AsRune.Value == '>' || k.AsRune.Value == ']')
+        if (isNext)
         {
             _ = NavigateDateFromKeyAsync(1);
             return true;

@@ -288,6 +288,15 @@ public sealed partial class MainWindow
 
         char c = char.ToUpperInvariant((char)k.AsRune.Value);
 
+        if (_currentViewMode == ViewMode.ListeningFootprint && !_isSearchActive && !_searchField.HasFocus)
+        {
+            if (_footprintView.HandleFootprintShortcut(k))
+            {
+                k.Handled = true;
+                return;
+            }
+        }
+
         if (!_isSearchActive && !_searchField.HasFocus)
         {
             if ((k == Key.D1 || c == '1') && _searchSongsBtn.Visible)
@@ -306,15 +315,6 @@ public sealed partial class MainWindow
             {
                 k.Handled = true;
                 await OnContextAction3Async();
-                return;
-            }
-        }
-
-        if (_currentViewMode == ViewMode.ListeningFootprint && !_isSearchActive && !_searchField.HasFocus)
-        {
-            if (_footprintView.HandleFootprintShortcut(k))
-            {
-                k.Handled = true;
                 return;
             }
         }
