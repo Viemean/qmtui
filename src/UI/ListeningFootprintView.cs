@@ -318,7 +318,8 @@ public sealed class ListeningFootprintView : FrameView
             sbSummary.AppendLine(FormatDuration(report.ListenTimeSec));
             if (report.ActiveHour >= 0)
             {
-                sbSummary.AppendLine($"最活跃时段: {report.ActiveHour:D2}:00");
+                sbSummary.AppendLine("最活跃时段:");
+                sbSummary.AppendLine($"{report.ActiveHour:D2}:00");
             }
         }
         else if (report.Period == ListeningReportPeriod.Week)
@@ -437,22 +438,13 @@ public sealed class ListeningFootprintView : FrameView
     {
         if (period == ListeningReportPeriod.Year) return "";
 
-        if (percent <= 0 && upOrDown == 0)
-        {
-            return period switch
-            {
-                ListeningReportPeriod.Week => "本周日均听歌时长与上周持平",
-                ListeningReportPeriod.Month => "相比上月持平",
-                _ => ""
-            };
-        }
+        string sign = upOrDown >= 0 ? "+" : "-";
+        string pctStr = percent > 0 ? $"{sign}{percent}%" : "0%";
 
-        string action = upOrDown >= 0 ? "增加" : "减少";
-        string weekAction = upOrDown >= 0 ? "多" : "少";
         return period switch
         {
-            ListeningReportPeriod.Week => $"本周日均听歌时长比上周{weekAction} {percent}%",
-            ListeningReportPeriod.Month => $"相比上月{action} {percent}%",
+            ListeningReportPeriod.Week => $"相比上周:\n{pctStr}",
+            ListeningReportPeriod.Month => $"相比上月:\n{pctStr}",
             _ => ""
         };
     }
@@ -502,16 +494,32 @@ public sealed class ListeningFootprintView : FrameView
         if (period == ListeningReportPeriod.Day)
         {
             sb.AppendLine("24小时听歌走势分布:");
-            var barLine = new StringBuilder();
-            for (int i = 0; i < points.Count && i < 24; i++)
+            var topBarLine = new StringBuilder();
+            var botBarLine = new StringBuilder();
+            for (int i = 0; i < 24; i++)
             {
-                long v = points[i].Value;
-                int barIdx = maxVal > 0 ? (int)(v * 8 / maxVal) : 0;
-                barIdx = Math.Clamp(barIdx, 0, 8);
-                barLine.Append(bars[barIdx]);
+                long v = i < points.Count ? points[i].Value : 0;
+                int totalIdx = maxVal > 0 ? (int)Math.Round((double)v * 16 / maxVal) : 0;
+                totalIdx = Math.Clamp(totalIdx, 0, 16);
+                if (totalIdx > 8)
+                {
+                    topBarLine.Append(bars[totalIdx - 8]);
+                    botBarLine.Append('█');
+                }
+                else if (totalIdx > 0)
+                {
+                    topBarLine.Append(' ');
+                    botBarLine.Append(bars[totalIdx]);
+                }
+                else
+                {
+                    topBarLine.Append(' ');
+                    botBarLine.Append(' ');
+                }
             }
-            sb.AppendLine(barLine.ToString());
-            sb.AppendLine("00:00   06:00   12:00   18:00   23:00");
+            sb.AppendLine(topBarLine.ToString());
+            sb.AppendLine(botBarLine.ToString());
+            sb.AppendLine("00    06    12    18   23");
         }
         else if (period == ListeningReportPeriod.Week)
         {
