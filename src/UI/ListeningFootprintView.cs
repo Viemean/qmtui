@@ -13,18 +13,16 @@ using QmTui.Services;
 namespace QmTui.UI;
 
 /// <summary>
-/// 听歌足迹视图组件。
+/// 听歌足迹视图组件（方案 A：上下流式分层布局，指标概览 + 走势字符图 + 歌手占比 + 单曲收听排行榜）。
 /// </summary>
 public sealed class ListeningFootprintView : FrameView
 {
     private readonly View _headerBar;
-    private readonly Button _tabDayBtn;
-    private readonly Button _tabWeekBtn;
-    private readonly Button _tabMonthBtn;
-    private readonly Button _tabYearBtn;
-    private readonly Button _datePrevBtn;
-    private readonly Label _dateLabel;
-    private readonly Button _dateNextBtn;
+    private readonly Label _tabDayLabel;
+    private readonly Label _tabWeekLabel;
+    private readonly Label _tabMonthLabel;
+    private readonly Label _tabYearLabel;
+    private readonly Label _dateNavigatorLabel;
 
     private readonly FrameView _statsFrame;
     private readonly Label _summaryLabel;
@@ -40,10 +38,9 @@ public sealed class ListeningFootprintView : FrameView
     private string? _currentDateKey;
     private ListeningReportData? _currentData;
     private readonly List<ListeningRankSong> _rankSongs = [];
-    private long _lastNavTick;
-    private int _lastRenderedWidth = -1;
 
     public event Func<Song, Task>? SongAccepted;
+    public event Action<Song>? SongLikedToggle;
     public event Action<bool>? TabNavigationRequested;
 
     public ListeningFootprintView()
@@ -65,107 +62,58 @@ public sealed class ListeningFootprintView : FrameView
             CanFocus = false
         };
 
-        _tabDayBtn = new Button
+        _tabDayLabel = new Label { Text = "[ 日 ]", X = 1, Y = 0 };
+        _tabWeekLabel = new Label { Text = " 周 ", X = 8, Y = 0 };
+        _tabMonthLabel = new Label { Text = " 月 ", X = 13, Y = 0 };
+        _tabYearLabel = new Label { Text = " 年 ", X = 18, Y = 0 };
+
+        _dateNavigatorLabel = new Label
         {
-            Text = "[1]日",
-            NoDecorations = true,
-            ShadowStyle = ShadowStyles.None,
-            X = 1,
-            Y = 0,
-            CanFocus = true
+            Text = "[<] 载入中... [>]",
+            X = Pos.AnchorEnd(32),
+            Y = 0
         };
-        _tabDayBtn.KeyBindings.Remove(Key.Space);
-        _tabDayBtn.Accepting += async (s, e) => await LoadFootprintAsync(ListeningReportPeriod.Day, null, forceRefresh: false);
-        _tabDayBtn.KeyDown += (s, k) =>
+
+        _headerBar.Add(_tabDayLabel, _tabWeekLabel, _tabMonthLabel, _tabYearLabel, _dateNavigatorLabel);
+        _headerBar.MouseEvent += (sender, m) =>
         {
-            if (k == Key.Tab.WithShift || (k == Key.Tab && k.IsShift))
+            if (!m.Flags.HasFlag(MouseFlags.LeftButtonClicked) && !m.Flags.HasFlag(MouseFlags.LeftButtonPressed))
             {
-                k.Handled = true;
-                TabNavigationRequested?.Invoke(false);
+                return;
+            }
+
+            int x = m.Position?.X ?? -1;
+            if (x < 0) return;
+
+            if (x is >= 1 and <= 5)
+            {
+                _ = LoadFootprintAsync(ListeningReportPeriod.Day, null, forceRefresh: false);
+            }
+            else if (x is >= 7 and <= 11)
+            {
+                _ = LoadFootprintAsync(ListeningReportPeriod.Week, null, forceRefresh: false);
+            }
+            else if (x is >= 12 and <= 16)
+            {
+                _ = LoadFootprintAsync(ListeningReportPeriod.Month, null, forceRefresh: false);
+            }
+            else if (x is >= 17 and <= 21)
+            {
+                _ = LoadFootprintAsync(ListeningReportPeriod.Year, null, forceRefresh: false);
+            }
+            else
+            {
+                int navLeft = _dateNavigatorLabel.Frame.X;
+                if (x >= navLeft && x <= navLeft + 4)
+                {
+                    _ = NavigateDateRelativeAsync(-1);
+                }
+                else if (x >= navLeft + _dateNavigatorLabel.Frame.Width - 4)
+                {
+                    _ = NavigateDateRelativeAsync(1);
+                }
             }
         };
-
-        _tabWeekBtn = new Button
-        {
-            Text = "[2]周",
-            NoDecorations = true,
-            ShadowStyle = ShadowStyles.None,
-            X = Pos.Right(_tabDayBtn) + 1,
-            Y = 0,
-            CanFocus = true
-        };
-        _tabWeekBtn.KeyBindings.Remove(Key.Space);
-        _tabWeekBtn.Accepting += async (s, e) => await LoadFootprintAsync(ListeningReportPeriod.Week, null, forceRefresh: false);
-
-        _tabMonthBtn = new Button
-        {
-            Text = "[3]月",
-            NoDecorations = true,
-            ShadowStyle = ShadowStyles.None,
-            X = Pos.Right(_tabWeekBtn) + 1,
-            Y = 0,
-            CanFocus = true
-        };
-        _tabMonthBtn.KeyBindings.Remove(Key.Space);
-        _tabMonthBtn.Accepting += async (s, e) => await LoadFootprintAsync(ListeningReportPeriod.Month, null, forceRefresh: false);
-
-        _tabYearBtn = new Button
-        {
-            Text = "[4]年",
-            NoDecorations = true,
-            ShadowStyle = ShadowStyles.None,
-            X = Pos.Right(_tabMonthBtn) + 1,
-            Y = 0,
-            CanFocus = true
-        };
-        _tabYearBtn.KeyBindings.Remove(Key.Space);
-        _tabYearBtn.Accepting += async (s, e) => await LoadFootprintAsync(ListeningReportPeriod.Year, null, forceRefresh: false);
-
-        _datePrevBtn = new Button
-        {
-            Text = "[<]",
-            NoDecorations = true,
-            ShadowStyle = ShadowStyles.None,
-            X = Pos.AnchorEnd(26),
-            Y = 0,
-            CanFocus = true
-        };
-        _datePrevBtn.KeyBindings.Remove(Key.Space);
-        _datePrevBtn.SetScheme(MikuTheme.SearchCategoryActive);
-        _datePrevBtn.Accepting += async (s, e) => await NavigateDateRelativeAsync(-1);
-
-        _dateLabel = new Label
-        {
-            Text = "载入中...",
-            X = Pos.Right(_datePrevBtn) + 1,
-            Y = 0,
-            Width = 16,
-            TextAlignment = Alignment.Center,
-            CanFocus = false
-        };
-
-        _dateNextBtn = new Button
-        {
-            Text = "[>]",
-            NoDecorations = true,
-            ShadowStyle = ShadowStyles.None,
-            X = Pos.Right(_dateLabel) + 1,
-            Y = 0,
-            CanFocus = true
-        };
-        _dateNextBtn.KeyBindings.Remove(Key.Space);
-        _dateNextBtn.SetScheme(MikuTheme.SearchCategoryActive);
-        _dateNextBtn.Accepting += async (s, e) => await NavigateDateRelativeAsync(1);
-        _dateNextBtn.KeyDown += (s, k) =>
-        {
-            if (k == Key.Tab && !k.IsShift)
-            {
-                k.Handled = true;
-                _rankingListView?.SetFocus();
-            }
-        };
-
-        _headerBar.Add(_tabDayBtn, _tabWeekBtn, _tabMonthBtn, _tabYearBtn, _datePrevBtn, _dateLabel, _dateNextBtn);
         Add(_headerBar);
 
         // 2. 统计概览面板（核心收听时长、活跃时段与 Unicode 字符图表）
@@ -184,7 +132,7 @@ public sealed class ListeningFootprintView : FrameView
             Text = "正在从云端同步听歌足迹数据...",
             X = 1,
             Y = 0,
-            Width = Dim.Percent(40),
+            Width = 26,
             Height = Dim.Fill()
         };
 
@@ -226,7 +174,7 @@ public sealed class ListeningFootprintView : FrameView
         // 4. 单曲收听排行榜列表
         _rankingFrame = new FrameView
         {
-            Title = "单曲收听排行 (Enter 点播)",
+            Title = "单曲收听排行 (Enter 点播 / Space 收藏)",
             X = 0,
             Y = Pos.Bottom(_singersFrame),
             Width = Dim.Fill(),
@@ -253,26 +201,21 @@ public sealed class ListeningFootprintView : FrameView
             if (k == Key.Tab || k.AsRune.Value == '\t' || k.ToString().Contains("Tab"))
             {
                 k.Handled = true;
-                if (k.IsShift)
-                {
-                    _dateNextBtn.SetFocus();
-                }
-                else
-                {
-                    TabNavigationRequested?.Invoke(true);
-                }
+                TabNavigationRequested?.Invoke(!k.IsShift);
                 return;
             }
 
-            if (HandleFootprintShortcut(k))
+            if (k == Key.Space)
             {
-                k.Handled = true;
+                var idx = _rankingListView.SelectedItem ?? 0;
+                if (idx >= 0 && idx < _rankSongs.Count)
+                {
+                    SongLikedToggle?.Invoke(_rankSongs[idx].Song);
+                    k.Handled = true;
+                }
                 return;
             }
-        };
 
-        KeyDown += (s, k) =>
-        {
             if (HandleFootprintShortcut(k))
             {
                 k.Handled = true;
@@ -295,13 +238,22 @@ public sealed class ListeningFootprintView : FrameView
         _rankingFrame.Add(_rankingListView);
         Add(_rankingFrame);
 
-        ViewportChanged += (s, e) =>
+        // 键盘快捷按键支持（左右键切换周期，快捷键调度）
+        KeyDown += (s, k) =>
         {
-            int curW = _rankingListView.Viewport.Width;
-            if (curW > 0 && curW != _lastRenderedWidth && _currentData != null)
+            if (k == Key.CursorLeft)
             {
-                _lastRenderedWidth = curW;
-                RenderReport(_currentData);
+                SwitchPeriodRelative(-1);
+                k.Handled = true;
+            }
+            else if (k == Key.CursorRight)
+            {
+                SwitchPeriodRelative(1);
+                k.Handled = true;
+            }
+            else if (HandleFootprintShortcut(k))
+            {
+                k.Handled = true;
             }
         };
     }
@@ -339,18 +291,15 @@ public sealed class ListeningFootprintView : FrameView
 
     private void UpdateTabStyles()
     {
-        _tabDayBtn.Text = "[1]日";
-        _tabWeekBtn.Text = "[2]周";
-        _tabMonthBtn.Text = "[3]月";
-        _tabYearBtn.Text = "[4]年";
+        _tabDayLabel.Text = _currentPeriod == ListeningReportPeriod.Day ? "[ 日 ]" : "  日  ";
+        _tabWeekLabel.Text = _currentPeriod == ListeningReportPeriod.Week ? "[ 周 ]" : "  周  ";
+        _tabMonthLabel.Text = _currentPeriod == ListeningReportPeriod.Month ? "[ 月 ]" : "  月  ";
+        _tabYearLabel.Text = _currentPeriod == ListeningReportPeriod.Year ? "[ 年 ]" : "  年  ";
 
-        _tabDayBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Day ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
-        _tabWeekBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Week ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
-        _tabMonthBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Month ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
-        _tabYearBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Year ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
-
-        _datePrevBtn.SetScheme(MikuTheme.SearchCategoryActive);
-        _dateNextBtn.SetScheme(MikuTheme.SearchCategoryActive);
+        _tabDayLabel.SetScheme(_currentPeriod == ListeningReportPeriod.Day ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+        _tabWeekLabel.SetScheme(_currentPeriod == ListeningReportPeriod.Week ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+        _tabMonthLabel.SetScheme(_currentPeriod == ListeningReportPeriod.Month ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+        _tabYearLabel.SetScheme(_currentPeriod == ListeningReportPeriod.Year ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
     }
 
     private void RenderReport(ListeningReportData report)
@@ -359,41 +308,57 @@ public sealed class ListeningFootprintView : FrameView
 
         // 1. 日期导航文本
         string displayDate = FormatDateKey(report.Period, report.DateKey);
-        _dateLabel.Text = displayDate;
+        _dateNavigatorLabel.Text = $"[<] {displayDate} [>]";
 
         // 2. 指标汇总
-        string timeStr = FormatDuration(report.ListenTimeSec);
         var sbSummary = new StringBuilder();
-        string periodTitle = report.Period switch
+        if (report.Period == ListeningReportPeriod.Day)
         {
-            ListeningReportPeriod.Day => "今日累计收听",
-            ListeningReportPeriod.Week => "本周日均收听",
-            ListeningReportPeriod.Month => "本月累计收听",
-            ListeningReportPeriod.Year => "年度累计收听",
-            _ => "累计收听"
-        };
-        sbSummary.AppendLine($"{periodTitle}: {timeStr}");
-        if (report.ActiveHour >= 0 && report.Period == ListeningReportPeriod.Day)
-        {
-            sbSummary.AppendLine($"最活跃时段: {report.ActiveHour:D2}:00");
+            sbSummary.AppendLine("今日听歌时长:");
+            sbSummary.AppendLine(FormatDuration(report.ListenTimeSec));
+            if (report.ActiveHour >= 0)
+            {
+                sbSummary.AppendLine($"最活跃时段: {report.ActiveHour:D2}:00");
+            }
         }
-        else if (report.Percent > 0)
+        else if (report.Period == ListeningReportPeriod.Week)
         {
-            string trend = report.UpOrDown >= 0 ? "+" : "-";
-            sbSummary.AppendLine($"环比变化: {trend}{report.Percent}%");
+            sbSummary.AppendLine("本周日均听歌时长:");
+            sbSummary.AppendLine(FormatDuration(report.ListenTimeSec));
+            string trendText = FormatTrendText(report.Period, report.Percent, report.UpOrDown);
+            if (!string.IsNullOrEmpty(trendText))
+            {
+                sbSummary.AppendLine(trendText);
+            }
+        }
+        else if (report.Period == ListeningReportPeriod.Month)
+        {
+            string monthLabel = report.DateKey.Length == 6 && int.TryParse(report.DateKey[4..6], out var mNum)
+                ? $"{mNum}月听歌首数:"
+                : "本月听歌首数:";
+            sbSummary.AppendLine(monthLabel);
+            sbSummary.AppendLine($"{report.ListenCnt} 首");
+            string trendText = FormatTrendText(report.Period, report.Percent, report.UpOrDown);
+            if (!string.IsNullOrEmpty(trendText))
+            {
+                sbSummary.AppendLine(trendText);
+            }
+        }
+        else if (report.Period == ListeningReportPeriod.Year)
+        {
+            sbSummary.AppendLine("年度听歌时长:");
+            sbSummary.AppendLine(FormatDuration(report.ListenTimeSec));
+            if (report.ListenCnt > 0)
+            {
+                sbSummary.AppendLine($"{report.ListenCnt} 首");
+            }
         }
         _summaryLabel.Text = sbSummary.ToString().TrimEnd();
 
         // 3. 走势字符图表（Unicode 柱状字符）
-        _chartLabel.Text = BuildAsciiChart(report.Period, report.ChartPoints);
+        _chartLabel.Text = BuildAsciiChart(report.Period, report.DateKey, report.ChartPoints);
 
-        // 4. 常听歌手分布条
-        _singersLabel.Text = BuildSingersBar(report.TopSingers);
-
-        // 5. 单曲收听排行榜
-        _rankSongs.Clear();
-        _rankSongs.AddRange(report.RankSongs);
-
+        // 4. 计算可用宽度
         int viewWidth = _rankingListView.Viewport.Width;
         if (viewWidth <= 0)
         {
@@ -401,9 +366,34 @@ public sealed class ListeningFootprintView : FrameView
             viewWidth = curW > 0 ? curW - 2 : 72;
         }
 
-        int countColW = 6;
+        // 5. 常听歌手分布条 / 高光时刻 / 每月最爱歌曲
+        if (report.Period == ListeningReportPeriod.Year)
+        {
+            _singersFrame.Title = "每月最爱歌曲";
+            _singersFrame.Height = 14;
+            _singersLabel.Text = BuildFavoriteSongsOfMonth(report.FavoriteSongsOfMonth, viewWidth);
+        }
+        else if (report.Period == ListeningReportPeriod.Month && report.HighLights.Count > 0)
+        {
+            _singersFrame.Title = "本月高光时刻";
+            _singersFrame.Height = report.HighLights.Count >= 4 ? 6 : 5;
+            _singersLabel.Text = BuildHighLightsBar(report.HighLights);
+        }
+        else
+        {
+            _singersFrame.Title = "常听歌手分布";
+            _singersFrame.Height = 5;
+            _singersLabel.Text = BuildSingersBar(report.TopSingers);
+        }
+
+        // 6. 单曲收听排行榜
+        _rankSongs.Clear();
+        _rankSongs.AddRange(report.RankSongs);
+
+        bool isYear = report.Period == ListeningReportPeriod.Year;
+        int countColW = isYear ? 0 : 6;
         int indexColW = 4;
-        int remain = Math.Max(24, viewWidth - indexColW - countColW - 6);
+        int remain = Math.Max(24, viewWidth - indexColW - countColW - (isYear ? 4 : 6));
         int titleW = Math.Max(14, (int)Math.Round(remain * 0.58));
         int artistW = Math.Max(10, remain - titleW);
 
@@ -415,8 +405,15 @@ public sealed class ListeningFootprintView : FrameView
             string idxStr = $"{i + 1,2}. ";
             string titleStr = SongListView.TruncateAndPadWide(s.Title, titleW);
             string artistStr = SongListView.TruncateAndPadWide(s.Artist, artistW);
-            string countStr = $"{item.ListenCnt}次";
-            listItems.Add($"{idxStr}{titleStr}  {artistStr}  {countStr}");
+            if (isYear)
+            {
+                listItems.Add($"{idxStr}{titleStr}  {artistStr}");
+            }
+            else
+            {
+                string countStr = $"{item.ListenCnt}次";
+                listItems.Add($"{idxStr}{titleStr}  {artistStr}  {countStr}");
+            }
         }
 
         if (listItems.Count == 0)
@@ -425,7 +422,39 @@ public sealed class ListeningFootprintView : FrameView
         }
 
         _rankingListView.SetSource(new ObservableCollection<string>(listItems));
-        _rankingFrame.Title = $"单曲收听排行 (共 {_rankSongs.Count} 首，Enter 点播)";
+        string periodRankTitle = report.Period switch
+        {
+            ListeningReportPeriod.Day => "本日单曲收听排行",
+            ListeningReportPeriod.Week => "本周单曲收听排行",
+            ListeningReportPeriod.Month => "本月单曲收听排行",
+            ListeningReportPeriod.Year => "本年单曲收听排行",
+            _ => "单曲收听排行"
+        };
+        _rankingFrame.Title = $"{periodRankTitle} (共 {_rankSongs.Count} 首，Enter 点播 / Space 收藏)";
+    }
+
+    private static string FormatTrendText(ListeningReportPeriod period, int percent, int upOrDown)
+    {
+        if (period == ListeningReportPeriod.Year) return "";
+
+        if (percent <= 0 && upOrDown == 0)
+        {
+            return period switch
+            {
+                ListeningReportPeriod.Week => "本周日均听歌时长与上周持平",
+                ListeningReportPeriod.Month => "相比上月持平",
+                _ => ""
+            };
+        }
+
+        string action = upOrDown >= 0 ? "增加" : "减少";
+        string weekAction = upOrDown >= 0 ? "多" : "少";
+        return period switch
+        {
+            ListeningReportPeriod.Week => $"本周日均听歌时长比上周{weekAction} {percent}%",
+            ListeningReportPeriod.Month => $"相比上月{action} {percent}%",
+            _ => ""
+        };
     }
 
     private static string FormatDuration(long sec)
@@ -458,7 +487,7 @@ public sealed class ListeningFootprintView : FrameView
         };
     }
 
-    private static string BuildAsciiChart(ListeningReportPeriod period, IReadOnlyList<ListeningChartPoint> points)
+    private static string BuildAsciiChart(ListeningReportPeriod period, string dateKey, IReadOnlyList<ListeningChartPoint> points)
     {
         if (points.Count == 0) return "暂无时段走势分布数据";
 
@@ -484,6 +513,79 @@ public sealed class ListeningFootprintView : FrameView
             sb.AppendLine(barLine.ToString());
             sb.AppendLine("00:00   06:00   12:00   18:00   23:00");
         }
+        else if (period == ListeningReportPeriod.Week)
+        {
+            sb.AppendLine("本周听歌走势分布:");
+            var barLine = new StringBuilder();
+            var weekDayLine = new StringBuilder();
+            var dateNumLine = new StringBuilder();
+
+            string[] weekDays = ["日", "一", "二", "三", "四", "五", "六"];
+
+            DateTime baseDate = DateTime.TryParseExact(dateKey, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var parsedDt)
+                ? parsedDt
+                : DateTime.Today;
+
+            for (int i = 0; i < 7; i++)
+            {
+                long v = i < points.Count ? points[i].Value : 0;
+                int barIdx = maxVal > 0 ? (int)(v * 8 / maxVal) : 0;
+                barIdx = Math.Clamp(barIdx, 0, 8);
+                barLine.Append($"  {bars[barIdx]} ");
+
+                weekDayLine.Append($" {weekDays[i]} ");
+
+                DateTime dayDt = baseDate.AddDays(i - (int)baseDate.DayOfWeek);
+                dateNumLine.Append($" {dayDt.Day,2} ");
+            }
+
+            sb.AppendLine(barLine.ToString());
+            sb.AppendLine(weekDayLine.ToString());
+            sb.AppendLine(dateNumLine.ToString());
+        }
+        else if (period == ListeningReportPeriod.Month)
+        {
+            sb.AppendLine("近6个月听歌首数走势:");
+            var barLine = new StringBuilder();
+            var monthLine = new StringBuilder();
+            var valLine = new StringBuilder();
+
+            const int cellW = 5;
+            foreach (var p in points)
+            {
+                int barIdx = maxVal > 0 ? (int)(p.Value * 8 / maxVal) : 0;
+                if (p.Value > 0 && barIdx == 0) barIdx = 1;
+                barIdx = Math.Clamp(barIdx, 0, 8);
+
+                barLine.Append(PadToColumns($"  {bars[barIdx]}", cellW));
+                monthLine.Append(PadToColumns($" {p.Text}", cellW));
+                valLine.Append(PadToColumns($"{p.Value,4}", cellW));
+            }
+
+            sb.AppendLine(barLine.ToString().TrimEnd());
+            sb.AppendLine(monthLine.ToString().TrimEnd());
+            sb.AppendLine(valLine.ToString().TrimEnd());
+        }
+        else if (period == ListeningReportPeriod.Year)
+        {
+            sb.AppendLine("近5年听歌走势:");
+            var barLine = new StringBuilder();
+            var yearLine = new StringBuilder();
+
+            const int cellW = 6;
+            foreach (var p in points)
+            {
+                int barIdx = maxVal > 0 ? (int)(p.Value * 8 / maxVal) : 0;
+                if (p.Value > 0 && barIdx == 0) barIdx = 1;
+                barIdx = Math.Clamp(barIdx, 0, 8);
+
+                barLine.Append(PadToColumns($"  {bars[barIdx]}", cellW));
+                yearLine.Append(PadToColumns($" {p.Text}", cellW));
+            }
+
+            sb.AppendLine(barLine.ToString().TrimEnd());
+            sb.AppendLine(yearLine.ToString().TrimEnd());
+        }
         else
         {
             sb.AppendLine("周期走势点位分布:");
@@ -498,6 +600,24 @@ public sealed class ListeningFootprintView : FrameView
         }
 
         return sb.ToString().TrimEnd();
+    }
+
+    private static int GetDisplayColumns(string s)
+    {
+        int cols = 0;
+        foreach (var r in s.EnumerateRunes())
+        {
+            cols += r.GetColumns();
+        }
+        return cols;
+    }
+
+    private static string PadToColumns(string s, int targetCols, bool rightAlign = false)
+    {
+        int curCols = GetDisplayColumns(s);
+        if (curCols >= targetCols) return s;
+        int diff = targetCols - curCols;
+        return rightAlign ? new string(' ', diff) + s : s + new string(' ', diff);
     }
 
     private static string BuildSingersBar(IReadOnlyList<ListeningSingerStat> singers)
@@ -529,12 +649,52 @@ public sealed class ListeningFootprintView : FrameView
         return sb.ToString().TrimEnd();
     }
 
+    private static string BuildFavoriteSongsOfMonth(IReadOnlyList<ListeningMonthFavoriteSong> songs, int viewWidth)
+    {
+        if (songs.Count == 0) return "当前年份暂无每月最爱歌曲记录";
+
+        if (viewWidth <= 0) viewWidth = 72;
+        int monthColW = 6;
+        int remain = Math.Max(24, viewWidth - monthColW - 4);
+        int titleW = Math.Max(14, (int)Math.Round(remain * 0.58));
+        int artistW = Math.Max(10, remain - titleW);
+
+        var sb = new StringBuilder();
+        foreach (var item in songs)
+        {
+            string mLabel = $"{item.Month,2}月. ";
+            string titleStr = SongListView.TruncateAndPadWide(item.Song.Title, titleW);
+            string artistStr = SongListView.TruncateAndPadWide(item.Song.Artist, artistW);
+            sb.AppendLine($"{mLabel}{titleStr}  {artistStr}");
+        }
+        return sb.ToString().TrimEnd();
+    }
+
+    private static string BuildHighLightsBar(IReadOnlyList<ListeningHighlight> highlights)
+    {
+        if (highlights.Count == 0) return "当前周期暂无高光时刻记录";
+
+        var sb = new StringBuilder();
+        int maxItems = Math.Min(4, highlights.Count);
+        for (int i = 0; i < maxItems; i++)
+        {
+            var h = highlights[i];
+            string detail = !string.IsNullOrWhiteSpace(h.Tips) ? $" ({h.Tips})" : "";
+            sb.AppendLine($"#{i + 1} {h.Title}: {h.Subtitle}{detail}");
+        }
+        return sb.ToString().TrimEnd();
+    }
+
+    private void SwitchPeriodRelative(int delta)
+    {
+        int p = (int)_currentPeriod + delta;
+        if (p < 1) p = 4;
+        if (p > 4) p = 1;
+        _ = LoadFootprintAsync((ListeningReportPeriod)p, null, forceRefresh: false);
+    }
+
     private async Task NavigateDateRelativeAsync(int delta)
     {
-        long now = Environment.TickCount64;
-        if (now - _lastNavTick < 250) return;
-        _lastNavTick = now;
-
         if (_currentData == null) return;
 
         var dates = _currentData.AvailableDates;
@@ -583,12 +743,12 @@ public sealed class ListeningFootprintView : FrameView
             _ = SwitchPeriodFromKeyAsync(ListeningReportPeriod.Year);
             return true;
         }
-        if (k.AsRune.Value == '<')
+        if (k.AsRune.Value == '<' || k.AsRune.Value == '[')
         {
             _ = NavigateDateFromKeyAsync(-1);
             return true;
         }
-        if (k.AsRune.Value == '>')
+        if (k.AsRune.Value == '>' || k.AsRune.Value == ']')
         {
             _ = NavigateDateFromKeyAsync(1);
             return true;
