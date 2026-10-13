@@ -112,8 +112,22 @@ public sealed class UserSession
 
             Current = session;
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Warn("UserSession", $"会话配置文件加载失败: {ex.Message}");
+            try
+            {
+                if (File.Exists(s_configPath))
+                {
+                    var backupPath = $"{s_configPath}.corrupt.{DateTime.Now:yyyyMMddHHmmss}";
+                    File.Copy(s_configPath, backupPath, overwrite: true);
+                    AppLogger.Warn("UserSession", $"已备份损坏的会话配置文件至: {backupPath}");
+                }
+            }
+            catch (Exception copyEx)
+            {
+                AppLogger.Debug("UserSession", $"备份损坏会话文件失败: {copyEx.Message}");
+            }
             Current = new UserSession();
         }
     }
@@ -263,8 +277,9 @@ public sealed class UserSession
                 File.Delete(s_configPath);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("UserSession", $"删除会话配置文件失败: {ex.Message}");
         }
     }
 

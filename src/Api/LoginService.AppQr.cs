@@ -181,7 +181,11 @@ public sealed partial class LoginService
             payload = packet[offset..];
             return !string.IsNullOrEmpty(type);
         }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("LoginService", $"官方协议包体解析失败: {ex.Message}");
+            return false;
+        }
     }
 
     private static bool ReadLoginCookies(byte[] payload, out string musicId, out string token)
@@ -196,7 +200,11 @@ public sealed partial class LoginService
             if (cookies.TryGetProperty("qqmusic_key", out var key) && key.TryGetProperty("value", out var kv)) token = kv.GetString() ?? "";
             return !string.IsNullOrEmpty(musicId) && !string.IsNullOrEmpty(token);
         }
-        catch (JsonException) { return false; }
+        catch (JsonException ex)
+        {
+            AppLogger.Debug("LoginService", $"登录凭据 JSON 解析失败: {ex.Message}");
+            return false;
+        }
     }
 
     private static async Task<bool> ExchangeOfficialCredentialAsync(string qrId, string musicId, string token, CancellationToken ct)

@@ -19,8 +19,9 @@ public static partial class LyricParser
             var bytes = Convert.FromBase64String(b64.Trim());
             return Encoding.UTF8.GetString(bytes);
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("LyricParser", $"Base64 解码失败: {ex.Message}");
             return "";
         }
     }

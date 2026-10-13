@@ -61,9 +61,9 @@ public static class AcousticRecognizeClient
             using var req = new HttpRequestMessage(HttpMethod.Head, _ep);
             using var resp = await HttpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
         }
-        catch
+        catch (Exception ex)
         {
-
+            AppLogger.Debug("AcousticRecognizeClient", $"识曲服务连接预热异常: {ex.Message}");
         }
     }
 

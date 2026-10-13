@@ -75,8 +75,9 @@ public sealed class ConnectMdnsService : IDisposable
 
             return bestIp;
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Warn("ConnectMdnsService", $"获取本机局域网 IP 异常，降级使用 127.0.0.1: {ex.Message}");
             return "127.0.0.1";
         }
     }

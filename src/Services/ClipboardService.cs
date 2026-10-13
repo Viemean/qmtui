@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using QmTui.Utils;
 
 namespace QmTui.Services;
 
@@ -116,8 +117,9 @@ public static class ClipboardService
             proc.WaitForExit(500);
             return proc.ExitCode == 0 ? output : null;
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("ClipboardService", $"调用外部剪贴板读取工具 {fileName} 失败: {ex.Message}");
             return null;
         }
     }
@@ -153,8 +155,9 @@ public static class ClipboardService
             proc.WaitForExit(1000);
             return proc.ExitCode == 0;
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("ClipboardService", $"调用外部剪贴板写入工具 {fileName} 失败: {ex.Message}");
             return false;
         }
     }

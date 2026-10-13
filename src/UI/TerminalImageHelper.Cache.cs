@@ -164,8 +164,9 @@ public static partial class TerminalImageHelper
             int height = BinaryPrimitives.ReadInt32BigEndian(buffer[20..24]);
             return width > 0 && height > 0 ? (width, height) : null;
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("TerminalImage", $"读取 PNG 尺寸异常: {ex.Message}");
             return null;
         }
     }
@@ -201,8 +202,9 @@ public static partial class TerminalImageHelper
             var tailAscii = Encoding.ASCII.GetString(tail);
             return tailAscii.Contains("IEND");
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("TerminalImage", $"校验 PNG 文件完整性异常: {ex.Message}");
             return false;
         }
     }
@@ -230,8 +232,9 @@ public static partial class TerminalImageHelper
             if (fs.Read(tail, 0, 2) < 2) return false;
             return tail[0] == 0xFF && tail[1] == 0xD9;
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("TerminalImage", $"校验 JPG 文件完整性异常: {ex.Message}");
             return false;
         }
     }
@@ -255,8 +258,9 @@ public static partial class TerminalImageHelper
             return header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F' &&
                    header[8] == 'W' && header[9] == 'E' && header[10] == 'B' && header[11] == 'P';
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("TerminalImage", $"校验 WebP 文件完整性异常: {ex.Message}");
             return false;
         }
     }

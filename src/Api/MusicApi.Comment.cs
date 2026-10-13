@@ -230,8 +230,9 @@ public sealed partial class MusicApi
                 SeqNo: seqNo
             );
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("MusicApi.Comment", $"单条评论节点解析失败: {ex.Message}");
             return null;
         }
     }
@@ -343,8 +344,9 @@ public sealed partial class MusicApi
                 IsHot: isHot
             );
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("MusicApi.Comment", $"单条旧版评论节点解析失败: {ex.Message}");
             return null;
         }
     }
