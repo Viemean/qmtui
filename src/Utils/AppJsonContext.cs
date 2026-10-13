@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using QmTui.Api;
 using QmTui.Models;
 
 namespace QmTui.Utils;
@@ -15,6 +16,7 @@ namespace QmTui.Utils;
 [JsonSerializable(typeof(FavoriteCache))]
 [JsonSerializable(typeof(List<LyricLine>))]
 [JsonSerializable(typeof(Dictionary<string, int>))]
+[JsonSerializable(typeof(ListeningReportData))]
 internal sealed partial class AppJsonContext : JsonSerializerContext
 {
 }

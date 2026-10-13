@@ -100,4 +100,338 @@ public sealed partial class MusicApi
             return null;
         }
     }
+
+    /// <summary>
+    /// 拉取指定周期（日/周/月/年）与日期的综合听歌足迹报告与排行榜单。
+    /// </summary>
+    /// <param name="period">统计周期维度。</param>
+    /// <param name="date">目标日期字符串（为空表示拉取当前最新）。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>解析后的综合报告数据对象，失败时返回兜底空数据。</returns>
+    public static async Task<ListeningReportData> GetListeningRecordReportAsync(
+        ListeningReportPeriod period = ListeningReportPeriod.Day,
+        string? date = null,
+        CancellationToken ct = default)
+    {
+        if (!UserSession.Current.IsLoggedIn)
+        {
+            return new ListeningReportData(period, date ?? "", "", 0L, 0, 0, 0, 0, [], [], [], []);
+        }
+
+        try
+        {
+            var uin = UserSession.Current.Uin;
+            var uinNum = long.TryParse(uin, out var parsedUin) ? parsedUin : 0L;
+
+            string barParam = string.IsNullOrWhiteSpace(date)
+                ? $$"""{ "type": {{(int)period}}, "optionType": 1, "version": "v2" }"""
+                : $$"""{ "type": {{(int)period}}, "date": "{{date}}", "optionType": 1, "version": "v2" }""";
+
+            string rankParam = string.IsNullOrWhiteSpace(date)
+                ? $$"""{ "type": {{(int)period}}, "version": "v2" }"""
+                : $$"""{ "type": {{(int)period}}, "date": "{{date}}", "version": "v2" }""";
+
+            var payload = $$"""
+                {
+                  "comm": {
+                    "cv": 4747474,
+                    "ct": 24,
+                    "format": "json",
+                    "inCharset": "utf-8",
+                    "outCharset": "utf-8",
+                    "notice": 0,
+                    "platform": "yqq.json",
+                    "needNewCode": 1,
+                    "uin": {{uinNum}}
+                  },
+                  "req_bar": {
+                    "module": "music.individuation.ListenReportSvr",
+                    "method": "GetBar",
+                    "param": {{barParam}}
+                  },
+                  "req_rank": {
+                    "module": "music.individuation.ListenReportSvr",
+                    "method": "GetRank",
+                    "param": {{rankParam}}
+                  }
+                }
+                """;
+
+            var responseJson = await PostMusicuAsync(payload, ct).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(responseJson);
+            var root = doc.RootElement;
+
+            var barData = root.TryGetProperty("req_bar", out var rb) && rb.TryGetProperty("data", out var bd)
+                ? bd
+                : default;
+            var rankData = root.TryGetProperty("req_rank", out var rr) && rr.TryGetProperty("data", out var rd)
+                ? rd
+                : default;
+
+            var availableDates = new List<string>();
+            if (barData.ValueKind == JsonValueKind.Object &&
+                barData.TryGetProperty("availableDates", out var adElem) &&
+                adElem.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var d in adElem.EnumerateArray())
+                {
+                    var s = d.GetString();
+                    if (!string.IsNullOrWhiteSpace(s))
+                    {
+                        availableDates.Add(s);
+                    }
+                }
+            }
+
+            string dateKey = !string.IsNullOrWhiteSpace(date)
+                ? date
+                : (availableDates.Count > 0 ? availableDates[0] : DateTime.Now.ToString("yyyyMMdd"));
+
+            long listenTimeSec = 0L;
+            int listenCnt = 0;
+            int activeHour = 0;
+            int percent = 0;
+            int upOrDown = 0;
+            string title = "";
+
+            JsonElement activePeriodObj = default;
+            if (barData.ValueKind == JsonValueKind.Object)
+            {
+                if (period == ListeningReportPeriod.Day && barData.TryGetProperty("today", out var td))
+                {
+                    activePeriodObj = td;
+                }
+                else if (period == ListeningReportPeriod.Week && barData.TryGetProperty("week", out var wk))
+                {
+                    activePeriodObj = wk;
+                }
+                else if (barData.TryGetProperty("bar", out var b))
+                {
+                    activePeriodObj = b;
+                }
+            }
+
+            if (activePeriodObj.ValueKind == JsonValueKind.Object)
+            {
+                if (activePeriodObj.TryGetProperty("title", out var tElem))
+                {
+                    title = tElem.GetString() ?? "";
+                }
+
+                if (activePeriodObj.TryGetProperty("listenTime", out var ltObj))
+                {
+                    if (ltObj.TryGetProperty("listenTimeSec", out var secE) && secE.TryGetInt64(out var sVal))
+                    {
+                        listenTimeSec = sVal;
+                    }
+                    if (ltObj.TryGetProperty("listenCnt", out var cntE) && cntE.TryGetInt32(out var cVal))
+                    {
+                        listenCnt = cVal;
+                    }
+                    if (ltObj.TryGetProperty("activeHour", out var ahE) && ahE.TryGetInt32(out var ahVal))
+                    {
+                        activeHour = ahVal;
+                    }
+                    if (ltObj.TryGetProperty("percent", out var pE) && pE.TryGetInt32(out var pVal))
+                    {
+                        percent = pVal;
+                    }
+                    if (ltObj.TryGetProperty("upOrDown", out var udE) && udE.TryGetInt32(out var udVal))
+                    {
+                        upOrDown = udVal;
+                    }
+                }
+            }
+
+            if (listenTimeSec == 0L && barData.ValueKind == JsonValueKind.Object &&
+                barData.TryGetProperty("listenTime", out var rootLt) &&
+                rootLt.TryGetProperty("listenTimeSec", out var rootSecE) &&
+                rootSecE.TryGetInt64(out var rSec))
+            {
+                listenTimeSec = rSec;
+            }
+
+            var chartPoints = new List<ListeningChartPoint>();
+            if (activePeriodObj.ValueKind == JsonValueKind.Object &&
+                activePeriodObj.TryGetProperty("chart", out var chartObj) &&
+                chartObj.TryGetProperty("chartInfo", out var chartInfo) &&
+                chartInfo.ValueKind == JsonValueKind.Object)
+            {
+                if (period == ListeningReportPeriod.Day)
+                {
+                    for (int h = 0; h < 24; h++)
+                    {
+                        string slotKey = h.ToString();
+                        long ptVal = 0;
+                        long avg = 0;
+                        if (chartInfo.TryGetProperty(slotKey, out var pt))
+                        {
+                            if (pt.TryGetProperty("value", out var vE) && vE.TryGetInt64(out var v)) ptVal = v;
+                            if (pt.TryGetProperty("avgValue", out var aE) && aE.TryGetInt64(out var a)) avg = a;
+                        }
+                        chartPoints.Add(new ListeningChartPoint(slotKey, ptVal, avg, $"{h:D2}:00"));
+                    }
+                }
+                else
+                {
+                    foreach (var prop in chartInfo.EnumerateObject())
+                    {
+                        long ptVal = 0;
+                        long avg = 0;
+                        if (prop.Value.TryGetProperty("value", out var vE) && vE.TryGetInt64(out var v)) ptVal = v;
+                        if (prop.Value.TryGetProperty("avgValue", out var aE) && aE.TryGetInt64(out var a)) avg = a;
+                        chartPoints.Add(new ListeningChartPoint(prop.Name, ptVal, avg, prop.Name));
+                    }
+                }
+            }
+
+            var topSingers = new List<ListeningSingerStat>();
+            JsonElement singersElem = default;
+            if (activePeriodObj.ValueKind == JsonValueKind.Object && activePeriodObj.TryGetProperty("singers", out var sList))
+            {
+                singersElem = sList;
+            }
+            else if (barData.ValueKind == JsonValueKind.Object && barData.TryGetProperty("singers", out var sList2))
+            {
+                singersElem = sList2;
+            }
+
+            if (singersElem.ValueKind == JsonValueKind.Array && singersElem.GetArrayLength() > 0)
+            {
+                int rankIdx = 1;
+                foreach (var sItem in singersElem.EnumerateArray())
+                {
+                    long sId = sItem.TryGetProperty("id", out var idE) && idE.TryGetInt64(out var id) ? id : 0L;
+                    string sName = sItem.TryGetProperty("name", out var nE) ? nE.GetString() ?? "" : "";
+                    string sCover = sItem.TryGetProperty("cover", out var cE) ? cE.GetString() ?? "" : "";
+                    long sSec = sItem.TryGetProperty("listenTimeSec", out var secE) && secE.TryGetInt64(out var sec) ? sec : 0L;
+
+                    if (!string.IsNullOrWhiteSpace(sName))
+                    {
+                        topSingers.Add(new ListeningSingerStat(sId, sName, sCover, sSec, rankIdx++));
+                    }
+                }
+            }
+            else if (barData.ValueKind == JsonValueKind.Object &&
+                     barData.TryGetProperty("optionResults", out var optRes) &&
+                     optRes.ValueKind == JsonValueKind.Array)
+            {
+                int rankIdx = 1;
+                foreach (var sItem in optRes.EnumerateArray())
+                {
+                    long sId = sItem.TryGetProperty("id", out var idE) && idE.TryGetInt64(out var id) ? id : 0L;
+                    string sName = sItem.TryGetProperty("name", out var nE) ? nE.GetString() ?? "" : "";
+                    string sCover = sItem.TryGetProperty("singerAvatar", out var cE) ? cE.GetString() ?? "" : "";
+                    long sSec = sItem.TryGetProperty("value", out var valE) && valE.TryGetInt64(out var v) ? v : 0L;
+
+                    if (!string.IsNullOrWhiteSpace(sName))
+                    {
+                        topSingers.Add(new ListeningSingerStat(sId, sName, sCover, sSec, rankIdx++));
+                    }
+                }
+            }
+
+            var rankSongs = new List<ListeningRankSong>();
+            if (rankData.ValueKind == JsonValueKind.Object &&
+                rankData.TryGetProperty("rank", out var rankArray) &&
+                rankArray.ValueKind == JsonValueKind.Array)
+            {
+                int rankNo = 1;
+                foreach (var rItem in rankArray.EnumerateArray())
+                {
+                    var trackElem = rItem.TryGetProperty("track", out var tr) ? tr : rItem;
+                    var song = ParseSongFromElement(trackElem);
+                    int cnt = rItem.TryGetProperty("listenCnt", out var cntE) && cntE.TryGetInt32(out var c) ? c : 0;
+
+                    if (song != null)
+                    {
+                        rankSongs.Add(new ListeningRankSong(song, rankNo++, cnt));
+                    }
+                }
+            }
+
+            return new ListeningReportData(
+                Period: period,
+                DateKey: dateKey,
+                Title: title,
+                ListenTimeSec: listenTimeSec,
+                ListenCnt: listenCnt,
+                ActiveHour: activeHour,
+                Percent: percent,
+                UpOrDown: upOrDown,
+                ChartPoints: chartPoints,
+                TopSingers: topSingers,
+                RankSongs: rankSongs,
+                AvailableDates: availableDates
+            );
+        }
+        catch (OperationCanceledException)
+        {
+            return new ListeningReportData(period, date ?? "", "", 0L, 0, 0, 0, 0, [], [], [], []);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MusicApi.ListeningStats", $"GetListeningRecordReportAsync exception: {ex.Message}");
+            return new ListeningReportData(period, date ?? "", "", 0L, 0, 0, 0, 0, [], [], [], []);
+        }
+    }
 }
+
+/// <summary>
+/// 听歌足迹统计周期维度。
+/// </summary>
+public enum ListeningReportPeriod
+{
+    Day = 1,
+    Week = 2,
+    Month = 3,
+    Year = 4
+}
+
+/// <summary>
+/// 听歌走势单个时段/点位数据。
+/// </summary>
+public sealed record ListeningChartPoint(
+    string Slot,
+    long Value,
+    long AvgValue,
+    string Text
+);
+
+/// <summary>
+/// 常听歌手统计项。
+/// </summary>
+public sealed record ListeningSingerStat(
+    long SingerId,
+    string SingerName,
+    string SingerCoverUrl,
+    long ListenTimeSec,
+    int Rank
+);
+
+/// <summary>
+/// 周期内歌曲收听排行榜项。
+/// </summary>
+public sealed record ListeningRankSong(
+    Song Song,
+    int RankNo,
+    int ListenCnt
+);
+
+/// <summary>
+/// 综合听歌足迹报告数据。
+/// </summary>
+public sealed record ListeningReportData(
+    ListeningReportPeriod Period,
+    string DateKey,
+    string Title,
+    long ListenTimeSec,
+    int ListenCnt,
+    int ActiveHour,
+    int Percent,
+    int UpOrDown,
+    IReadOnlyList<ListeningChartPoint> ChartPoints,
+    IReadOnlyList<ListeningSingerStat> TopSingers,
+    IReadOnlyList<ListeningRankSong> RankSongs,
+    IReadOnlyList<string> AvailableDates
+);

@@ -962,6 +962,7 @@ public sealed partial class MainWindow
         _reportedPlaySeconds += deltaSec;
         _lastPlayStreamReportTick = nowTick;
         Interlocked.Add(ref _localReportedSecondsSinceLastAudit, deltaSec);
+        ListeningFootprintCacheService.RecordLocalReportDelta(deltaSec);
 
         long songId = song.Id;
         int duration = song.Duration;
