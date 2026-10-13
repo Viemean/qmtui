@@ -463,4 +463,29 @@ public sealed partial class MainWindow
             await PlaySongAsync(prevSong);
         }
     }
+
+    private async Task LoadListeningFootprintAsync()
+    {
+        _currentViewMode = ViewMode.ListeningFootprint;
+        UpdateSearchCategoryVisibility(false);
+        _hasMoreSearchResults = false;
+        _isViewingPlaylistsList = false;
+        _currentDrilldownPlaylist = null;
+        _isViewingAlbumsList = false;
+        _currentDrilldownAlbum = null;
+
+        _songListView.Visible = false;
+        _footprintView.Visible = true;
+        _footprintView.SetFocusToList();
+
+        if (!UserSession.Current.IsLoggedIn)
+        {
+            _controlBar?.UpdateStatus("[听歌足迹] 请按 U 键登录后查看听歌足迹");
+            return;
+        }
+
+        _controlBar?.UpdateStatus("[听歌足迹] 正在同步听歌数据报告...");
+        await _footprintView.LoadDefaultAsync();
+        _controlBar?.UpdateStatus("[听歌足迹] 数据已同步完成");
+    }
 }

@@ -655,7 +655,14 @@ public sealed partial class MainWindow
                 _sidebarList.SetFocus();
                 break;
             case 1:
-                _songListView.SetFocusToList();
+                if (_currentViewMode == ViewMode.ListeningFootprint && _footprintView.Visible)
+                {
+                    _footprintView.SetFocusToList();
+                }
+                else
+                {
+                    _songListView.SetFocusToList();
+                }
                 break;
             case 2:
                 if (_artistAlbumDetailView.Visible)

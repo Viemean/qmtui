@@ -31,6 +31,7 @@ public sealed partial class MainWindow : Window
     private readonly ListView _sidebarList;
     private readonly MiniCoverView _miniCoverView;
     private readonly SongListView _songListView;
+    private readonly ListeningFootprintView _footprintView;
     private readonly FrameView _lyricFrame;
     private readonly ListView _lyricListView;
     private readonly ThinScrollBarView _lyricScrollBar;
@@ -174,6 +175,7 @@ public sealed partial class MainWindow : Window
         ArtistDetail,
         AlbumDetail,
         RecentPlay,
+        ListeningFootprint,
         LocalMusic,
         WebDav,
         Other
@@ -478,6 +480,7 @@ public sealed partial class MainWindow : Window
             "我的歌单",
             "收藏专辑",
             "最近播放",
+            "听歌足迹",
             "本地音乐",
             "WebDAV",
             "远程控制"
@@ -587,6 +590,20 @@ public sealed partial class MainWindow : Window
         };
         Add(_songListView);
 
+        _footprintView = new ListeningFootprintView
+        {
+            X = Pos.Right(_sidebarFrame),
+            Y = 1,
+            Width = Dim.Percent(58),
+            Height = Dim.Fill(5),
+            Visible = false
+        };
+        _footprintView.SongAccepted += async song =>
+        {
+            await PlaySongAsync(song);
+        };
+        Add(_footprintView);
+
         // 3.5. 主列表即时查找悬浮窗 (G 键触发) - 置于中央歌曲列表视窗内靠上居中，避免与右侧分割线重叠
         _quickSearchBar = new QuickSearchFloatingBar
         {
@@ -612,6 +629,11 @@ public sealed partial class MainWindow : Window
             CancelFavoriteSync();
             ClearNavigationStack();
             var idx = _sidebarList.SelectedItem ?? 0;
+            if (idx != 8)
+            {
+                _footprintView.Visible = false;
+                _songListView.Visible = true;
+            }
             if (idx == 0)
             {
                 _isViewingPlaylistsList = false;
@@ -670,6 +692,8 @@ public sealed partial class MainWindow : Window
                 _currentDrilldownPlaylist = null;
                 _isViewingAlbumsList = false;
                 _currentDrilldownAlbum = null;
+                _footprintView.Visible = false;
+                _songListView.Visible = true;
                 await LoadRecentPlaySongsAsync();
             }
             else if (idx == 8)
@@ -678,7 +702,7 @@ public sealed partial class MainWindow : Window
                 _currentDrilldownPlaylist = null;
                 _isViewingAlbumsList = false;
                 _currentDrilldownAlbum = null;
-                await LoadLocalMusicAsync();
+                await LoadListeningFootprintAsync();
             }
             else if (idx == 9)
             {
@@ -686,9 +710,21 @@ public sealed partial class MainWindow : Window
                 _currentDrilldownPlaylist = null;
                 _isViewingAlbumsList = false;
                 _currentDrilldownAlbum = null;
-                await LoadWebDavMusicAsync();
+                _footprintView.Visible = false;
+                _songListView.Visible = true;
+                await LoadLocalMusicAsync();
             }
             else if (idx == 10)
+            {
+                _isViewingPlaylistsList = false;
+                _currentDrilldownPlaylist = null;
+                _isViewingAlbumsList = false;
+                _currentDrilldownAlbum = null;
+                _footprintView.Visible = false;
+                _songListView.Visible = true;
+                await LoadWebDavMusicAsync();
+            }
+            else if (idx == 11)
             {
                 ShowConnectDialog();
             }
