@@ -43,6 +43,7 @@ public sealed class ListeningFootprintView : FrameView
     private long _lastNavTick;
 
     public event Func<Song, Task>? SongAccepted;
+    public event Func<IReadOnlyList<Song>, int, Task>? PlayQueueAccepted;
     public event Action<bool>? TabNavigationRequested;
 
     public ListeningFootprintView()
@@ -52,7 +53,7 @@ public sealed class ListeningFootprintView : FrameView
         Y = 0;
         Width = Dim.Fill();
         Height = Dim.Fill();
-        CanFocus = true;
+        CanFocus = false;
 
         // 1. 顶部周期维度 Tab 与日期翻页导航
         _headerBar = new View
@@ -201,6 +202,13 @@ public sealed class ListeningFootprintView : FrameView
                 return;
             }
 
+            if (k == Key.CursorDown && (_favoritesListView.SelectedItem ?? 0) >= _favoriteSongs.Count - 1)
+            {
+                k.Handled = true;
+                _rankingListView?.SetFocus();
+                return;
+            }
+
             if (HandleFootprintShortcut(k))
             {
                 k.Handled = true;
@@ -212,10 +220,14 @@ public sealed class ListeningFootprintView : FrameView
             var idx = _favoritesListView.SelectedItem ?? 0;
             if (idx >= 0 && idx < _favoriteSongs.Count)
             {
-                var song = _favoriteSongs[idx].Song;
-                if (SongAccepted != null)
+                var songs = _favoriteSongs.Select(f => f.Song).ToList();
+                if (PlayQueueAccepted != null)
                 {
-                    await SongAccepted.Invoke(song);
+                    await PlayQueueAccepted.Invoke(songs, idx);
+                }
+                else if (SongAccepted != null)
+                {
+                    await SongAccepted.Invoke(songs[idx]);
                 }
             }
         };
@@ -264,6 +276,13 @@ public sealed class ListeningFootprintView : FrameView
                 return;
             }
 
+            if (k == Key.CursorUp && (_rankingListView.SelectedItem ?? 0) <= 0 && _currentPeriod == ListeningReportPeriod.Year && _favoritesListView.Visible)
+            {
+                k.Handled = true;
+                _favoritesListView.SetFocus();
+                return;
+            }
+
             if (HandleFootprintShortcut(k))
             {
                 k.Handled = true;
@@ -275,10 +294,14 @@ public sealed class ListeningFootprintView : FrameView
             var idx = _rankingListView.SelectedItem ?? 0;
             if (idx >= 0 && idx < _rankSongs.Count)
             {
-                var song = _rankSongs[idx].Song;
-                if (SongAccepted != null)
+                var songs = _rankSongs.Select(r => r.Song).ToList();
+                if (PlayQueueAccepted != null)
                 {
-                    await SongAccepted.Invoke(song);
+                    await PlayQueueAccepted.Invoke(songs, idx);
+                }
+                else if (SongAccepted != null)
+                {
+                    await SongAccepted.Invoke(songs[idx]);
                 }
             }
         };

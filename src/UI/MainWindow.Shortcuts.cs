@@ -264,10 +264,17 @@ public sealed partial class MainWindow
             return;
         }
 
-        // 5. 焦点丢失时的兜底处理（按方向键或回车将焦点恢复至中央歌曲列表）
+        // 5. 焦点丢失时的兜底处理（按方向键或回车将焦点恢复至中央列表）
         if (!_isNowPlayingViewActive && GetFocusedWindowIndex(focused) == -1 && (k == Key.CursorUp || k == Key.CursorDown || k == Key.CursorLeft || k == Key.CursorRight || k == Key.Enter))
         {
-            _songListView.SetFocusToList();
+            if (_currentViewMode == ViewMode.ListeningFootprint && _footprintView.Visible)
+            {
+                _footprintView.SetFocusToList();
+            }
+            else
+            {
+                _songListView.SetFocusToList();
+            }
             Application.Invoke(UpdateFrameBorderHighlights);
         }
 

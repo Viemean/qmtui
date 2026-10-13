@@ -602,6 +602,15 @@ public sealed partial class MainWindow : Window
         {
             await PlaySongAsync(song);
         };
+        _footprintView.PlayQueueAccepted += async (songs, curIdx) =>
+        {
+            if (songs.Count > 0 && curIdx >= 0 && curIdx < songs.Count)
+            {
+                PlaybackQueueService.Instance.Mode = _currentPlaybackMode;
+                PlaybackQueueService.Instance.SetQueue(songs, curIdx);
+                await PlaySongAsync(songs[curIdx]);
+            }
+        };
         _footprintView.TabNavigationRequested += forward => SwitchNextFocusWindow(forward);
         Add(_footprintView);
 
@@ -729,7 +738,14 @@ public sealed partial class MainWindow : Window
             {
                 ShowConnectDialog();
             }
-            _songListView.SetFocusToList();
+            if (_currentViewMode == ViewMode.ListeningFootprint && _footprintView.Visible)
+            {
+                _footprintView.SetFocusToList();
+            }
+            else
+            {
+                _songListView.SetFocusToList();
+            }
             Application.Invoke(UpdateFrameBorderHighlights);
         };
 
