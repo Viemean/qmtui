@@ -30,6 +30,8 @@ public sealed class ListeningFootprintView : FrameView
 
     private readonly FrameView _singersFrame;
     private readonly Label _singersLabel;
+    private readonly ListView _favoritesListView;
+    private readonly List<ListeningMonthFavoriteSong> _favoriteSongs = [];
 
     private readonly FrameView _rankingFrame;
     private readonly ListView _rankingListView;
@@ -163,13 +165,62 @@ public sealed class ListeningFootprintView : FrameView
         _singersLabel = new Label
         {
             Text = "暂无歌手收听分布数据",
-            X = 1,
+            X = 0,
             Y = 0,
-            Width = Dim.Fill() - 2,
+            Width = Dim.Fill(),
             Height = Dim.Fill()
         };
 
-        _singersFrame.Add(_singersLabel);
+        _favoritesListView = new ListView
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
+            CanFocus = true,
+            Visible = false
+        };
+        _favoritesListView.SetScheme(MikuTheme.Base);
+        _favoritesListView.KeyBindings.Remove(Key.Space);
+        _favoritesListView.KeyBindings.Remove(Key.Tab);
+        _favoritesListView.KeyBindings.Remove(Key.Tab.WithShift);
+
+        _favoritesListView.KeyDown += (s, k) =>
+        {
+            if (k == Key.Tab || k.AsRune.Value == '\t' || k.ToString().Contains("Tab"))
+            {
+                k.Handled = true;
+                if (k.IsShift)
+                {
+                    TabNavigationRequested?.Invoke(false);
+                }
+                else
+                {
+                    _rankingListView?.SetFocus();
+                }
+                return;
+            }
+
+            if (HandleFootprintShortcut(k))
+            {
+                k.Handled = true;
+            }
+        };
+
+        _favoritesListView.Accepted += async (s, e) =>
+        {
+            var idx = _favoritesListView.SelectedItem ?? 0;
+            if (idx >= 0 && idx < _favoriteSongs.Count)
+            {
+                var song = _favoriteSongs[idx].Song;
+                if (SongAccepted != null)
+                {
+                    await SongAccepted.Invoke(song);
+                }
+            }
+        };
+
+        _singersFrame.Add(_singersLabel, _favoritesListView);
         Add(_singersFrame);
 
         // 4. 单曲收听排行榜列表
@@ -202,7 +253,14 @@ public sealed class ListeningFootprintView : FrameView
             if (k == Key.Tab || k.AsRune.Value == '\t' || k.ToString().Contains("Tab"))
             {
                 k.Handled = true;
-                TabNavigationRequested?.Invoke(!k.IsShift);
+                if (k.IsShift && _currentPeriod == ListeningReportPeriod.Year && _favoritesListView.Visible)
+                {
+                    _favoritesListView.SetFocus();
+                }
+                else
+                {
+                    TabNavigationRequested?.Invoke(!k.IsShift);
+                }
                 return;
             }
 
@@ -244,6 +302,14 @@ public sealed class ListeningFootprintView : FrameView
             else if (HandleFootprintShortcut(k))
             {
                 k.Handled = true;
+            }
+        };
+
+        ViewportChanged += (s, e) =>
+        {
+            if (_currentData != null && Viewport.Width > 0)
+            {
+                RenderReport(_currentData);
             }
         };
     }
@@ -350,31 +416,64 @@ public sealed class ListeningFootprintView : FrameView
         _chartLabel.Text = BuildAsciiChart(report.Period, report.DateKey, report.ChartPoints);
 
         // 4. 计算可用宽度
-        int viewWidth = _rankingListView.Viewport.Width;
+        int viewWidth = _singersFrame.Viewport.Width;
+        if (viewWidth <= 0)
+        {
+            viewWidth = _rankingListView.Viewport.Width;
+        }
         if (viewWidth <= 0)
         {
             int curW = Viewport.Width > 0 ? Viewport.Width : Frame.Width;
-            viewWidth = curW > 0 ? curW - 2 : 72;
+            viewWidth = curW > 4 ? curW - 4 : 52;
         }
 
         // 5. 常听歌手分布条 / 高光时刻 / 每月最爱歌曲
         if (report.Period == ListeningReportPeriod.Year)
         {
             _singersFrame.Title = "每月最爱歌曲";
-            _singersFrame.Height = 14;
-            _singersLabel.Text = BuildFavoriteSongsOfMonth(report.FavoriteSongsOfMonth, viewWidth);
-        }
-        else if (report.Period == ListeningReportPeriod.Month && report.HighLights.Count > 0)
-        {
-            _singersFrame.Title = "本月高光时刻";
-            _singersFrame.Height = report.HighLights.Count >= 4 ? 6 : 5;
-            _singersLabel.Text = BuildHighLightsBar(report.HighLights);
+            _singersFrame.Height = 6;
+            _singersLabel.Visible = false;
+            _favoritesListView.Visible = true;
+
+            _favoriteSongs.Clear();
+            _favoriteSongs.AddRange(report.FavoriteSongsOfMonth);
+
+            int monthColW = 5;
+            int favRemain = Math.Max(20, viewWidth - monthColW - 3);
+            int favTitleW = Math.Max(12, (int)Math.Round(favRemain * 0.58));
+            int favArtistW = Math.Max(8, favRemain - favTitleW);
+
+            var favItems = new List<string>(_favoriteSongs.Count);
+            foreach (var item in _favoriteSongs)
+            {
+                string mLabel = $"{item.Month,2}月. ";
+                string titleStr = SongListView.TruncateAndPadWide(item.Song.Title, favTitleW);
+                string artistStr = SongListView.TruncateAndPadWide(item.Song.Artist, favArtistW);
+                favItems.Add($"{mLabel}{titleStr}  {artistStr}");
+            }
+            if (favItems.Count == 0)
+            {
+                favItems.Add("当前年份暂无每月最爱歌曲记录");
+            }
+            _favoritesListView.SetSource(new ObservableCollection<string>(favItems));
         }
         else
         {
-            _singersFrame.Title = "常听歌手分布";
-            _singersFrame.Height = 5;
-            _singersLabel.Text = BuildSingersBar(report.TopSingers);
+            _favoritesListView.Visible = false;
+            _singersLabel.Visible = true;
+
+            if (report.Period == ListeningReportPeriod.Month && report.HighLights.Count > 0)
+            {
+                _singersFrame.Title = "本月高光时刻";
+                _singersFrame.Height = report.HighLights.Count >= 4 ? 6 : 5;
+                _singersLabel.Text = BuildHighLightsBar(report.HighLights);
+            }
+            else
+            {
+                _singersFrame.Title = "常听歌手分布";
+                _singersFrame.Height = 5;
+                _singersLabel.Text = BuildSingersBar(report.TopSingers);
+            }
         }
 
         // 6. 单曲收听排行榜
@@ -644,27 +743,6 @@ public sealed class ListeningFootprintView : FrameView
             sb.AppendLine($"#{i + 1} {singerName}{padding}  {durationStr}");
         }
 
-        return sb.ToString().TrimEnd();
-    }
-
-    private static string BuildFavoriteSongsOfMonth(IReadOnlyList<ListeningMonthFavoriteSong> songs, int viewWidth)
-    {
-        if (songs.Count == 0) return "当前年份暂无每月最爱歌曲记录";
-
-        if (viewWidth <= 0) viewWidth = 72;
-        int monthColW = 6;
-        int remain = Math.Max(24, viewWidth - monthColW - 4);
-        int titleW = Math.Max(14, (int)Math.Round(remain * 0.58));
-        int artistW = Math.Max(10, remain - titleW);
-
-        var sb = new StringBuilder();
-        foreach (var item in songs)
-        {
-            string mLabel = $"{item.Month,2}月. ";
-            string titleStr = SongListView.TruncateAndPadWide(item.Song.Title, titleW);
-            string artistStr = SongListView.TruncateAndPadWide(item.Song.Artist, artistW);
-            sb.AppendLine($"{mLabel}{titleStr}  {artistStr}");
-        }
         return sb.ToString().TrimEnd();
     }
 
