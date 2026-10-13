@@ -2,6 +2,7 @@ bin/
 obj/
 *.dbg
 *.tmp
+.tmp/
 *.media
 TestResults/
 .cache/

@@ -61,7 +61,7 @@ public class SignAndCryptoTests
     [Fact]
     public void DecryptAg1Response_XorEncryptedPayload_SuccessfullyRestoresJson()
     {
-        var originalJson = "{\"code\":0,\"data\":{\"msg\":\"ok\",\"uin\":\"2647681420\"}}";
+        var originalJson = "{\"code\":0,\"data\":{\"msg\":\"ok\",\"uin\":\"10001\"}}";
         var plainBytes = Encoding.UTF8.GetBytes(originalJson);
 
         // 模拟服务端根据 s_ag1ResponseKey 进行的异或加密流
