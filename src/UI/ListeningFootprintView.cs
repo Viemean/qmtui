@@ -41,6 +41,7 @@ public sealed class ListeningFootprintView : FrameView
     private ListeningReportData? _currentData;
     private readonly List<ListeningRankSong> _rankSongs = [];
     private long _lastNavTick;
+    private int _lastRenderedWidth = -1;
 
     public event Func<Song, Task>? SongAccepted;
     public event Action<bool>? TabNavigationRequested;
@@ -66,7 +67,7 @@ public sealed class ListeningFootprintView : FrameView
 
         _tabDayBtn = new Button
         {
-            Text = "[ 日 ]",
+            Text = "[1]日",
             NoDecorations = true,
             ShadowStyle = ShadowStyles.None,
             X = 1,
@@ -86,7 +87,7 @@ public sealed class ListeningFootprintView : FrameView
 
         _tabWeekBtn = new Button
         {
-            Text = "  周  ",
+            Text = "[2]周",
             NoDecorations = true,
             ShadowStyle = ShadowStyles.None,
             X = Pos.Right(_tabDayBtn) + 1,
@@ -98,7 +99,7 @@ public sealed class ListeningFootprintView : FrameView
 
         _tabMonthBtn = new Button
         {
-            Text = "  月  ",
+            Text = "[3]月",
             NoDecorations = true,
             ShadowStyle = ShadowStyles.None,
             X = Pos.Right(_tabWeekBtn) + 1,
@@ -110,7 +111,7 @@ public sealed class ListeningFootprintView : FrameView
 
         _tabYearBtn = new Button
         {
-            Text = "  年  ",
+            Text = "[4]年",
             NoDecorations = true,
             ShadowStyle = ShadowStyles.None,
             X = Pos.Right(_tabMonthBtn) + 1,
@@ -130,6 +131,7 @@ public sealed class ListeningFootprintView : FrameView
             CanFocus = true
         };
         _datePrevBtn.KeyBindings.Remove(Key.Space);
+        _datePrevBtn.SetScheme(MikuTheme.SearchCategoryActive);
         _datePrevBtn.Accepting += async (s, e) => await NavigateDateRelativeAsync(-1);
 
         _dateLabel = new Label
@@ -152,6 +154,7 @@ public sealed class ListeningFootprintView : FrameView
             CanFocus = true
         };
         _dateNextBtn.KeyBindings.Remove(Key.Space);
+        _dateNextBtn.SetScheme(MikuTheme.SearchCategoryActive);
         _dateNextBtn.Accepting += async (s, e) => await NavigateDateRelativeAsync(1);
         _dateNextBtn.KeyDown += (s, k) =>
         {
@@ -260,6 +263,20 @@ public sealed class ListeningFootprintView : FrameView
                 }
                 return;
             }
+
+            if (HandleFootprintShortcut(k))
+            {
+                k.Handled = true;
+                return;
+            }
+        };
+
+        KeyDown += (s, k) =>
+        {
+            if (HandleFootprintShortcut(k))
+            {
+                k.Handled = true;
+            }
         };
 
         _rankingListView.Accepted += async (s, e) =>
@@ -277,6 +294,16 @@ public sealed class ListeningFootprintView : FrameView
 
         _rankingFrame.Add(_rankingListView);
         Add(_rankingFrame);
+
+        ViewportChanged += (s, e) =>
+        {
+            int curW = _rankingListView.Viewport.Width;
+            if (curW > 0 && curW != _lastRenderedWidth && _currentData != null)
+            {
+                _lastRenderedWidth = curW;
+                RenderReport(_currentData);
+            }
+        };
     }
 
     /// <summary>
@@ -312,18 +339,18 @@ public sealed class ListeningFootprintView : FrameView
 
     private void UpdateTabStyles()
     {
-        _tabDayBtn.Text = _currentPeriod == ListeningReportPeriod.Day ? "[ 日 ]" : "  日  ";
-        _tabWeekBtn.Text = _currentPeriod == ListeningReportPeriod.Week ? "[ 周 ]" : "  周  ";
-        _tabMonthBtn.Text = _currentPeriod == ListeningReportPeriod.Month ? "[ 月 ]" : "  月  ";
-        _tabYearBtn.Text = _currentPeriod == ListeningReportPeriod.Year ? "[ 年 ]" : "  年  ";
+        _tabDayBtn.Text = "[1]日";
+        _tabWeekBtn.Text = "[2]周";
+        _tabMonthBtn.Text = "[3]月";
+        _tabYearBtn.Text = "[4]年";
 
         _tabDayBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Day ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
         _tabWeekBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Week ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
         _tabMonthBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Month ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
         _tabYearBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Year ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
 
-        _datePrevBtn.SetScheme(MikuTheme.SearchCategoryDim);
-        _dateNextBtn.SetScheme(MikuTheme.SearchCategoryDim);
+        _datePrevBtn.SetScheme(MikuTheme.SearchCategoryActive);
+        _dateNextBtn.SetScheme(MikuTheme.SearchCategoryActive);
     }
 
     private void RenderReport(ListeningReportData report)
@@ -367,13 +394,29 @@ public sealed class ListeningFootprintView : FrameView
         _rankSongs.Clear();
         _rankSongs.AddRange(report.RankSongs);
 
+        int viewWidth = _rankingListView.Viewport.Width;
+        if (viewWidth <= 0)
+        {
+            int curW = Viewport.Width > 0 ? Viewport.Width : Frame.Width;
+            viewWidth = curW > 0 ? curW - 2 : 72;
+        }
+
+        int countColW = 6;
+        int indexColW = 4;
+        int remain = Math.Max(24, viewWidth - indexColW - countColW - 6);
+        int titleW = Math.Max(14, (int)Math.Round(remain * 0.58));
+        int artistW = Math.Max(10, remain - titleW);
+
         var listItems = new List<string>(_rankSongs.Count);
         for (int i = 0; i < _rankSongs.Count; i++)
         {
             var item = _rankSongs[i];
             var s = item.Song;
-            string durStr = s.Duration > 0 ? $"{s.Duration / 60:D2}:{s.Duration % 60:D2}" : "--:--";
-            listItems.Add($"{i + 1,2}. {s.Title} - {s.Artist} ({durStr}) [收听 {item.ListenCnt} 次]");
+            string idxStr = $"{i + 1,2}. ";
+            string titleStr = SongListView.TruncateAndPadWide(s.Title, titleW);
+            string artistStr = SongListView.TruncateAndPadWide(s.Artist, artistW);
+            string countStr = $"{item.ListenCnt}次";
+            listItems.Add($"{idxStr}{titleStr}  {artistStr}  {countStr}");
         }
 
         if (listItems.Count == 0)
@@ -510,5 +553,64 @@ public sealed class ListeningFootprintView : FrameView
         {
             await LoadFootprintAsync(_currentPeriod, dates[nextIdx], forceRefresh: false);
         }
+    }
+
+    /// <summary>
+    /// 处理听歌足迹页面专属快捷键。
+    /// </summary>
+    /// <param name="k">按键事件对象。</param>
+    /// <returns>若成功命中并处理足迹快捷键则返回 true，否则返回 false。</returns>
+    public bool HandleFootprintShortcut(Key k)
+    {
+        char c = char.ToUpperInvariant((char)k.AsRune.Value);
+        if (c == '1' || k == Key.D1)
+        {
+            _ = SwitchPeriodFromKeyAsync(ListeningReportPeriod.Day);
+            return true;
+        }
+        if (c == '2' || k == Key.D2)
+        {
+            _ = SwitchPeriodFromKeyAsync(ListeningReportPeriod.Week);
+            return true;
+        }
+        if (c == '3' || k == Key.D3)
+        {
+            _ = SwitchPeriodFromKeyAsync(ListeningReportPeriod.Month);
+            return true;
+        }
+        if (c == '4' || k == Key.D4)
+        {
+            _ = SwitchPeriodFromKeyAsync(ListeningReportPeriod.Year);
+            return true;
+        }
+        if (k.AsRune.Value == '<')
+        {
+            _ = NavigateDateFromKeyAsync(-1);
+            return true;
+        }
+        if (k.AsRune.Value == '>')
+        {
+            _ = NavigateDateFromKeyAsync(1);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 响应快捷键切换统计周期。
+    /// </summary>
+    /// <param name="period">目标统计周期维度。</param>
+    public async Task SwitchPeriodFromKeyAsync(ListeningReportPeriod period)
+    {
+        await LoadFootprintAsync(period, null, forceRefresh: false);
+    }
+
+    /// <summary>
+    /// 响应快捷键切换日期。
+    /// </summary>
+    /// <param name="delta">翻页相对偏移（-1 为历史，1 为向前）。</param>
+    public async Task NavigateDateFromKeyAsync(int delta)
+    {
+        await NavigateDateRelativeAsync(delta);
     }
 }
