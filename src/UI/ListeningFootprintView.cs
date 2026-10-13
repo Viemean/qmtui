@@ -18,11 +18,13 @@ namespace QmTui.UI;
 public sealed class ListeningFootprintView : FrameView
 {
     private readonly View _headerBar;
-    private readonly Label _tabDayLabel;
-    private readonly Label _tabWeekLabel;
-    private readonly Label _tabMonthLabel;
-    private readonly Label _tabYearLabel;
-    private readonly Label _dateNavigatorLabel;
+    private readonly Button _tabDayBtn;
+    private readonly Button _tabWeekBtn;
+    private readonly Button _tabMonthBtn;
+    private readonly Button _tabYearBtn;
+    private readonly Button _datePrevBtn;
+    private readonly Label _dateLabel;
+    private readonly Button _dateNextBtn;
 
     private readonly FrameView _statsFrame;
     private readonly Label _summaryLabel;
@@ -38,8 +40,10 @@ public sealed class ListeningFootprintView : FrameView
     private string? _currentDateKey;
     private ListeningReportData? _currentData;
     private readonly List<ListeningRankSong> _rankSongs = [];
+    private long _lastNavTick;
 
     public event Func<Song, Task>? SongAccepted;
+    public event Action<bool>? TabNavigationRequested;
 
     public ListeningFootprintView()
     {
@@ -60,58 +64,105 @@ public sealed class ListeningFootprintView : FrameView
             CanFocus = false
         };
 
-        _tabDayLabel = new Label { Text = "[ 日 ]", X = 1, Y = 0 };
-        _tabWeekLabel = new Label { Text = " 周 ", X = 8, Y = 0 };
-        _tabMonthLabel = new Label { Text = " 月 ", X = 13, Y = 0 };
-        _tabYearLabel = new Label { Text = " 年 ", X = 18, Y = 0 };
-
-        _dateNavigatorLabel = new Label
+        _tabDayBtn = new Button
         {
-            Text = "[<] 载入中... [>]",
-            X = Pos.AnchorEnd(32),
-            Y = 0
+            Text = "[ 日 ]",
+            NoDecorations = true,
+            ShadowStyle = ShadowStyles.None,
+            X = 1,
+            Y = 0,
+            CanFocus = true
+        };
+        _tabDayBtn.KeyBindings.Remove(Key.Space);
+        _tabDayBtn.Accepting += async (s, e) => await LoadFootprintAsync(ListeningReportPeriod.Day, null, forceRefresh: false);
+        _tabDayBtn.KeyDown += (s, k) =>
+        {
+            if (k == Key.Tab.WithShift || (k == Key.Tab && k.IsShift))
+            {
+                k.Handled = true;
+                TabNavigationRequested?.Invoke(false);
+            }
         };
 
-        _headerBar.Add(_tabDayLabel, _tabWeekLabel, _tabMonthLabel, _tabYearLabel, _dateNavigatorLabel);
-        _headerBar.MouseEvent += (sender, m) =>
+        _tabWeekBtn = new Button
         {
-            if (!m.Flags.HasFlag(MouseFlags.LeftButtonClicked) && !m.Flags.HasFlag(MouseFlags.LeftButtonPressed))
-            {
-                return;
-            }
+            Text = "  周  ",
+            NoDecorations = true,
+            ShadowStyle = ShadowStyles.None,
+            X = Pos.Right(_tabDayBtn) + 1,
+            Y = 0,
+            CanFocus = true
+        };
+        _tabWeekBtn.KeyBindings.Remove(Key.Space);
+        _tabWeekBtn.Accepting += async (s, e) => await LoadFootprintAsync(ListeningReportPeriod.Week, null, forceRefresh: false);
 
-            int x = m.Position?.X ?? -1;
-            if (x < 0) return;
+        _tabMonthBtn = new Button
+        {
+            Text = "  月  ",
+            NoDecorations = true,
+            ShadowStyle = ShadowStyles.None,
+            X = Pos.Right(_tabWeekBtn) + 1,
+            Y = 0,
+            CanFocus = true
+        };
+        _tabMonthBtn.KeyBindings.Remove(Key.Space);
+        _tabMonthBtn.Accepting += async (s, e) => await LoadFootprintAsync(ListeningReportPeriod.Month, null, forceRefresh: false);
 
-            if (x is >= 1 and <= 5)
+        _tabYearBtn = new Button
+        {
+            Text = "  年  ",
+            NoDecorations = true,
+            ShadowStyle = ShadowStyles.None,
+            X = Pos.Right(_tabMonthBtn) + 1,
+            Y = 0,
+            CanFocus = true
+        };
+        _tabYearBtn.KeyBindings.Remove(Key.Space);
+        _tabYearBtn.Accepting += async (s, e) => await LoadFootprintAsync(ListeningReportPeriod.Year, null, forceRefresh: false);
+
+        _datePrevBtn = new Button
+        {
+            Text = "[<]",
+            NoDecorations = true,
+            ShadowStyle = ShadowStyles.None,
+            X = Pos.AnchorEnd(26),
+            Y = 0,
+            CanFocus = true
+        };
+        _datePrevBtn.KeyBindings.Remove(Key.Space);
+        _datePrevBtn.Accepting += async (s, e) => await NavigateDateRelativeAsync(-1);
+
+        _dateLabel = new Label
+        {
+            Text = "载入中...",
+            X = Pos.Right(_datePrevBtn) + 1,
+            Y = 0,
+            Width = 16,
+            TextAlignment = Alignment.Center,
+            CanFocus = false
+        };
+
+        _dateNextBtn = new Button
+        {
+            Text = "[>]",
+            NoDecorations = true,
+            ShadowStyle = ShadowStyles.None,
+            X = Pos.Right(_dateLabel) + 1,
+            Y = 0,
+            CanFocus = true
+        };
+        _dateNextBtn.KeyBindings.Remove(Key.Space);
+        _dateNextBtn.Accepting += async (s, e) => await NavigateDateRelativeAsync(1);
+        _dateNextBtn.KeyDown += (s, k) =>
+        {
+            if (k == Key.Tab && !k.IsShift)
             {
-                _ = LoadFootprintAsync(ListeningReportPeriod.Day, null, forceRefresh: false);
-            }
-            else if (x is >= 7 and <= 11)
-            {
-                _ = LoadFootprintAsync(ListeningReportPeriod.Week, null, forceRefresh: false);
-            }
-            else if (x is >= 12 and <= 16)
-            {
-                _ = LoadFootprintAsync(ListeningReportPeriod.Month, null, forceRefresh: false);
-            }
-            else if (x is >= 17 and <= 21)
-            {
-                _ = LoadFootprintAsync(ListeningReportPeriod.Year, null, forceRefresh: false);
-            }
-            else
-            {
-                int navLeft = _dateNavigatorLabel.Frame.X;
-                if (x >= navLeft && x <= navLeft + 4)
-                {
-                    _ = NavigateDateRelativeAsync(-1);
-                }
-                else if (x >= navLeft + _dateNavigatorLabel.Frame.Width - 4)
-                {
-                    _ = NavigateDateRelativeAsync(1);
-                }
+                k.Handled = true;
+                _rankingListView?.SetFocus();
             }
         };
+
+        _headerBar.Add(_tabDayBtn, _tabWeekBtn, _tabMonthBtn, _tabYearBtn, _datePrevBtn, _dateLabel, _dateNextBtn);
         Add(_headerBar);
 
         // 2. 统计概览面板（核心收听时长、活跃时段与 Unicode 字符图表）
@@ -191,6 +242,25 @@ public sealed class ListeningFootprintView : FrameView
 
         _rankingListView.SetScheme(MikuTheme.Base);
         _rankingListView.KeyBindings.Remove(Key.Space);
+        _rankingListView.KeyBindings.Remove(Key.Tab);
+        _rankingListView.KeyBindings.Remove(Key.Tab.WithShift);
+
+        _rankingListView.KeyDown += (s, k) =>
+        {
+            if (k == Key.Tab || k.AsRune.Value == '\t' || k.ToString().Contains("Tab"))
+            {
+                k.Handled = true;
+                if (k.IsShift)
+                {
+                    _dateNextBtn.SetFocus();
+                }
+                else
+                {
+                    TabNavigationRequested?.Invoke(true);
+                }
+                return;
+            }
+        };
 
         _rankingListView.Accepted += async (s, e) =>
         {
@@ -242,15 +312,18 @@ public sealed class ListeningFootprintView : FrameView
 
     private void UpdateTabStyles()
     {
-        _tabDayLabel.Text = _currentPeriod == ListeningReportPeriod.Day ? "[ 日 ]" : "  日  ";
-        _tabWeekLabel.Text = _currentPeriod == ListeningReportPeriod.Week ? "[ 周 ]" : "  周  ";
-        _tabMonthLabel.Text = _currentPeriod == ListeningReportPeriod.Month ? "[ 月 ]" : "  月  ";
-        _tabYearLabel.Text = _currentPeriod == ListeningReportPeriod.Year ? "[ 年 ]" : "  年  ";
+        _tabDayBtn.Text = _currentPeriod == ListeningReportPeriod.Day ? "[ 日 ]" : "  日  ";
+        _tabWeekBtn.Text = _currentPeriod == ListeningReportPeriod.Week ? "[ 周 ]" : "  周  ";
+        _tabMonthBtn.Text = _currentPeriod == ListeningReportPeriod.Month ? "[ 月 ]" : "  月  ";
+        _tabYearBtn.Text = _currentPeriod == ListeningReportPeriod.Year ? "[ 年 ]" : "  年  ";
 
-        _tabDayLabel.SetScheme(_currentPeriod == ListeningReportPeriod.Day ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
-        _tabWeekLabel.SetScheme(_currentPeriod == ListeningReportPeriod.Week ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
-        _tabMonthLabel.SetScheme(_currentPeriod == ListeningReportPeriod.Month ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
-        _tabYearLabel.SetScheme(_currentPeriod == ListeningReportPeriod.Year ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+        _tabDayBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Day ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+        _tabWeekBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Week ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+        _tabMonthBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Month ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+        _tabYearBtn.SetScheme(_currentPeriod == ListeningReportPeriod.Year ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+
+        _datePrevBtn.SetScheme(MikuTheme.SearchCategoryDim);
+        _dateNextBtn.SetScheme(MikuTheme.SearchCategoryDim);
     }
 
     private void RenderReport(ListeningReportData report)
@@ -259,7 +332,7 @@ public sealed class ListeningFootprintView : FrameView
 
         // 1. 日期导航文本
         string displayDate = FormatDateKey(report.Period, report.DateKey);
-        _dateNavigatorLabel.Text = $"[<] {displayDate} [>]";
+        _dateLabel.Text = displayDate;
 
         // 2. 指标汇总
         string timeStr = FormatDuration(report.ListenTimeSec);
@@ -282,7 +355,6 @@ public sealed class ListeningFootprintView : FrameView
             string trend = report.UpOrDown >= 0 ? "+" : "-";
             sbSummary.AppendLine($"环比变化: {trend}{report.Percent}%");
         }
-        sbSummary.AppendLine($"常听歌手数: {report.TopSingers.Count} 位");
         _summaryLabel.Text = sbSummary.ToString().TrimEnd();
 
         // 3. 走势字符图表（Unicode 柱状字符）
@@ -416,6 +488,10 @@ public sealed class ListeningFootprintView : FrameView
 
     private async Task NavigateDateRelativeAsync(int delta)
     {
+        long now = Environment.TickCount64;
+        if (now - _lastNavTick < 250) return;
+        _lastNavTick = now;
+
         if (_currentData == null) return;
 
         var dates = _currentData.AvailableDates;
