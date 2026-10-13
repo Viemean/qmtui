@@ -53,7 +53,8 @@ public sealed class ListeningFootprintView : FrameView
         Y = 0;
         Width = Dim.Fill();
         Height = Dim.Fill();
-        CanFocus = false;
+        CanFocus = true;
+        TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop;
 
         // 1. 顶部周期维度 Tab 与日期翻页导航
         _headerBar = new View
@@ -160,8 +161,10 @@ public sealed class ListeningFootprintView : FrameView
             Y = Pos.Bottom(_statsFrame),
             Width = Dim.Fill(),
             Height = 5,
-            CanFocus = false
+            CanFocus = true,
+            TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop
         };
+        _singersFrame.SetScheme(MikuTheme.FrameBorderDim);
 
         _singersLabel = new Label
         {
@@ -243,8 +246,10 @@ public sealed class ListeningFootprintView : FrameView
             Y = Pos.Bottom(_singersFrame),
             Width = Dim.Fill(),
             Height = Dim.Fill(),
-            CanFocus = false
+            CanFocus = true,
+            TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop
         };
+        _rankingFrame.SetScheme(MikuTheme.FrameBorderDim);
 
         _rankingListView = new ListView
         {
@@ -350,7 +355,22 @@ public sealed class ListeningFootprintView : FrameView
     /// </summary>
     public void SetFocusToList()
     {
-        _rankingListView.SetFocus();
+        if (_currentPeriod == ListeningReportPeriod.Year && _favoritesListView.Visible)
+        {
+            _favoritesListView.SetFocus();
+            if (_favoritesListView.SelectedItem is null or < 0 && _favoriteSongs.Count > 0)
+            {
+                _favoritesListView.SelectedItem = 0;
+            }
+        }
+        else
+        {
+            _rankingListView.SetFocus();
+            if (_rankingListView.SelectedItem is null or < 0 && _rankSongs.Count > 0)
+            {
+                _rankingListView.SelectedItem = 0;
+            }
+        }
     }
 
     private async Task LoadFootprintAsync(ListeningReportPeriod period, string? date, bool forceRefresh)
@@ -479,6 +499,10 @@ public sealed class ListeningFootprintView : FrameView
                 favItems.Add("当前年份暂无每月最爱歌曲记录");
             }
             _favoritesListView.SetSource(new ObservableCollection<string>(favItems));
+            if (favItems.Count > 0 && (_favoritesListView.SelectedItem is null or < 0))
+            {
+                _favoritesListView.SelectedItem = 0;
+            }
         }
         else
         {
@@ -535,6 +559,10 @@ public sealed class ListeningFootprintView : FrameView
         }
 
         _rankingListView.SetSource(new ObservableCollection<string>(listItems));
+        if (listItems.Count > 0 && (_rankingListView.SelectedItem is null or < 0))
+        {
+            _rankingListView.SelectedItem = 0;
+        }
         string periodRankTitle = report.Period switch
         {
             ListeningReportPeriod.Day => "本日单曲收听排行",

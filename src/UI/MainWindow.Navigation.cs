@@ -487,5 +487,6 @@ public sealed partial class MainWindow
         _controlBar?.UpdateStatus("[听歌足迹] 正在同步听歌数据报告...");
         await _footprintView.LoadDefaultAsync();
         _controlBar?.UpdateStatus("[听歌足迹] 数据已同步完成");
+        _footprintView.SetFocusToList();
     }
 }
