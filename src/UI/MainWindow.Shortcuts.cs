@@ -310,6 +310,15 @@ public sealed partial class MainWindow
             }
         }
 
+        if (_currentViewMode == ViewMode.ListeningFootprint && !_isSearchActive && !_searchField.HasFocus)
+        {
+            if (_footprintView.HandleFootprintShortcut(k))
+            {
+                k.Handled = true;
+                return;
+            }
+        }
+
         if (_currentViewMode == ViewMode.PlaylistsList && !_isSearchActive)
         {
             if (c == 'N' && GetFocusedWindowIndex(focused) == 1)
