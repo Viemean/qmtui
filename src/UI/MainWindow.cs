@@ -602,6 +602,7 @@ public sealed partial class MainWindow : Window
         {
             await PlaySongAsync(song);
         };
+        _footprintView.TabNavigationRequested += forward => SwitchNextFocusWindow(forward);
         Add(_footprintView);
 
         // 3.5. 主列表即时查找悬浮窗 (G 键触发) - 置于中央歌曲列表视窗内靠上居中，避免与右侧分割线重叠
