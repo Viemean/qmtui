@@ -388,6 +388,8 @@ public sealed partial class MainWindow
 
         if (confirmed)
         {
+            TryReportPlayStreamChunk(_activeSong, isPauseEvent: false);
+            try { _streamAuditCts?.Cancel(); _streamAuditCts?.Dispose(); _streamAuditCts = null; } catch { }
             UserSession.Current.Save();
             try { _connectMdns?.Dispose(); _connectMdns = null; } catch { }
             try { _connectServer?.Dispose(); _connectServer = null; } catch { }

@@ -33,7 +33,15 @@ public sealed partial class MainWindow
     private CancellationTokenSource? _cachingCts;
     private string? _lastResolvedPlayUrl;
     private double _accumulatedPlaySeconds;
+    private double _reportedPlaySeconds;
+    private long _lastPlayStreamReportTick;
+    private bool _wasPlayingForStreamReport;
     private double _lastProgressSec;
+
+    // 播放流水云端对齐与健康自愈状态机（3 分钟周期巡检，0 增加时自动轮换设备指纹）
+    private int _lastAuditedCloudTodaySec;
+    private int _localReportedSecondsSinceLastAudit;
+    private CancellationTokenSource? _streamAuditCts;
 
     // 云端最近播放上报状态机（单曲 5s / 歌单或专辑上下文 15s 独立触发）
     private bool _hasReportedCurrentSong;
@@ -53,6 +61,8 @@ public sealed partial class MainWindow
             previousCts?.Dispose();
         }
         catch { }
+
+        TryReportPlayStreamChunk(_activeSong, isPauseEvent: false);
 
         var currentCts = _playbackCts;
         var currentSession = Interlocked.Increment(ref _playbackSessionId);
@@ -83,6 +93,8 @@ public sealed partial class MainWindow
         }
         _lastResolvedPlayUrl = null;
         _accumulatedPlaySeconds = 0.0;
+        _reportedPlaySeconds = 0.0;
+        _wasPlayingForStreamReport = true;
         _lastProgressSec = startPosition;
         _currentCoverFilePath = null;
 
@@ -590,6 +602,11 @@ public sealed partial class MainWindow
         _controlBar.UpdateQuality(AudioQualityHelper.GetBadge(_actualQualityTier));
         _controlBar.UpdateVolume(_player.Volume, _player.Volume == 0);
         bool isPlaying = _isTuiAudioDisabled ? _isWebPlaying : _player.IsPlaying;
+        if (_wasPlayingForStreamReport && !isPlaying && _activeSong != null)
+        {
+            TryReportPlayStreamChunk(_activeSong, isPauseEvent: true);
+        }
+        _wasPlayingForStreamReport = isPlaying;
         _controlBar.UpdatePlayingState(isPlaying);
         _mprisService.UpdatePlaybackStatus(isPlaying);
         if (_standaloneWebServer != null && _standaloneWebServer.IsRunning)
@@ -919,6 +936,125 @@ public sealed partial class MainWindow
         catch (Exception ex)
         {
             AppLogger.Debug("MainWindow", $"PrefetchNextSongAsync exception: {ex.Message}");
+        }
+    }
+
+    private void TryReportPlayStreamChunk(Song? song, bool isPauseEvent)
+    {
+        if (song == null || song.IsLocal || song.IsWebDav || song.Id <= 0 || !UserSession.Current.IsLoggedIn)
+        {
+            return;
+        }
+
+        double unreportedSec = _accumulatedPlaySeconds - _reportedPlaySeconds;
+        int deltaSec = (int)Math.Floor(unreportedSec);
+        if (deltaSec < 5)
+        {
+            return;
+        }
+
+        long nowTick = Environment.TickCount64;
+        if (isPauseEvent && nowTick - _lastPlayStreamReportTick < 10000)
+        {
+            return;
+        }
+
+        _reportedPlaySeconds += deltaSec;
+        _lastPlayStreamReportTick = nowTick;
+        Interlocked.Add(ref _localReportedSecondsSinceLastAudit, deltaSec);
+
+        long songId = song.Id;
+        int duration = song.Duration;
+
+        _ = Task.Run(() => MusicApi.ReportPlayStreamAsync(songId, duration, deltaSec, CancellationToken.None));
+    }
+
+    private void StartStreamAuditLoop()
+    {
+        _streamAuditCts?.Cancel();
+        _streamAuditCts?.Dispose();
+        _streamAuditCts = new CancellationTokenSource();
+        var ct = _streamAuditCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(10000, ct).ConfigureAwait(false);
+                if (UserSession.Current.IsLoggedIn)
+                {
+                    var initStats = await MusicApi.GetListeningStatsAsync(ct).ConfigureAwait(false);
+                    if (initStats != null)
+                    {
+                        _lastAuditedCloudTodaySec = initStats.TodayListenTimeSec;
+                    }
+                }
+            }
+            catch (OperationCanceledException) { return; }
+            catch { }
+
+            using var timer = new PeriodicTimer(TimeSpan.FromMinutes(3));
+            while (!ct.IsCancellationRequested)
+            {
+                try
+                {
+                    await timer.WaitForNextTickAsync(ct).ConfigureAwait(false);
+                    await AuditPlayStreamHealthAsync(ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { break; }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("MainWindow.Playback", $"StreamAudit loop exception: {ex.Message}");
+                }
+            }
+        }, ct);
+    }
+
+    private async Task AuditPlayStreamHealthAsync(CancellationToken ct)
+    {
+        if (!UserSession.Current.IsLoggedIn)
+        {
+            return;
+        }
+
+        int reportedDelta = Interlocked.Exchange(ref _localReportedSecondsSinceLastAudit, 0);
+        if (reportedDelta < 15)
+        {
+            Interlocked.Add(ref _localReportedSecondsSinceLastAudit, reportedDelta);
+            return;
+        }
+
+        try
+        {
+            var stats = await MusicApi.GetListeningStatsAsync(ct).ConfigureAwait(false);
+            if (stats == null)
+            {
+                Interlocked.Add(ref _localReportedSecondsSinceLastAudit, reportedDelta);
+                return;
+            }
+
+            int cloudToday = stats.TodayListenTimeSec;
+            if (_lastAuditedCloudTodaySec > 0)
+            {
+                int cloudIncrement = cloudToday - _lastAuditedCloudTodaySec;
+                if (cloudIncrement <= 0)
+                {
+                    var rotated = DeviceReportService.RotateDeviceProfile();
+                    AppLogger.Warn("MainWindow.Playback", $"Stream audit: cloud increased {cloudIncrement}s despite {reportedDelta}s reported locally. Rotated profile to {rotated.Model} ({rotated.AndroidId})");
+                }
+                else
+                {
+                    AppLogger.Debug("MainWindow.Playback", $"Stream audit passed: cloud increased +{cloudIncrement}s (local reported {reportedDelta}s).");
+                }
+            }
+
+            _lastAuditedCloudTodaySec = cloudToday;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("MainWindow.Playback", $"AuditPlayStreamHealthAsync failed: {ex.Message}");
+            Interlocked.Add(ref _localReportedSecondsSinceLastAudit, reportedDelta);
         }
     }
 }

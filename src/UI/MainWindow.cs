@@ -1320,6 +1320,7 @@ public sealed partial class MainWindow : Window
         });
         SetFocusToWindow(0);
         AudioPreRollManager.EnsureStarted();
+        StartStreamAuditLoop();
 
         // 后台预热收藏曲目 ID 缓存，用于更新收藏状态
         if (UserSession.Current.IsLoggedIn)
