@@ -36,6 +36,7 @@ public sealed class ListenTogetherDialog : Dialog
     private Label? _statusNoticeLabel;
     private Label? _statsLabel;
     private readonly Action<ListenTogetherSpaceStats?> _onStatsUpdated;
+    private readonly Action<ListenTogetherRoomInfo?> _onRoomChanged;
 
     public ListenTogetherDialog(
         Func<Song?> currentSongGetter,
@@ -79,15 +80,38 @@ public sealed class ListenTogetherDialog : Dialog
             {
                 if (_statsLabel != null)
                 {
-                    _statsLabel.Text = s != null
-                        ? $"累计共听: {s.ListenMinutes} 分钟 | 已听: {s.ListenSongsCount} 首 | 共同收藏: {s.FavoriteSongsCount} 首"
-                        : "累计共听统计正在同步...";
+                    var r = ListenTogetherManager.Instance.CurrentRoom;
+                    if (r == null || r.UsersCount < 2)
+                    {
+                        _statsLabel.Text = "等待好友加入后开启统计";
+                    }
+                    else if (s != null)
+                    {
+                        _statsLabel.Text = $"累计共听: {s.ListenMinutes} 分钟 | 已听: {s.ListenSongsCount} 首 | 共同收藏: {s.FavoriteSongsCount} 首";
+                    }
+                    else
+                    {
+                        _statsLabel.Text = "累计共听统计正在同步...";
+                    }
                 }
             });
         };
         ListenTogetherManager.Instance.SpaceStatsUpdated += _onStatsUpdated;
 
+        _onRoomChanged = _ =>
+        {
+            Application.Invoke(RenderContent);
+        };
+        ListenTogetherManager.Instance.RoomChanged += _onRoomChanged;
+
         RenderContent();
+    }
+
+    protected override bool OnAccepting(CommandEventArgs? args)
+    {
+        // 阻止基类 Dialog 默认将内部任意 Button 的 Accepting 冒泡作为 RequestStop() 的行为。
+        // ListenTogetherDialog 的退出由关闭按钮与 K/Esc 键显式控制。
+        return false;
     }
 
     protected override void Dispose(bool disposing)
@@ -95,6 +119,7 @@ public sealed class ListenTogetherDialog : Dialog
         if (disposing)
         {
             ListenTogetherManager.Instance.SpaceStatsUpdated -= _onStatsUpdated;
+            ListenTogetherManager.Instance.RoomChanged -= _onRoomChanged;
         }
         base.Dispose(disposing);
     }
@@ -334,9 +359,20 @@ public sealed class ListenTogetherDialog : Dialog
         songLabel.SetScheme(TransparentDialogScheme);
         Add(songLabel);
 
-        string statsDesc = stats != null
-            ? $"累计共听: {stats.ListenMinutes} 分钟 | 已听: {stats.ListenSongsCount} 首 | 共同收藏: {stats.FavoriteSongsCount} 首"
-            : "累计共听统计正在同步...";
+        string statsDesc;
+        if (room.UsersCount < 2)
+        {
+            statsDesc = "等待好友加入后开启统计";
+        }
+        else if (stats != null)
+        {
+            statsDesc = $"累计共听: {stats.ListenMinutes} 分钟 | 已听: {stats.ListenSongsCount} 首 | 共同收藏: {stats.FavoriteSongsCount} 首";
+        }
+        else
+        {
+            statsDesc = "累计共听统计正在同步...";
+        }
+
         _statsLabel = new Label
         {
             Text = statsDesc,
@@ -373,9 +409,7 @@ public sealed class ListenTogetherDialog : Dialog
         leaveBtn.SetScheme(TransparentDialogScheme);
         leaveBtn.Accepting += (s, e) =>
         {
-            ListenTogetherManager.Instance.LeaveRoom();
-            _statusCallback?.Invoke("已退出一起听");
-            RenderContent();
+            ShowLeaveConfirmDialog();
         };
         Add(leaveBtn);
 
@@ -406,5 +440,68 @@ public sealed class ListenTogetherDialog : Dialog
         {
             _statusNoticeLabel.Text = msg;
         }
+    }
+
+    private void ShowLeaveConfirmDialog()
+    {
+        var confirmDlg = new Dialog
+        {
+            Title = "退出确认",
+            Width = 46,
+            Height = 8,
+            X = Pos.Center(),
+            Y = Pos.Center()
+        };
+        confirmDlg.SetScheme(TransparentDialogScheme);
+
+        var msg = new Label
+        {
+            Text = "确定要退出当前一起听房间吗？",
+            X = Pos.Center(),
+            Y = 1
+        };
+        msg.SetScheme(TransparentDialogScheme);
+        confirmDlg.Add(msg);
+
+        var yesBtn = new Button
+        {
+            Text = "确定 (Enter)",
+            X = Pos.Center() - 14,
+            Y = Pos.AnchorEnd(1),
+            ShadowStyle = ShadowStyles.None
+        };
+        yesBtn.SetScheme(TransparentDialogScheme);
+        yesBtn.Accepting += (s, e) =>
+        {
+            Application.RequestStop(confirmDlg);
+            ListenTogetherManager.Instance.LeaveRoom();
+            _statusCallback?.Invoke("已退出一起听");
+            RenderContent();
+        };
+
+        var noBtn = new Button
+        {
+            Text = "取消 (Esc)",
+            X = Pos.Center() + 2,
+            Y = Pos.AnchorEnd(1),
+            ShadowStyle = ShadowStyles.None
+        };
+        noBtn.SetScheme(TransparentDialogScheme);
+        noBtn.Accepting += (s, e) =>
+        {
+            Application.RequestStop(confirmDlg);
+        };
+
+        confirmDlg.KeyDown += (s, k) =>
+        {
+            if (k == Key.Esc)
+            {
+                k.Handled = true;
+                Application.RequestStop(confirmDlg);
+            }
+        };
+
+        confirmDlg.Add(yesBtn, noBtn);
+        Application.Run(confirmDlg);
     }
 }

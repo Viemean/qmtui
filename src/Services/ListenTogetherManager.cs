@@ -103,6 +103,14 @@ public sealed class ListenTogetherManager : IDisposable
         }
     }
 
+    internal void SetRoomForTesting(ListenTogetherRoomInfo? room)
+    {
+        lock (_lock)
+        {
+            CurrentRoom = room;
+        }
+    }
+
     /// <summary>
     /// 发起创建一起听房间并启动心跳同步。
     /// </summary>
@@ -508,6 +516,11 @@ public sealed class ListenTogetherManager : IDisposable
                         if (oldUsers != state.UsersCount)
                         {
                             current.UsersCount = state.UsersCount;
+                            if (state.UsersCount < 2)
+                            {
+                                ResetSpaceStats();
+                                SpaceStatsUpdated?.Invoke(null);
+                            }
                             RoomChanged?.Invoke(current);
                         }
 
@@ -818,6 +831,9 @@ public sealed class ListenTogetherManager : IDisposable
     private void FetchSpaceStats(string showId, string partnerEncUin, bool force = false)
     {
         if (string.IsNullOrEmpty(showId) || string.IsNullOrEmpty(partnerEncUin)) return;
+        var room = CurrentRoom;
+        if (room == null || room.UsersCount < 2) return;
+
         long now = Environment.TickCount64;
         if (!force && string.Equals(_lastFetchedStatsRoomId, showId, StringComparison.OrdinalIgnoreCase) &&
             SpaceStats != null && (now - _lastStatsFetchTick) < 120_000)
