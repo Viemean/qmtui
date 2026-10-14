@@ -14,6 +14,50 @@ namespace QmTui.UI;
 public sealed partial class MainWindow
 {
     private bool _isLoginDialogOpen;
+    private bool _isListenTogetherDialogOpen;
+
+    private void ShowListenTogetherDialog()
+    {
+        if (_isListenTogetherDialogOpen)
+        {
+            if (_activeModalDialog is ListenTogetherDialog ltd)
+            {
+                Application.RequestStop(ltd);
+            }
+            return;
+        }
+
+        _isListenTogetherDialogOpen = true;
+        try
+        {
+            var dlg = new ListenTogetherDialog(
+                () => _activeSong,
+                () => PlaybackQueueService.Instance.ActiveSongs,
+                () => (long)(_player.CurrentPositionSeconds * 1000),
+                msg => _controlBar.UpdateStatus(msg)
+            );
+            RunModalDialog(dlg);
+        }
+        finally
+        {
+            _isListenTogetherDialogOpen = false;
+        }
+    }
+
+    private void UpdateListenTogetherStatusUi()
+    {
+        var room = ListenTogetherManager.Instance.CurrentRoom;
+        if (room != null)
+        {
+            _listenTogetherStatusLabel.Text = $" [一起听 {room.UsersCount}人] ";
+            _listenTogetherStatusLabel.Visible = true;
+        }
+        else
+        {
+            _listenTogetherStatusLabel.Visible = false;
+        }
+        SetNeedsDraw();
+    }
 
     private void ShowLoginDialog()
     {

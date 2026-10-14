@@ -752,7 +752,7 @@ public sealed partial class MainWindow
             _lyricImmersiveBtn.Visible = true;
 
             _lyricTitleLabel.Text = " 歌词 ";
-            _hotkeyHintLabel.Text = " [V]播放界面  [B]通知  [M]静音  [- / +]音量  [/]搜索  [E]队列  [G]查找  [C]评论";
+            _hotkeyHintLabel.Text = " [V]播放界面  [K]一起听  [B]通知  [M]静音  [- / +]音量  [/]搜索  [E]队列  [G]查找  [C]评论";
             _songListView.SetFocusToList();
         }
 

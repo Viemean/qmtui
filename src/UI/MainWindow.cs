@@ -73,6 +73,7 @@ public sealed partial class MainWindow : Window
     private readonly Label _lyricTransBtn;
     private readonly Label _lyricImmersiveBtn;
     private readonly Label _lyricMatchBtn;
+    private readonly Label _listenTogetherStatusLabel;
     private bool _isImmersiveMode;
     private long _lastImmersiveActivityTick;
     private object? _immersiveActivityTimerToken;
@@ -1103,7 +1104,7 @@ public sealed partial class MainWindow : Window
         // 底部快捷键操作指南（独立放置在控制栏UI方框下方最底行，干净平整无边框干扰）
         _hotkeyHintLabel = new Label
         {
-            Text = " [V]播放界面  [B]通知  [M]静音  [- / +]音量  [/]搜索  [E]队列  [G]查找  [C]评论",
+            Text = " [V]播放界面  [K]一起听  [B]通知  [M]静音  [- / +]音量  [/]搜索  [E]队列  [G]查找  [C]评论",
             X = 0,
             Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),
@@ -1119,7 +1120,7 @@ public sealed partial class MainWindow : Window
         {
             if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
             {
-                if (m.Position.HasValue && m.Position.Value.X >= 55)
+                if (m.Position.HasValue && m.Position.Value.X >= 64)
                 {
                     ToggleCommentView();
                     m.Handled = true;
@@ -1127,6 +1128,30 @@ public sealed partial class MainWindow : Window
             }
         };
         Add(_hotkeyHintLabel);
+
+        _listenTogetherStatusLabel = new Label
+        {
+            Text = "",
+            X = Pos.AnchorEnd(18),
+            Y = Pos.AnchorEnd(1),
+            Width = 18,
+            Height = 1,
+            CanFocus = false,
+            Visible = false
+        };
+        _listenTogetherStatusLabel.SetScheme(new Scheme
+        {
+            Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenPrimary, MikuTheme.MikuBgSurface)
+        });
+        _listenTogetherStatusLabel.MouseEvent += (s, m) =>
+        {
+            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
+            {
+                ShowListenTogetherDialog();
+                m.Handled = true;
+            }
+        };
+        Add(_listenTogetherStatusLabel);
 
         // 顶部三大窗格置顶常驻高亮标题（即使未获焦暗化边框线条，标题文本始终保持翡翠薄荷绿高亮）
         _sidebarTitleLabel = new Label
@@ -1405,6 +1430,17 @@ public sealed partial class MainWindow : Window
             });
         }
 
+        ListenTogetherManager.Instance.PlaySongHandler = (song, offsetSec) => PlaySongAsync(song, offsetSec);
+        ListenTogetherManager.Instance.PlayHandler = () => _player.TogglePauseAsync();
+        ListenTogetherManager.Instance.PauseHandler = () => _player.TogglePauseAsync();
+        ListenTogetherManager.Instance.SeekHandler = sec => _player.SeekAsync(sec);
+        ListenTogetherManager.Instance.IsPlayingGetter = () => _player.IsPlaying;
+        ListenTogetherManager.Instance.CurrentPositionSecondsGetter = () => _player.CurrentPositionSeconds;
+        ListenTogetherManager.Instance.CurrentSongGetter = () => _activeSong;
+        ListenTogetherManager.Instance.RoomChanged += _ => Application.Invoke(UpdateListenTogetherStatusUi);
+        ListenTogetherManager.Instance.SpaceStatsUpdated += _ => Application.Invoke(UpdateListenTogetherStatusUi);
+        ListenTogetherManager.Instance.StatusMessageRequested += msg => Application.Invoke(() => _controlBar.UpdateStatus(msg));
+
         RestorePlaybackState();
         UpdateSidebarLayout();
     }
@@ -1609,6 +1645,11 @@ public sealed partial class MainWindow : Window
         if (totalSec > 0)
         {
             targetSec = Math.Clamp(targetSec, 0, totalSec);
+        }
+
+        if (ListenTogetherManager.Instance.IsInRoom && !ListenTogetherManager.Instance.IsSyncingFromRemote)
+        {
+            ListenTogetherManager.Instance.HandleLocalAction(cmd: 7, offsetMs: (long)(targetSec * 1000));
         }
 
         if (_isTuiAudioDisabled)

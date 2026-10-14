@@ -48,6 +48,14 @@ public sealed partial class MainWindow
                 }
                 return;
             }
+
+            if (activeModal is ListenTogetherDialog ltd && (k == Key.K || k.AsRune.Value == 'k' || k.AsRune.Value == 'K'))
+            {
+                k.Handled = true;
+                IsTerminalWindowFocused = true;
+                Application.RequestStop(ltd);
+                return;
+            }
         }
 
         // 0.5. ANSI 1004 Focus Reporting 状态机与失焦/后台按键拦截
@@ -509,6 +517,14 @@ public sealed partial class MainWindow
             if (_isNowPlayingViewActive) return true;
             k.Handled = true;
             HandleWebButtonClicked();
+            return true;
+        }
+
+        if (c == 'K')
+        {
+            if (_isNowPlayingViewActive) return true;
+            k.Handled = true;
+            ShowListenTogetherDialog();
             return true;
         }
 
