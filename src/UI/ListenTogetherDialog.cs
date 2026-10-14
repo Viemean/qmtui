@@ -34,6 +34,8 @@ public sealed class ListenTogetherDialog : Dialog
 
     private TextField? _joinInput;
     private Label? _statusNoticeLabel;
+    private Label? _statsLabel;
+    private readonly Action<ListenTogetherSpaceStats?> _onStatsUpdated;
 
     public ListenTogetherDialog(
         Func<Song?> currentSongGetter,
@@ -47,7 +49,7 @@ public sealed class ListenTogetherDialog : Dialog
         _statusCallback = statusCallback;
 
         Title = " 一起听 ";
-        Width = 56;
+        Width = 60;
         Height = 15;
         X = Pos.Center();
         Y = Pos.Center();
@@ -71,7 +73,30 @@ public sealed class ListenTogetherDialog : Dialog
             }
         };
 
+        _onStatsUpdated = s =>
+        {
+            Application.Invoke(() =>
+            {
+                if (_statsLabel != null)
+                {
+                    _statsLabel.Text = s != null
+                        ? $"累计共听: {s.ListenMinutes} 分钟 | 已听: {s.ListenSongsCount} 首 | 共同收藏: {s.FavoriteSongsCount} 首"
+                        : "累计共听统计正在同步...";
+                }
+            });
+        };
+        ListenTogetherManager.Instance.SpaceStatsUpdated += _onStatsUpdated;
+
         RenderContent();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            ListenTogetherManager.Instance.SpaceStatsUpdated -= _onStatsUpdated;
+        }
+        base.Dispose(disposing);
     }
 
     private void RenderContent()
@@ -310,16 +335,16 @@ public sealed class ListenTogetherDialog : Dialog
         Add(songLabel);
 
         string statsDesc = stats != null
-            ? $"累计共听: {stats.ListenMinutes} 分钟 | 已听: {stats.ListenSongsCount} 首"
+            ? $"累计共听: {stats.ListenMinutes} 分钟 | 已听: {stats.ListenSongsCount} 首 | 共同收藏: {stats.FavoriteSongsCount} 首"
             : "累计共听统计正在同步...";
-        var statsLabel = new Label
+        _statsLabel = new Label
         {
             Text = statsDesc,
             X = 2,
             Y = 5
         };
-        statsLabel.SetScheme(TransparentDialogScheme);
-        Add(statsLabel);
+        _statsLabel.SetScheme(TransparentDialogScheme);
+        Add(_statsLabel);
 
         var copyBtn = new Button
         {
@@ -342,7 +367,7 @@ public sealed class ListenTogetherDialog : Dialog
         var leaveBtn = new Button
         {
             Text = " 退出房间 ",
-            X = 20,
+            X = 21,
             Y = 7
         };
         leaveBtn.SetScheme(TransparentDialogScheme);
