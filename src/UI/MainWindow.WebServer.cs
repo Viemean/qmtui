@@ -315,6 +315,10 @@ public sealed partial class MainWindow
                 _standaloneWebServer.IsPlaying = _player.IsPlaying;
                 _standaloneWebServer.BroadcastState(_player.IsPlaying ? "play" : "pause");
             }
+            if (ListenTogetherManager.Instance.IsInRoom && !ListenTogetherManager.Instance.IsSyncingFromRemote)
+            {
+                ListenTogetherManager.Instance.HandleLocalAction(_player.IsPlaying ? 2 : 3);
+            }
             UpdatePlayerStatus();
         }
     }

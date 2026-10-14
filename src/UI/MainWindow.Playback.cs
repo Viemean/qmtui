@@ -54,6 +54,12 @@ public sealed partial class MainWindow
 
     private async Task PlaySongAsync(Song song, double startPosition = 0, string? overridePlayUrl = null)
     {
+        if (ListenTogetherManager.Instance.IsInRoom && ListenTogetherManager.IsLocalOrWebDavSong(song))
+        {
+            _controlBar.UpdateStatus("[一起听] 处于一起听房间，暂不支持播放本地/私有云曲目");
+            return;
+        }
+
         var previousCts = Interlocked.Exchange(ref _playbackCts, new CancellationTokenSource());
         try
         {
@@ -458,6 +464,13 @@ public sealed partial class MainWindow
                 _standaloneWebServer.IsCurrentSongFavorite = isFav;
                 _standaloneWebServer.BroadcastState("play");
             }
+
+            if (ListenTogetherManager.Instance.IsInRoom && !ListenTogetherManager.Instance.IsSyncingFromRemote)
+            {
+                int songIdx = PlaybackQueueService.Instance.CurrentIndex;
+                ListenTogetherManager.Instance.HandleLocalAction(cmd: 4, songId: song.Id, songTitle: song.Title, songIndex: songIdx, offsetMs: (long)(startPosition * 1000));
+            }
+
             UserSession.Current.LastPlayedSong = song;
             UserSession.Current.LastPlaybackPositionSeconds = startPosition;
             UserSession.Current.Save();

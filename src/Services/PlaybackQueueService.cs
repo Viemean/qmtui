@@ -70,6 +70,12 @@ public sealed class PlaybackQueueService
     /// <param name="sourceContext">队列曲目的来源上下文信息；若无则为 null。</param>
     public void SetQueue(IEnumerable<Song> songs, int startIndex = 0, PlaybackSourceContext? sourceContext = null)
     {
+        var mgr = ListenTogetherManager.Instance;
+        if (mgr.IsInRoom)
+        {
+            songs = songs.Where(s => !ListenTogetherManager.IsLocalOrWebDavSong(s));
+        }
+
         lock (_lock)
         {
             SourceContext = sourceContext;
@@ -91,6 +97,12 @@ public sealed class PlaybackQueueService
 
         QueueChanged?.Invoke();
         SaveQueueDebounced();
+
+        if (mgr.IsInRoom && !mgr.IsSyncingFromRemote && _activeSongs.Count > 0)
+        {
+            var targetSong = CurrentSong ?? _activeSongs[0];
+            mgr.HandleLocalAction(cmd: 1, songId: targetSong.Id, songTitle: targetSong.Title, songIndex: CurrentIndex, playlist: _activeSongs);
+        }
     }
 
     /// <summary>
@@ -99,6 +111,12 @@ public sealed class PlaybackQueueService
     /// <param name="song">插队至下一首顺位的曲目对象。</param>
     public void InsertNext(Song song)
     {
+        var mgr = ListenTogetherManager.Instance;
+        if (mgr.IsInRoom && ListenTogetherManager.IsLocalOrWebDavSong(song))
+        {
+            return;
+        }
+
         lock (_lock)
         {
             if (_activeSongs.Count == 0)
@@ -138,6 +156,12 @@ public sealed class PlaybackQueueService
         AppLogger.Info("PlaybackQueue", $"Song inserted next: {song.Title} - {song.Artist}");
         QueueChanged?.Invoke();
         SaveQueueDebounced();
+
+        if (mgr.IsInRoom && !mgr.IsSyncingFromRemote && _activeSongs.Count > 0)
+        {
+            var targetSong = CurrentSong ?? _activeSongs[0];
+            mgr.HandleLocalAction(cmd: 1, songId: targetSong.Id, songTitle: targetSong.Title, songIndex: CurrentIndex, playlist: _activeSongs);
+        }
     }
 
     /// <summary>
