@@ -1118,9 +1118,11 @@ public sealed partial class MainWindow : Window
         });
         _hotkeyHintLabel.MouseEvent += (s, m) =>
         {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
+            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked) && m.Position.HasValue)
             {
-                if (m.Position.HasValue && m.Position.Value.X >= 64)
+                string text = _hotkeyHintLabel.Text ?? "";
+                int commentIdx = text.IndexOf("[C]", StringComparison.Ordinal);
+                if (commentIdx >= 0 && m.Position.Value.X >= commentIdx)
                 {
                     ToggleCommentView();
                     m.Handled = true;
@@ -1290,6 +1292,7 @@ public sealed partial class MainWindow : Window
         ViewportChanged += (s, e) =>
         {
             UpdateSidebarLayout();
+            UpdateFooterLayout();
             if (_isNowPlayingViewActive)
             {
                 _nowPlayingView.OnWindowResized();
@@ -1443,6 +1446,33 @@ public sealed partial class MainWindow : Window
 
         RestorePlaybackState();
         UpdateSidebarLayout();
+        UpdateFooterLayout();
+    }
+
+    public void UpdateFooterLayout()
+    {
+        int width = Viewport.Width > 0 ? Viewport.Width : (Application.Driver?.Cols ?? 120);
+        bool isTogetherActive = _listenTogetherStatusLabel.Visible;
+        int reservedRight = isTogetherActive ? 18 : 0;
+        _hotkeyHintLabel.Width = Dim.Fill(reservedRight);
+
+        int availableWidth = width - reservedRight;
+        if (availableWidth >= 92)
+        {
+            _hotkeyHintLabel.Text = " [V]播放界面  [K]一起听  [B]通知  [M]静音  [- / +]音量  [/]搜索  [E]队列  [G]查找  [C]评论";
+        }
+        else if (availableWidth >= 74)
+        {
+            _hotkeyHintLabel.Text = " [V]界面  [K]一起听  [B]通知  [M]静音  [-/+]音量  [/]搜索  [E]队列  [C]评论";
+        }
+        else if (availableWidth >= 54)
+        {
+            _hotkeyHintLabel.Text = " [V]界面  [K]一起听  [M]静音  [-/+]音量  [/]搜索  [E]队列";
+        }
+        else
+        {
+            _hotkeyHintLabel.Text = " [V]界面  [K]一起听  [/]搜索";
+        }
     }
 
     public void UpdateSidebarLayout()

@@ -56,6 +56,7 @@ public sealed partial class MainWindow
         {
             _listenTogetherStatusLabel.Visible = false;
         }
+        UpdateFooterLayout();
         SetNeedsDraw();
     }
 
