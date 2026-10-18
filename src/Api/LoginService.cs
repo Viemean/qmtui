@@ -440,7 +440,7 @@ public sealed partial class LoginService
             ["qm_keyst"] = musicKey,
             ["qqmusic_version"] = "17",
             ["qqmusic_miniversion"] = "70",
-            ["tmeLoginType"] = type == QrLoginType.WeChat ? "1" : "6"
+            ["tmeLoginType"] = type == QrLoginType.WeChat ? "1" : "2"
         };
 
         AddCredentialCookie(data, cookies, "openid", type == QrLoginType.WeChat ? "psrf_wxopenid" : "openid");
@@ -519,7 +519,25 @@ public sealed partial class LoginService
                 }
             }
 
-            // 2. 若存有 p_skey，自动走 OAuth2 重授权换票流程
+            // 2. 若存有 refresh_token 与 musicid/uin，尝试通过官方 App LoginServer 接口续期
+            if (UserSession.Current.Cookies.TryGetValue("refresh_token", out var refreshToken) && !string.IsNullOrEmpty(refreshToken))
+            {
+                var musicId = UserSession.Current.Uin;
+                if (string.IsNullOrEmpty(musicId) && UserSession.Current.Cookies.TryGetValue("musicid", out var mid)) musicId = mid;
+                if (string.IsNullOrEmpty(musicId) && UserSession.Current.Cookies.TryGetValue("uin", out var uin)) musicId = uin;
+
+                if (!string.IsNullOrEmpty(musicId))
+                {
+                    UserSession.Current.Cookies.TryGetValue("refresh_key", out var refreshKey);
+                    AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting token refresh via music.login.LoginServer...");
+                    if (await RefreshOfficialAppTokenAsync(musicId, refreshToken, refreshKey ?? "", ct).ConfigureAwait(false))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            // 3. 若存有 p_skey，自动走 OAuth2 重授权换票流程
             if (UserSession.Current.Cookies.TryGetValue("p_skey", out var pskey) && !string.IsNullOrEmpty(pskey))
             {
                 AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting automatic OAuth2 exchange via p_skey...");
@@ -576,6 +594,109 @@ public sealed partial class LoginService
             AppLogger.Warn("LoginService", $"RefreshQQLoginTokenAsync exception: {ex.Message}");
         }
         return false;
+    }
+
+    /// <summary>
+    /// 使用移动端官方 App 登录下发的 refresh_token 与 refresh_key 刷新 musickey 凭据。
+    /// </summary>
+    /// <param name="musicId">用户识别标识（musicid 或 uin）。</param>
+    /// <param name="refreshToken">官方登录下发的长效刷新令牌。</param>
+    /// <param name="refreshKey">官方登录下发的刷新密钥。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>若刷新成功并更新凭据返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
+    public static async Task<bool> RefreshOfficialAppTokenAsync(
+        string musicId,
+        string refreshToken,
+        string refreshKey = "",
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var cleanId = musicId.TrimStart('o');
+            if (!long.TryParse(cleanId, out var numericUin)) return false;
+
+            var cookies = UserSession.Current.Cookies;
+            var currentMusicKey = UserSession.Current.MusicKey;
+            if (string.IsNullOrEmpty(currentMusicKey) && cookies.TryGetValue("qm_keyst", out var mk)) currentMusicKey = mk;
+            if (string.IsNullOrEmpty(currentMusicKey) && cookies.TryGetValue("musickey", out var mk2)) currentMusicKey = mk2;
+
+            var rawLoginType = cookies.TryGetValue("tmeLoginType", out var lt) && int.TryParse(lt, out var lti) ? lti : 2;
+            var actualLoginType = (rawLoginType == 1 || rawLoginType == 2) ? rawLoginType : 2;
+
+            cookies.TryGetValue("openid", out var openid);
+            if (string.IsNullOrEmpty(openid) && cookies.TryGetValue("psrf_qqopenid", out var qqOpenid)) openid = qqOpenid;
+
+            cookies.TryGetValue("access_token", out var accessToken);
+            if (string.IsNullOrEmpty(accessToken) && cookies.TryGetValue("psrf_qqaccess_token", out var qqAccessToken)) accessToken = qqAccessToken;
+
+            var sb = new StringBuilder(512);
+            sb.Append("{\"comm\":{\"ct\":11,\"cv\":14090008,\"v\":14090008,\"chid\":\"10003505\",\"tmeAppID\":\"qqmusic\",\"tmeLoginType\":")
+              .Append(actualLoginType).Append("},\"req_0\":{\"module\":\"music.login.LoginServer\",\"method\":\"Login\",\"param\":{")
+              .Append("\"musicid\":").Append(numericUin)
+              .Append(",\"refresh_token\":\"").Append(JsonEncodedText.Encode(refreshToken)).Append('"');
+
+            if (!string.IsNullOrEmpty(refreshKey))
+            {
+                sb.Append(",\"refresh_key\":\"").Append(JsonEncodedText.Encode(refreshKey)).Append('"');
+            }
+            if (!string.IsNullOrEmpty(currentMusicKey))
+            {
+                sb.Append(",\"musickey\":\"").Append(JsonEncodedText.Encode(currentMusicKey)).Append('"');
+            }
+            if (!string.IsNullOrEmpty(openid))
+            {
+                sb.Append(",\"openid\":\"").Append(JsonEncodedText.Encode(openid)).Append('"');
+            }
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                sb.Append(",\"access_token\":\"").Append(JsonEncodedText.Encode(accessToken)).Append('"');
+            }
+            sb.Append(",\"loginMode\":2}}}");
+            var payload = sb.ToString();
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, "https://u.y.qq.com/cgi-bin/musicu.fcg");
+            req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+            req.Headers.TryAddWithoutValidation("User-Agent", "QQMusic 14090008(android 14)");
+
+            using var resp = await s_http.SendAsync(req, ct).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) return false;
+            var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("req_0", out var req0) ||
+                !req0.TryGetProperty("code", out var codeElem) ||
+                codeElem.GetInt32() != 0 ||
+                !req0.TryGetProperty("data", out var data))
+            {
+                AppLogger.Warn("LoginService", $"RefreshOfficialAppToken rejected: {json}");
+                return false;
+            }
+
+            var newMusicKey = GetJsonString(data, "musickey");
+            if (string.IsNullOrEmpty(newMusicKey)) return false;
+
+            var cookieDict = UserSession.Current.Cookies;
+            cookieDict["musickey"] = newMusicKey;
+            cookieDict["qm_keyst"] = newMusicKey;
+            cookieDict["qqmusic_key"] = newMusicKey;
+            cookieDict["tmeLoginType"] = actualLoginType.ToString();
+
+            AddCredentialCookie(data, cookieDict, "refresh_token", "refresh_token");
+            AddCredentialCookie(data, cookieDict, "refresh_key", "refresh_key");
+            AddCredentialCookie(data, cookieDict, "openid", "openid");
+            AddCredentialCookie(data, cookieDict, "access_token", "access_token");
+
+            UserSession.Current.MusicKey = newMusicKey;
+            UserSession.Current.Save();
+            await MusicApi.RefreshCurrentUserProfileAsync(ct).ConfigureAwait(false);
+            AppLogger.Info("LoginService", $"Refreshed OfficialApp credentials stored for musicid={musicId}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("LoginService", $"RefreshOfficialAppToken exception: {ex.Message}");
+            return false;
+        }
     }
 
     private static async Task<bool> ApplyLoginDataAsync(JsonElement loginData, Dictionary<string, string> cookieDict, CancellationToken ct)
