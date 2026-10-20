@@ -29,6 +29,12 @@ public sealed class UserConfig
     public bool EnableAudioRecognitionPreRoll { get; set; } = true;
 
     /// <summary>
+    /// 主题模式 ("auto" 自动检测, "light" 亮色, "dark" 暗色)
+    /// </summary>
+    [JsonPropertyName("theme_mode")]
+    public string ThemeMode { get; set; } = "auto";
+
+    /// <summary>
     /// 从 ~/.config/qmtui/config.json 加载偏好配置
     /// </summary>
     public static void Load()

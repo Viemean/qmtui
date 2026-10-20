@@ -54,6 +54,7 @@ public sealed partial class MainWindow : Window
     private readonly Button _userStatusBtn;
     private readonly Button _recognizeBtn;
     private readonly Button _webBtn;
+    private readonly Button _themeBtn;
     private WebPlaybackServer? _standaloneWebServer;
     private string? _currentPlayUrl;
     private bool _isTuiAudioDisabled;
@@ -309,6 +310,20 @@ public sealed partial class MainWindow : Window
         _webBtn.KeyBindings.Remove(Key.Space);
         _webBtn.Accepting += (s, e) => HandleWebButtonClicked();
         Add(_webBtn);
+
+        // 顶部主题切换按钮：位于 Web 按钮右侧（循环切换：自动 -> 亮色 -> 暗色 -> 自动）
+        _themeBtn = new Button
+        {
+            Text = GetThemeButtonText(),
+            NoDecorations = true,
+            Y = 0,
+            ShadowStyle = ShadowStyles.None,
+            CanFocus = false
+        };
+        _themeBtn.TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop;
+        _themeBtn.KeyBindings.Remove(Key.Space);
+        _themeBtn.Accepting += (s, e) => HandleThemeButtonClicked();
+        Add(_themeBtn);
 
         _searchField = new TextField
         {
@@ -1792,30 +1807,37 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 动态刷新顶部右上角按钮（识曲、账号状态与 Web 协同按钮）的防重叠独立布局
-    /// 自右向左依次排列：[W] Web -> [U] 账号 -> [R] 识曲
+    /// 动态刷新顶部右上角按钮（主题、Web 协同、账号状态与识曲按钮）的防重叠独立布局
+    /// 自右向左依次排列：[主题] -> [W] Web -> [U] 账号 -> [R] 识曲
     /// </summary>
     internal void UpdateTopRightButtonsLayout()
     {
-        if (_userStatusBtn == null || _recognizeBtn == null || _webBtn == null || _searchField == null ||
+        if (_userStatusBtn == null || _recognizeBtn == null || _webBtn == null || _themeBtn == null || _searchField == null ||
             _searchSongsBtn == null || _searchPlaylistsBtn == null || _searchAlbumsBtn == null) return;
 
-        // 1. 最右侧：Web 协同按钮 [W] Web (右侧保留 1 列安全留白)
+        // 1. 最右侧：主题切换按钮 [主题:自动] / [主题:亮色] / [主题:暗色] (右侧保留 1 列安全留白)
+        var themeText = GetThemeButtonText();
+        _themeBtn.Text = themeText;
+        int themeBtnWidth = GetVisualWidth(themeText);
+        int themeAnchorOffset = themeBtnWidth + 1;
+        _themeBtn.X = Pos.AnchorEnd(themeAnchorOffset);
+
+        // 2. Web 协同按钮 [W] Web (排在主题按钮左侧，间隔 2 列)
         var isWebRunning = (_standaloneWebServer?.IsRunning == true) || (_player is WebPlayer);
         var webText = isWebRunning ? "[W] Web:开" : "[W] Web";
         _webBtn.Text = webText;
         int webBtnWidth = GetVisualWidth(webText);
-        int webAnchorOffset = webBtnWidth + 1;
+        int webAnchorOffset = themeAnchorOffset + 2 + webBtnWidth;
         _webBtn.X = Pos.AnchorEnd(webAnchorOffset);
 
-        // 2. 账号按钮 [U] 登录 / [U] 账号: ... (排在 Web 按钮左侧，间隔 2 列)
+        // 3. 账号按钮 [U] 登录 / [U] 账号: ... (排在 Web 按钮左侧，间隔 2 列)
         var statusText = GetUserStatusText();
         _userStatusBtn.Text = statusText;
         int userBtnWidth = GetVisualWidth(statusText);
         int userAnchorOffset = webAnchorOffset + 2 + userBtnWidth;
         _userStatusBtn.X = Pos.AnchorEnd(userAnchorOffset);
 
-        // 3. 识曲按钮 [R] 识曲 (排在账号按钮左侧，间隔 2 列)
+        // 4. 识曲按钮 [R] 识曲 (排在账号按钮左侧，间隔 2 列)
         const string recText = "[R] 识曲";
         _recognizeBtn.Text = recText;
         int recBtnWidth = GetVisualWidth(recText);
@@ -1856,6 +1878,77 @@ public sealed partial class MainWindow : Window
             _searchAlbumsBtn.X = currentX;
         }
 
+        SetNeedsLayout();
+    }
+
+    private static string GetThemeButtonText()
+    {
+        var mode = Models.UserConfig.Current.ThemeMode?.ToLowerInvariant() ?? "auto";
+        return mode switch
+        {
+            "light" => "[主题:亮色]",
+            "dark" => "[主题:暗色]",
+            _ => "[主题:自动]"
+        };
+    }
+
+    private void HandleThemeButtonClicked()
+    {
+        var current = Models.UserConfig.Current.ThemeMode?.ToLowerInvariant() ?? "auto";
+        string nextMode = current switch
+        {
+            "auto" => "light",
+            "light" => "dark",
+            "dark" => "auto",
+            _ => "auto"
+        };
+        Models.UserConfig.Current.ThemeMode = nextMode;
+        Models.UserConfig.Current.Save();
+
+        MikuTheme.ApplyTheme(nextMode);
+        ApplyCurrentThemeToMainWindow();
+
+        string display = nextMode switch
+        {
+            "light" => "亮色",
+            "dark" => "暗色",
+            _ => "自动"
+        };
+        _controlBar?.UpdateStatus($"已切换主题模式: {display}");
+    }
+
+    private void ApplyCurrentThemeToMainWindow()
+    {
+        MikuTheme.ApplyTo(this, MikuTheme.Base);
+        _themeBtn.SetScheme(MikuTheme.Base);
+        _webBtn.SetScheme(MikuTheme.Base);
+        _userStatusBtn.SetScheme(MikuTheme.Base);
+        _recognizeBtn.SetScheme(MikuTheme.Base);
+        _searchField.SetScheme(MikuTheme.Base);
+
+        _sidebarTitleLabel.SetScheme(MikuTheme.TitleHighlight);
+        _songListTitleLabel.SetScheme(MikuTheme.TitleHighlight);
+        _lyricTitleLabel.SetScheme(MikuTheme.TitleHighlight);
+
+        UpdateFrameBorderHighlights();
+        UpdateTopRightButtonsLayout();
+
+        _sidebarList.SetScheme(MikuTheme.Base);
+        _sidebarList.SetNeedsDraw();
+
+        _songListView.RefreshTheme();
+        _controlBar.RefreshTheme();
+        _nowPlayingView.RefreshTheme();
+        _songCommentView.RefreshTheme();
+        _miniCoverView.SetScheme(MikuTheme.FrameBorderDim);
+        _miniCoverView.SetNeedsDraw();
+
+        if (_artistAlbumDetailView.Visible)
+        {
+            _artistAlbumDetailView.ApplyInnerScheme();
+        }
+
+        SetNeedsDraw();
         SetNeedsLayout();
     }
 

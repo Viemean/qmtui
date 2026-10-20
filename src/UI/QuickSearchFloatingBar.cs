@@ -24,18 +24,7 @@ public sealed class QuickSearchFloatingBar : FrameView
     public event Action? DismissRequested;
     public Func<string, List<int>>? SearchProvider { get; set; }
 
-    private static Scheme FloatingSearchScheme { get; } = new Scheme
-    {
-        Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextWhite, Color.None),
-        Focus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark),
-        HotNormal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuPinkAccent, Color.None),
-        HotFocus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.MikuPinkAccent),
-        Disabled = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
-        Highlight = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenPrimary, Color.None),
-        Active = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
-        ReadOnly = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
-        Editable = new Terminal.Gui.Drawing.Attribute(Color.White, Color.None)
-    };
+    private static Scheme FloatingSearchScheme => MikuTheme.TransparentDialog;
 
     public QuickSearchFloatingBar()
     {

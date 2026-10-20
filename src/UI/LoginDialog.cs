@@ -20,18 +20,7 @@ public sealed class LoginDialog : Dialog
     private LoginService.QrLoginType _loginType = LoginService.QrLoginType.Qq;
     private object? _uiTimerToken;
 
-    private static Scheme TransparentDialogScheme { get; } = new Scheme
-    {
-        Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextWhite, Color.None),
-        Focus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark),
-        HotNormal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuPinkAccent, Color.None),
-        HotFocus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.MikuPinkAccent),
-        Disabled = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
-        Highlight = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenPrimary, Color.None),
-        Active = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
-        ReadOnly = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
-        Editable = new Terminal.Gui.Drawing.Attribute(Color.White, Color.None)
-    };
+    private static Scheme TransparentDialogScheme => MikuTheme.TransparentDialog;
 
     // 1. 网页登录容器 (默认首选)
     private readonly View _webContainer;

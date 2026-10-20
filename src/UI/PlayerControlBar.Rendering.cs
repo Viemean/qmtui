@@ -179,11 +179,12 @@ public sealed partial class PlayerControlBar
     {
         var focusScheme = new Scheme
         {
-            Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
-            Focus = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
-            HotNormal = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark)
+            Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqPlayingFocusText, MikuTheme.QqGreenDark),
+            Focus = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqPlayingFocusText, MikuTheme.QqGreenDark),
+            HotNormal = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqPlayingFocusText, MikuTheme.QqGreenDark)
         };
         var normalScheme = MikuTheme.PlayerBar;
+        _nowPlayingLabel.SetScheme(normalScheme);
 
         bool isFocused = HasFocus;
 
@@ -488,5 +489,11 @@ public sealed partial class PlayerControlBar
         _currentPercent = Math.Clamp(percent, 0, 1);
 
         RenderProgressLabel();
+    }
+
+    public void RefreshTheme()
+    {
+        UpdateControlHighlight();
+        SetNeedsDraw();
     }
 }

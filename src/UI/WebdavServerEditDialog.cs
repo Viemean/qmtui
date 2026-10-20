@@ -23,18 +23,7 @@ public sealed class WebdavServerEditDialog : Dialog
     private readonly WebDavServer _server;
     private readonly Action<WebDavServer> _onSaved;
 
-    private static Scheme TransparentDialogScheme { get; } = new Scheme
-    {
-        Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextWhite, Color.None),
-        Focus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.QqGreenDark),
-        HotNormal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuPinkAccent, Color.None),
-        HotFocus = new Terminal.Gui.Drawing.Attribute(Color.White, MikuTheme.MikuPinkAccent),
-        Disabled = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
-        Highlight = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenPrimary, Color.None),
-        Active = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
-        ReadOnly = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None),
-        Editable = new Terminal.Gui.Drawing.Attribute(Color.White, Color.None)
-    };
+    private static Scheme TransparentDialogScheme => MikuTheme.TransparentDialog;
 
     public WebdavServerEditDialog(WebDavServer? existingServer, Action<WebDavServer> onSaved)
     {

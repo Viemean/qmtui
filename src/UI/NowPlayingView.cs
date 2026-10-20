@@ -162,7 +162,7 @@ public sealed partial class NowPlayingView : View
         };
         _songTitleLabel.SetScheme(new Scheme
         {
-            Normal = new Attribute(Color.White, Color.None)
+            Normal = new Attribute(MikuTheme.MikuTextWhite, Color.None)
         });
 
         _hyphenLabel = new Label
@@ -684,5 +684,28 @@ public sealed partial class NowPlayingView : View
         }
         SetNeedsDraw();
         CommentViewToggled?.Invoke(_isCommentViewActive);
+    }
+
+    public void RefreshTheme()
+    {
+        _songTitleLabel.SetScheme(new Scheme
+        {
+            Normal = new Attribute(MikuTheme.MikuTextWhite, Color.None)
+        });
+        _hyphenLabel.SetScheme(new Scheme
+        {
+            Normal = new Attribute(MikuTheme.QqTextLyricDim, Color.None)
+        });
+        _lyricListView.SetScheme(MikuTheme.Lyric);
+        _lyricScrollBar.SetScheme(MikuTheme.FrameBorderActive);
+        _commentView.RefreshTheme();
+        UpdateTransButtonHighlight();
+        UpdateImmersiveButtonHighlight();
+        UpdateMatchLyricButtonHighlight();
+        _songTitleLabel.SetNeedsDraw();
+        _hyphenLabel.SetNeedsDraw();
+        _lyricListView.SetNeedsDraw();
+        _lyricScrollBar.SetNeedsDraw();
+        SetNeedsDraw();
     }
 }

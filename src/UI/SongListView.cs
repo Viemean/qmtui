@@ -255,21 +255,21 @@ public sealed partial class SongListView : FrameView
                     if (isPlaying)
                     {
                         // 正在播放且被光标选中：发光浅薄荷绿字 + 清晰海青高光底色
-                        e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark);
+                        e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqPlayingFocusText, MikuTheme.QqGreenDark);
                     }
                     return;
                 }
 
                 if (isSearchMatched)
                 {
-                    // 列表查找命中的非当前行：高亮底色 (QqGreenActive) + 浅薄荷绿字，醒目展现所有匹配项
-                    e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenActive);
+                    // 列表查找命中的非当前行：高亮底色绿字
+                    e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqPlayingFocusText, MikuTheme.QqGreenActive);
                     return;
                 }
 
                 if (isPlaying)
                 {
-                    // 正在播放但未被光标选中：纯正翡翠绿高亮字（与歌词高亮完全对齐）
+                    // 正在播放但未被光标选中：绿色亮字（与歌词高亮对齐）
                     e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenPrimary, Color.None);
                     return;
                 }
@@ -279,7 +279,7 @@ public sealed partial class SongListView : FrameView
                 bool isSelected = _listView.SelectedItem == e.Row;
                 if (!isSelected && _searchMatchedRows.Contains(e.Row))
                 {
-                    e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenActive);
+                    e.RowAttribute = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqPlayingFocusText, MikuTheme.QqGreenActive);
                 }
             }
         };

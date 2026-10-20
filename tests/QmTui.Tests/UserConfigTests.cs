@@ -12,19 +12,26 @@ public class UserConfigTests
     {
         var config = new UserConfig();
         Assert.True(config.EnableSongSwitchNotification);
+        Assert.Equal("auto", config.ThemeMode);
     }
 
     [Fact]
     public void UserConfig_SerializationRoundtrip_MaintainsValues()
     {
-        var original = new UserConfig { EnableSongSwitchNotification = false };
+        var original = new UserConfig
+        {
+            EnableSongSwitchNotification = false,
+            ThemeMode = "light"
+        };
         var json = JsonSerializer.Serialize(original, AppJsonContext.Default.UserConfig);
 
         Assert.Contains("\"enable_song_switch_notification\": false", json);
+        Assert.Contains("\"theme_mode\": \"light\"", json);
 
         var restored = JsonSerializer.Deserialize(json, AppJsonContext.Default.UserConfig);
         Assert.NotNull(restored);
         Assert.False(restored.EnableSongSwitchNotification);
+        Assert.Equal("light", restored.ThemeMode);
     }
 
     [Fact]

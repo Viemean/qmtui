@@ -35,6 +35,15 @@ public sealed partial class SongListView
         _locatePlayingBtn.SetScheme(iconScheme);
     }
 
+    public void RefreshTheme()
+    {
+        SetScheme(HasFocus ? MikuTheme.FrameBorderActive : MikuTheme.FrameBorderDim);
+        ApplyInnerScheme(MikuTheme.Base);
+        _scrollBar.SetScheme(MikuTheme.FrameBorderActive);
+        _listView.SetNeedsDraw();
+        SetNeedsDraw();
+    }
+
     public void ScrollToTop()
     {
         if (_isRadioMode) return;

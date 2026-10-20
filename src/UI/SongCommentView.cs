@@ -127,9 +127,9 @@ public sealed class SongCommentView : View
             if (isSelected)
             {
                 var fg = (item.Type == ItemType.CommentPic || item.Type == ItemType.HotToggle)
-                    ? MikuTheme.QqGreenLight
+                    ? MikuTheme.QqPlayingFocusText
                     : Color.White;
-                var bg = HasActiveFocus ? MikuTheme.QqGreenDark : Color.None;
+                var bg = HasActiveFocus ? MikuTheme.QqGreenDark : MikuTheme.QqGreenActive;
                 e.RowAttribute = new Attribute(fg, bg);
                 return;
             }
@@ -145,7 +145,7 @@ public sealed class SongCommentView : View
                 case ItemType.CommentMeta:
                     e.RowAttribute = item.IsHot
                         ? new Attribute(MikuTheme.QqGreenPrimary, Color.None)
-                        : new Attribute(Color.White, Color.None);
+                        : new Attribute(MikuTheme.MikuTextWhite, Color.None);
                     break;
                 case ItemType.CommentContent:
                     e.RowAttribute = new Attribute(MikuTheme.QqTextLyricDim, Color.None);
@@ -374,8 +374,8 @@ public sealed class SongCommentView : View
         _scrollTopBtn.SetScheme(new Scheme
         {
             Normal = new Attribute(MikuTheme.QqGreenPrimary, Color.None),
-            Focus = new Attribute(MikuTheme.QqGreenLight, MikuTheme.QqGreenDark),
-            HotNormal = new Attribute(MikuTheme.QqGreenLight, Color.None)
+            Focus = new Attribute(MikuTheme.QqPlayingFocusText, MikuTheme.QqGreenDark),
+            HotNormal = new Attribute(MikuTheme.QqPlayingFocusText, Color.None)
         });
         _scrollTopBtn.MouseEvent += (s, m) =>
         {
@@ -1559,6 +1559,23 @@ public sealed class SongCommentView : View
             _sharedSnapshot = snapshot;
             RestoreSnapshot(snapshot);
         }
+    }
+
+    /// <summary>
+    /// 刷新评论视图色彩配置以响应主题切换。
+    /// </summary>
+    public void RefreshTheme()
+    {
+        _listView.SetScheme(MikuTheme.Lyric);
+        _scrollBar.SetScheme(MikuTheme.FrameBorderActive);
+        _scrollTopBtn.SetScheme(new Scheme
+        {
+            Normal = new Attribute(MikuTheme.QqGreenPrimary, Color.None),
+            Focus = new Attribute(MikuTheme.QqPlayingFocusText, MikuTheme.QqGreenDark),
+            HotNormal = new Attribute(MikuTheme.QqPlayingFocusText, Color.None)
+        });
+        _listView.SetNeedsDraw();
+        SetNeedsDraw();
     }
 }
 
