@@ -9,6 +9,7 @@ TestResults/
 .agents/
 .tags
 *.raw.cs
+.idea/
 
 # 构建输出与打包产物
 *.pkg.tar.*
