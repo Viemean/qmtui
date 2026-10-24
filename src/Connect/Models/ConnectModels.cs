@@ -251,8 +251,13 @@ public sealed record ConnectSong(
     /// <param name="song">源曲目实体。</param>
     /// <param name="tier">期望输出的音频质量档位。</param>
     /// <param name="port">本机流媒体服务端口号。</param>
+    /// <param name="availableTiers">该曲目支持的音质档位列表；若未提供则根据曲目类型及缓存推导。</param>
     /// <returns>适用于网络广播与多端同步的 <see cref="ConnectSong"/> 模型。</returns>
-    public static ConnectSong FromDomainSong(Song song, AudioQualityTier tier = AudioQualityTier.SQ, int port = 8765)
+    public static ConnectSong FromDomainSong(
+        Song song,
+        AudioQualityTier tier = AudioQualityTier.SQ,
+        int port = 8765,
+        List<string>? availableTiers = null)
     {
         var singerList = song.Singers.Select(s => new ConnectArtist(s.Id, s.Mid, s.Name, "")).ToList();
 
@@ -293,6 +298,27 @@ public sealed record ConnectSong(
             }
         }
 
+        List<string>? effectiveAvailableTiers = availableTiers;
+        if (effectiveAvailableTiers == null)
+        {
+            if (song.IsPureLocalOrWebDav)
+            {
+                effectiveAvailableTiers = [tier.ToString()];
+            }
+            else
+            {
+                var cached = QmTui.Api.MusicApi.GetCachedAvailableTiers(song.Mid);
+                if (cached != null && cached.Count > 0)
+                {
+                    effectiveAvailableTiers = cached.Select(t => t.ToString()).ToList();
+                }
+                else
+                {
+                    effectiveAvailableTiers = [tier.ToString()];
+                }
+            }
+        }
+
         string cover = ResolveCoverUrl(song, port);
         return new ConnectSong(
             SongId: song.Id,
@@ -303,6 +329,7 @@ public sealed record ConnectSong(
             AlbumMid: song.AlbumMid,
             DurationSeconds: song.Duration,
             CurrentTier: tier.ToString(),
+            AvailableTiers: effectiveAvailableTiers,
             CoverUrl: cover,
             MediaMid: effectiveMediaMid,
             SingerList: singerList,

@@ -1,32 +1,29 @@
+# 编译与构建输出
 bin/
 obj/
-*.dbg
-*.tmp
-.tmp/
-*.media
 TestResults/
-.cache/
-.agents/
-.tags
-*.raw.cs
-.idea/
-
-# 构建输出与打包产物
 *.pkg.tar.*
 *.deb
 pkg/
 qmtui
-src/Services/AudioRecognition/Native/qafp_runner
-src/Services/AudioRecognition/Runtime/
-.docker/
-mod/
-qqmusiclinux/
-# 前端开发依赖
-node_modules/
-歌单类.md
 
-# 本地发布与 AUR 独立打包配置
-AUR/
-release-aur.sh
-bump-version.sh
-.bin/
+# 临时与缓存产物
+*.dbg
+*.tmp
+.tmp/
+.cache/
+*.media
+*.raw.cs
+node_modules/
+
+# IDE 与环境配置
+.idea/
+.tags
+.agents/
+.docker/
+
+# 通用待办与本地标记
+TODO*
+todo*
+*.local
+*.local.*

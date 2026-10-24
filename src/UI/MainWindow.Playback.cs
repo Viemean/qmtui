@@ -49,6 +49,7 @@ public sealed partial class MainWindow
     private string? _currentContextKey;
     private string? _currentCoverFilePath;
     private long _lastConnectBroadcastTick;
+    private List<AudioQualityTier> _currentAvailableTiers = [];
 
     private Task PlaySongAsync(Song song) => PlaySongAsync(song, 0, null);
 
@@ -226,6 +227,45 @@ public sealed partial class MainWindow
             _lyricListView.SetSource(new ObservableCollection<string> { "正在加载歌词..." });
             try { _lyricListView.SelectedItem = 0; } catch { }
         });
+
+        if (!song.IsPureLocalOrWebDav && !string.IsNullOrEmpty(song.Mid))
+        {
+            var cachedTiers = MusicApi.GetCachedAvailableTiers(song.Mid);
+            if (cachedTiers != null && cachedTiers.Count > 0)
+            {
+                _currentAvailableTiers = cachedTiers;
+            }
+            else
+            {
+                _currentAvailableTiers = [_actualQualityTier];
+                _ = Task.Run(async () =>
+                {
+                    if (IsStale()) return;
+                    try
+                    {
+                        var probed = await MusicApi.ProbeSongQualitiesAsync(song.Mid, song.EffectiveMediaMid, ct).ConfigureAwait(false);
+                        if (IsStale()) return;
+                        var valid = probed.Where(o => o.Available && DeviceAudioCapability.IsTierSupported(o.Tier))
+                            .Select(o => o.Tier)
+                            .ToList();
+                        if (valid.Count > 0 && _activeSong?.Mid == song.Mid)
+                        {
+                            _currentAvailableTiers = valid;
+                            BroadcastConnectPlayerState();
+                        }
+                    }
+                    catch (OperationCanceledException) { }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("MainWindow.Playback", $"Background probe error: {ex.Message}");
+                    }
+                }, ct);
+            }
+        }
+        else
+        {
+            _currentAvailableTiers = [_actualQualityTier];
+        }
 
         string? playUrl;
         List<LyricLine> lyrics;
@@ -453,6 +493,10 @@ public sealed partial class MainWindow
             if (IsStale()) return;
 
             _currentPlayUrl = playUrl;
+            if (!_currentAvailableTiers.Contains(_actualQualityTier))
+            {
+                _currentAvailableTiers.Add(_actualQualityTier);
+            }
             if (_standaloneWebServer != null && _standaloneWebServer.IsRunning)
             {
                 _standaloneWebServer.CurrentPlayUrl = playUrl;
@@ -464,6 +508,7 @@ public sealed partial class MainWindow
                 _standaloneWebServer.IsCurrentSongFavorite = isFav;
                 _standaloneWebServer.BroadcastState("play");
             }
+            BroadcastConnectPlayerState();
 
             if (ListenTogetherManager.Instance.IsInRoom && !ListenTogetherManager.Instance.IsSyncingFromRemote)
             {
@@ -855,13 +900,17 @@ public sealed partial class MainWindow
         UserSession.Current.PreferredQuality = AudioQualityHelper.GetBadge(newTier);
         UserSession.Current.Save();
 
-        if (_activeSong != null && !_activeSong.IsLocal && !_activeSong.IsWebDav)
+        if (_activeSong != null && !_activeSong.IsPureLocalOrWebDav)
         {
             double currentPos = _isTuiAudioDisabled ? _webVirtualPosition : _player.CurrentPositionSeconds;
             var (url, quality, actualTier) = await MusicApi.GetPlayUrlForTierAsync(_activeSong.Mid, _activeSong.EffectiveMediaMid, newTier);
             if (!string.IsNullOrEmpty(url))
             {
                 _actualQualityTier = actualTier;
+                if (!_currentAvailableTiers.Contains(actualTier))
+                {
+                    _currentAvailableTiers.Add(actualTier);
+                }
                 _activeSong.Quality = quality;
                 if (!_isTuiAudioDisabled)
                 {
@@ -882,6 +931,7 @@ public sealed partial class MainWindow
                     _standaloneWebServer.CurrentPositionSeconds = currentPos;
                     _standaloneWebServer.BroadcastState("play");
                 }
+                BroadcastConnectPlayerState();
             }
         }
         else

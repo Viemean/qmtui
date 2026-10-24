@@ -11,6 +11,19 @@ namespace QmTui.Api;
 
 public sealed partial class MusicApi
 {
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, List<AudioQualityTier>> s_probedAvailableTiers = new();
+
+    /// <summary>
+    /// 获取指定曲目已探测缓存的可用音频质量档位列表。
+    /// </summary>
+    /// <param name="songMid">歌曲唯一字符串标识。</param>
+    /// <returns>若已完成嗅探且有可用档位，返回已过滤的档位列表；否则返回 <see langword="null"/>。</returns>
+    public static List<AudioQualityTier>? GetCachedAvailableTiers(string songMid)
+    {
+        if (string.IsNullOrEmpty(songMid)) return null;
+        return s_probedAvailableTiers.TryGetValue(songMid, out var tiers) ? tiers : null;
+    }
+
     /// <summary>
     /// 探测指定曲目在各音质档位下的可用状态及播放参数。
     /// </summary>
@@ -92,6 +105,15 @@ public sealed partial class MusicApi
             }
 
             await RefineQualityMetadataAsync(options, doc.RootElement, songMid, ct).ConfigureAwait(false);
+
+            var validTiers = options
+                .Where(o => o.Available && DeviceAudioCapability.IsTierSupported(o.Tier))
+                .Select(o => o.Tier)
+                .ToList();
+            if (validTiers.Count > 0 && !string.IsNullOrEmpty(songMid))
+            {
+                s_probedAvailableTiers[songMid] = validTiers;
+            }
 
             return options;
         }

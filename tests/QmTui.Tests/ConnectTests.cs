@@ -660,4 +660,38 @@ public class ConnectTests
             if (File.Exists(coverFilePath)) File.Delete(coverFilePath);
         }
     }
+
+    [Fact]
+    public void FromDomainSong_PureLocalOrWebDavSong_RestrictsAvailableTiersToCurrentTier()
+    {
+        var localSong = new Song("local_test_1", "Local Song", "Artist", "Album", 180)
+        {
+            LocalFilePath = "/tmp/local_test_1.flac"
+        };
+        var connectLocal = ConnectSong.FromDomainSong(localSong, AudioQualityTier.SQ);
+        Assert.NotNull(connectLocal.AvailableTiers);
+        Assert.Single(connectLocal.AvailableTiers);
+        Assert.Equal("SQ", connectLocal.AvailableTiers[0]);
+
+        var webDavSong = new Song("webdav_srv1_test", "WebDav Song", "Artist", "Album", 200)
+        {
+            WebDavHref = "http://example.com/test.flac"
+        };
+        var connectWebDav = ConnectSong.FromDomainSong(webDavSong, AudioQualityTier.HiRes);
+        Assert.NotNull(connectWebDav.AvailableTiers);
+        Assert.Single(connectWebDav.AvailableTiers);
+        Assert.Equal("HiRes", connectWebDav.AvailableTiers[0]);
+    }
+
+    [Fact]
+    public void FromDomainSong_WithFilteredAvailableTiers_PreservesSpecifiedTiers()
+    {
+        var onlineSong = new Song("003onlineMid", "Online Song", "Artist", "Album", 210);
+        var filteredTiers = new List<string> { "Standard", "HQ", "SQ" };
+        var connectSong = ConnectSong.FromDomainSong(onlineSong, AudioQualityTier.SQ, availableTiers: filteredTiers);
+
+        Assert.NotNull(connectSong.AvailableTiers);
+        Assert.Equal(3, connectSong.AvailableTiers.Count);
+        Assert.Equal(filteredTiers, connectSong.AvailableTiers);
+    }
 }

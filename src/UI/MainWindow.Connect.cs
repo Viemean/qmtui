@@ -493,10 +493,32 @@ public sealed partial class MainWindow
 
             var actualPort = _connectServer.ActualPort;
 
+            List<string> availableTiers;
+            if (_activeSong == null || _activeSong.IsPureLocalOrWebDav)
+            {
+                availableTiers = [_actualQualityTier.ToString()];
+            }
+            else
+            {
+                var cached = QmTui.Api.MusicApi.GetCachedAvailableTiers(_activeSong.Mid);
+                if (cached != null && cached.Count > 0)
+                {
+                    availableTiers = cached.Select(t => t.ToString()).ToList();
+                }
+                else if (_currentAvailableTiers.Count > 0)
+                {
+                    availableTiers = _currentAvailableTiers.Select(t => t.ToString()).ToList();
+                }
+                else
+                {
+                    availableTiers = [_actualQualityTier.ToString()];
+                }
+            }
+
             ConnectSong? connectSong = null;
             if (_activeSong != null)
             {
-                connectSong = ConnectSong.FromDomainSong(_activeSong, _actualQualityTier, actualPort);
+                connectSong = ConnectSong.FromDomainSong(_activeSong, _actualQualityTier, actualPort, availableTiers);
             }
 
             ConnectSong? prevSong = null;
@@ -513,8 +535,6 @@ public sealed partial class MainWindow
             }
 
             string? lrcPayload = GetOrBuildFormattedLyricsPayload();
-
-            var availableTiers = new List<string> { "Standard", "HQ", "SQ", "HiRes", "Master" };
 
             var evt = new PlayerStateEvent(
                 CurrentSong: connectSong,
