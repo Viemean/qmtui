@@ -25,6 +25,11 @@ public record Song(
     public string? WebDavHref { get; set; }
     public bool IsWebDav => !string.IsNullOrEmpty(WebDavHref);
     public bool IsLocal => !string.IsNullOrEmpty(LocalFilePath) && !IsWebDav;
+    public bool IsPureLocalOrWebDav =>
+        string.IsNullOrEmpty(Mid) ||
+        Mid.StartsWith("local_", StringComparison.OrdinalIgnoreCase) ||
+        Mid.StartsWith("pc_local_", StringComparison.OrdinalIgnoreCase) ||
+        Mid.StartsWith("webdav_", StringComparison.OrdinalIgnoreCase);
     public string? CoverUrl { get; set; }
     public List<ArtistInfo> Singers { get; set; } = [];
 }

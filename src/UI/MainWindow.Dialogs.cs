@@ -81,7 +81,7 @@ public sealed partial class MainWindow
 
     private void ShowQualityDialog()
     {
-        if (_activeSong != null && (_activeSong.IsLocal || _activeSong.IsWebDav))
+        if (_activeSong != null && _activeSong.IsPureLocalOrWebDav)
         {
             ShowLocalOrWebDavAudioInfoDialog(_activeSong);
             return;

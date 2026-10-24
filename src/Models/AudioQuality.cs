@@ -11,7 +11,8 @@ public enum AudioQualityTier
     Master = 4,
     Premium = 5,
     Atmos = 6,
-    Dolby = 8
+    Dolby = 8,
+    DtsX = 9
 }
 
 public static class AudioQualityHelper
@@ -19,9 +20,10 @@ public static class AudioQualityHelper
     public static string GetBadge(AudioQualityTier tier) => tier switch
     {
         AudioQualityTier.Master => "母带",
-        AudioQualityTier.Premium => "臻品",
-        AudioQualityTier.Atmos => "全景声",
         AudioQualityTier.Dolby => "杜比",
+        AudioQualityTier.DtsX => "DTS:X",
+        AudioQualityTier.Atmos => "全景声",
+        AudioQualityTier.Premium => "臻品",
         AudioQualityTier.HiRes => "Hi-Res",
         AudioQualityTier.SQ => "SQ",
         AudioQualityTier.HQ => "HQ",
@@ -32,9 +34,10 @@ public static class AudioQualityHelper
     public static string GetPrefix(AudioQualityTier tier) => tier switch
     {
         AudioQualityTier.Master => "AI00",
-        AudioQualityTier.Premium => "Q000",
+        AudioQualityTier.Dolby => "D004",
+        AudioQualityTier.DtsX => "DT03",
         AudioQualityTier.Atmos => "Q001",
-        AudioQualityTier.Dolby => "Q000",
+        AudioQualityTier.Premium => "Q000",
         AudioQualityTier.HiRes => "RS01",
         AudioQualityTier.SQ => "F000",
         AudioQualityTier.HQ => "M800",
@@ -45,9 +48,10 @@ public static class AudioQualityHelper
     public static string GetExtension(AudioQualityTier tier) => tier switch
     {
         AudioQualityTier.Master => ".flac",
-        AudioQualityTier.Premium => ".flac",
+        AudioQualityTier.Dolby => ".mp4",
+        AudioQualityTier.DtsX => ".mp4",
         AudioQualityTier.Atmos => ".flac",
-        AudioQualityTier.Dolby => ".flac",
+        AudioQualityTier.Premium => ".flac",
         AudioQualityTier.HiRes => ".flac",
         AudioQualityTier.SQ => ".flac",
         AudioQualityTier.HQ => ".mp3",
@@ -58,9 +62,10 @@ public static class AudioQualityHelper
     public static (string Key, AudioQualityTier Tier, string Prefix, string Extension)[] ProbeRequests { get; } =
     [
         ("req_master", AudioQualityTier.Master, "AI00", ".flac"),
-        ("req_premium", AudioQualityTier.Premium, "Q000", ".flac"),
+        ("req_dolby", AudioQualityTier.Dolby, "D004", ".mp4"),
+        ("req_dtsx", AudioQualityTier.DtsX, "DT03", ".mp4"),
         ("req_atmos", AudioQualityTier.Atmos, "Q001", ".flac"),
-        ("req_dolby", AudioQualityTier.Dolby, "Q000", ".flac"),
+        ("req_premium", AudioQualityTier.Premium, "Q000", ".flac"),
         ("req_hires", AudioQualityTier.HiRes, "RS01", ".flac"),
         ("req_sq", AudioQualityTier.SQ, "F000", ".flac"),
         ("req_320", AudioQualityTier.HQ, "M800", ".mp3"),
@@ -70,9 +75,10 @@ public static class AudioQualityHelper
     public static string GetDefaultSpec(AudioQualityTier tier) => tier switch
     {
         AudioQualityTier.Master => "24bit / 192kHz",
-        AudioQualityTier.Premium => "臻品音质",
-        AudioQualityTier.Atmos => "5.1 环绕声",
         AudioQualityTier.Dolby => "Dolby Atmos",
+        AudioQualityTier.DtsX => "DTS:X 环绕声",
+        AudioQualityTier.Atmos => "5.1 环绕声",
+        AudioQualityTier.Premium => "臻品音质",
         AudioQualityTier.HiRes => "24bit / 96kHz",
         AudioQualityTier.SQ => "16bit / 44.1kHz",
         AudioQualityTier.HQ => "320kbps",
@@ -99,12 +105,77 @@ public static class AudioQualityHelper
         return sampleRate > 0 && sampleRate <= 384000 && bitsPerSample >= 8 && bitsPerSample <= 32;
     }
 
+    public static bool TryParseMp4AudioInfo(ReadOnlySpan<byte> data, out int sampleRate, out int bitsPerSample, out int channels)
+    {
+        sampleRate = 0;
+        bitsPerSample = 0;
+        channels = 0;
+
+        ReadOnlySpan<byte> stsdTag = "stsd"u8;
+        var stsdIdx = data.IndexOf(stsdTag);
+        if (stsdIdx == -1 || stsdIdx + 44 > data.Length)
+        {
+            return false;
+        }
+
+        var payloadStart = stsdIdx + 12;
+        if (payloadStart + 4 > data.Length) return false;
+        var entryCount = (data[payloadStart] << 24) | (data[payloadStart + 1] << 16) | (data[payloadStart + 2] << 8) | data[payloadStart + 3];
+        if (entryCount < 1) return false;
+
+        var entryStart = payloadStart + 4;
+        if (entryStart + 36 > data.Length) return false;
+
+        Span<char> fourCcChars = stackalloc char[4];
+        fourCcChars[0] = char.ToLowerInvariant((char)data[entryStart + 4]);
+        fourCcChars[1] = char.ToLowerInvariant((char)data[entryStart + 5]);
+        fourCcChars[2] = char.ToLowerInvariant((char)data[entryStart + 6]);
+        fourCcChars[3] = char.ToLowerInvariant((char)data[entryStart + 7]);
+
+        channels = (data[entryStart + 24] << 8) | data[entryStart + 25];
+        bitsPerSample = (data[entryStart + 26] << 8) | data[entryStart + 27];
+        sampleRate = (data[entryStart + 32] << 8) | data[entryStart + 33];
+
+        if (fourCcChars.SequenceEqual("ac-4"))
+        {
+            if (channels == 0) channels = 6;
+            if (sampleRate == 0) sampleRate = 48000;
+            if (bitsPerSample == 0) bitsPerSample = 16;
+        }
+        else if (fourCcChars.SequenceEqual("dtsx"))
+        {
+            if (channels == 0) channels = 6;
+            if (sampleRate == 0) sampleRate = 48000;
+            if (bitsPerSample == 0) bitsPerSample = 16;
+        }
+
+        return sampleRate > 0 || channels > 0;
+    }
+
+    public static bool TryParseOggVorbisInfo(ReadOnlySpan<byte> data, out int sampleRate, out int bitsPerSample, out int channels)
+    {
+        sampleRate = 0;
+        bitsPerSample = 16;
+        channels = 0;
+
+        ReadOnlySpan<byte> vorbisTag = [(byte)1, (byte)'v', (byte)'o', (byte)'r', (byte)'b', (byte)'i', (byte)'s'];
+        var vIdx = data.IndexOf(vorbisTag);
+        if (vIdx == -1 || vIdx + 16 > data.Length)
+        {
+            return false;
+        }
+
+        channels = data[vIdx + 11];
+        sampleRate = data[vIdx + 12] | (data[vIdx + 13] << 8) | (data[vIdx + 14] << 16) | (data[vIdx + 15] << 24);
+        return sampleRate > 0 && channels > 0;
+    }
+
     public static string FormatAudioSpec(int sampleRate, int bitsPerSample, int channels, AudioQualityTier tier)
     {
         var rateStr = sampleRate % 1000 == 0 ? $"{sampleRate / 1000}kHz" : $"{sampleRate / 1000.0:0.#}kHz";
-        if (tier == AudioQualityTier.Atmos && channels > 2)
+        if ((tier == AudioQualityTier.Atmos || tier == AudioQualityTier.Dolby || tier == AudioQualityTier.DtsX) && channels > 2)
         {
-            return channels == 6 ? "5.1 环绕声" : $"{channels}ch 环绕声";
+            return channels == 6 ? "5.1 环绕声" : (channels == 8 ? "7.1 环绕声" : $"{channels}ch 环绕声");
         }
         if (channels > 2)
         {
@@ -113,12 +184,12 @@ public static class AudioQualityHelper
         return $"{bitsPerSample}bit / {rateStr}";
     }
 
-
     public static AudioQualityTier Parse(string? name)
     {
         if (string.IsNullOrEmpty(name)) return AudioQualityTier.SQ;
         if (name.Contains("母带", StringComparison.OrdinalIgnoreCase) || name.Contains("Master", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Master;
         if (name.Contains("杜比", StringComparison.OrdinalIgnoreCase) || name.Contains("Dolby", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Dolby;
+        if (name.Contains("dts", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.DtsX;
         if (name.Contains("全景声", StringComparison.OrdinalIgnoreCase) || name.Contains("Atmos", StringComparison.OrdinalIgnoreCase) || name.Contains("5.1", StringComparison.OrdinalIgnoreCase) || name.Contains("7.1", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Atmos;
         if (name.Contains("臻品", StringComparison.OrdinalIgnoreCase) || name.Contains("Premium", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.Premium;
         if (name.Contains("Hi-Res", StringComparison.OrdinalIgnoreCase) || name.Contains("HiRes", StringComparison.OrdinalIgnoreCase)) return AudioQualityTier.HiRes;
@@ -171,8 +242,9 @@ public static class AudioQualityHelper
     public static IReadOnlyList<AudioQualityTier> SelectionOrder { get; } =
     [
         AudioQualityTier.Master,
-        AudioQualityTier.Atmos,
         AudioQualityTier.Dolby,
+        AudioQualityTier.DtsX,
+        AudioQualityTier.Atmos,
         AudioQualityTier.Premium,
         AudioQualityTier.HiRes,
         AudioQualityTier.SQ,
@@ -192,11 +264,13 @@ public static class AudioQualityHelper
     public static IReadOnlyList<AudioQualityTier> GetFallbackTiers(AudioQualityTier tier) => tier switch
     {
         AudioQualityTier.Master =>
-            [AudioQualityTier.Atmos, AudioQualityTier.Dolby, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
-        AudioQualityTier.Atmos =>
-            [AudioQualityTier.Dolby, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+            [AudioQualityTier.Dolby, AudioQualityTier.DtsX, AudioQualityTier.Atmos, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
         AudioQualityTier.Dolby =>
-            [AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+            [AudioQualityTier.DtsX, AudioQualityTier.Atmos, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+        AudioQualityTier.DtsX =>
+            [AudioQualityTier.Dolby, AudioQualityTier.Atmos, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+        AudioQualityTier.Atmos =>
+            [AudioQualityTier.Dolby, AudioQualityTier.DtsX, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
         AudioQualityTier.Premium =>
             [AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
         AudioQualityTier.HiRes => [AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
@@ -207,14 +281,15 @@ public static class AudioQualityHelper
 
     public static string GetQualityName(AudioQualityTier tier) => tier switch
     {
-        AudioQualityTier.Master => "臻品母带",
-        AudioQualityTier.Premium => "臻品音质",
-        AudioQualityTier.Atmos => "臻品全景声",
-        AudioQualityTier.Dolby => "杜比全景声",
+        AudioQualityTier.Master => "母带",
+        AudioQualityTier.Dolby => "杜比",
+        AudioQualityTier.DtsX => "DTS:X",
+        AudioQualityTier.Atmos => "全景声",
+        AudioQualityTier.Premium => "臻品",
         AudioQualityTier.HiRes => "Hi-Res",
-        AudioQualityTier.SQ => "SQ 无损",
-        AudioQualityTier.HQ => "HQ 高品质",
-        _ => "标准音质"
+        AudioQualityTier.SQ => "SQ",
+        AudioQualityTier.HQ => "HQ",
+        _ => "标准"
     };
 }
 
