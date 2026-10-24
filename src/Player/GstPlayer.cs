@@ -68,6 +68,7 @@ public sealed partial class GstPlayer : IPlayer
 
             gst_init(0, 0);
             AppLogger.Info("GstPlayer", "GStreamer initialized successfully (in-process)");
+            DeviceAudioCapability.EnsureInitialized();
 
             lock (_lock)
             {
