@@ -1886,9 +1886,9 @@ public sealed partial class MainWindow : Window
         var mode = Models.UserConfig.Current.ThemeMode?.ToLowerInvariant() ?? "auto";
         return mode switch
         {
-            "light" => "[主题:亮色]",
-            "dark" => "[主题:暗色]",
-            _ => "[主题:自动]"
+            "light" => "[H] 主题:亮色",
+            "dark" => "[H] 主题:暗色",
+            _ => "[H] 主题:自动"
         };
     }
 

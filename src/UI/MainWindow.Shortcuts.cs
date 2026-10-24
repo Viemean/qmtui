@@ -588,6 +588,13 @@ public sealed partial class MainWindow
             return true;
         }
 
+        if (c == 'H')
+        {
+            k.Handled = true;
+            HandleThemeButtonClicked();
+            return true;
+        }
+
         if (c == 'Y')
         {
             k.Handled = true;
