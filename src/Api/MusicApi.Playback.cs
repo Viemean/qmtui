@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using QmTui.Models;
+using QmTui.Player;
 using QmTui.Services;
 using QmTui.Utils;
 
@@ -36,7 +37,7 @@ public sealed partial class MusicApi
                 ? mk
                 : (UserSession.Current.Cookies.TryGetValue("qqmusic_key", out var qmk) ? qmk : ""));
 
-        var requests = AudioQualityHelper.ProbeRequests;
+        var requests = AudioQualityHelper.ProbeRequests.Where(r => DeviceAudioCapability.IsTierSupported(r.Tier)).ToArray();
         var requestJson = new StringBuilder(1536);
         requestJson.Append("{\"comm\":{\"uin\":\"").Append(JsonEncodedText.Encode(uin))
             .Append("\",\"format\":\"json\",\"ct\":28,\"cv\":1,\"authst\":\"")
@@ -97,8 +98,9 @@ public sealed partial class MusicApi
         catch (Exception ex)
         {
             AppLogger.Error("MusicApi", "ProbeSongQualitiesAsync exception", ex);
-            var options = new List<QualityOption>(AudioQualityHelper.SelectionOrder.Count);
-            foreach (var tier in AudioQualityHelper.SelectionOrder)
+            var supportedTiers = AudioQualityHelper.SelectionOrder.Where(DeviceAudioCapability.IsTierSupported).ToList();
+            var options = new List<QualityOption>(supportedTiers.Count);
+            foreach (var tier in supportedTiers)
             {
                 options.Add(new QualityOption(tier, AudioQualityHelper.GetBadge(tier), AudioQualityHelper.GetQualityName(tier), AudioQualityHelper.GetDefaultSpec(tier), "", false));
             }
@@ -156,12 +158,14 @@ public sealed partial class MusicApi
         var isTrueHiRes = hiresRaw > 0 || hiresSample > 48000 || hiresBitdepth > 16;
         var hiResSize = isTrueHiRes ? (hiresRaw > 0 ? hiresRaw : flacSize) : 0L;
 
+        var dtsXSize = GetArrayValue(sizeNew, 9);
         var sizeByTier = new Dictionary<AudioQualityTier, long>
         {
             [AudioQualityTier.Master] = GetArrayValue(sizeNew, 0),
-            [AudioQualityTier.Premium] = GetArrayValue(sizeNew, 1),
-            [AudioQualityTier.Atmos] = GetArrayValue(sizeNew, 2),
             [AudioQualityTier.Dolby] = sizeDolby,
+            [AudioQualityTier.DtsX] = dtsXSize,
+            [AudioQualityTier.Atmos] = GetArrayValue(sizeNew, 2),
+            [AudioQualityTier.Premium] = GetArrayValue(sizeNew, 1),
             [AudioQualityTier.HiRes] = hiResSize,
             [AudioQualityTier.SQ] = flacSize,
             [AudioQualityTier.HQ] = size320,
@@ -193,6 +197,12 @@ public sealed partial class MusicApi
                                    !string.IsNullOrEmpty(sip) &&
                                    purl.Contains(prefix, StringComparison.OrdinalIgnoreCase);
 
+                    // 过滤无法稳定解码的 12 声道 Q003 Vorbis 流
+                    if (purl != null && (purl.Contains("Q003", StringComparison.OrdinalIgnoreCase) || purl.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        hasValid = false;
+                    }
+
                     if (hasValid && purl != null)
                     {
                         return (sip + purl, true);
@@ -212,6 +222,10 @@ public sealed partial class MusicApi
             if (request.Tier == AudioQualityTier.Dolby)
             {
                 available = sizeDolby > 0 && hasValidUrl;
+            }
+            else if (request.Tier == AudioQualityTier.DtsX)
+            {
+                available = dtsXSize > 0 && hasValidUrl;
             }
             else if (hasFileObj)
             {
@@ -287,7 +301,7 @@ public sealed partial class MusicApi
             {
                 try
                 {
-                    var isFlac = AudioQualityHelper.GetExtension(opt.Tier) == ".flac";
+                    var ext = AudioQualityHelper.GetExtension(opt.Tier);
                     string? newSpec = null;
                     long realSize = opt.FileSizeBytes;
 
@@ -303,7 +317,7 @@ public sealed partial class MusicApi
                                 realSize = fi.Length;
                             }
 
-                            if (isFlac && fi.Length >= 42)
+                            if (ext == ".flac" && fi.Length >= 42)
                             {
                                 using var fs = File.OpenRead(localCached);
                                 var buf = new byte[42];
@@ -313,16 +327,38 @@ public sealed partial class MusicApi
                                     newSpec = AudioQualityHelper.FormatAudioSpec(sr, bps, ch, opt.Tier);
                                 }
                             }
+                            else if (ext == ".mp4" && fi.Length >= 64)
+                            {
+                                using var fs = File.OpenRead(localCached);
+                                var readLen = (int)Math.Min(fi.Length, 4096);
+                                var buf = new byte[readLen];
+                                int read = await fs.ReadAsync(buf.AsMemory(0, readLen), ct).ConfigureAwait(false);
+                                if (read > 0 && AudioQualityHelper.TryParseMp4AudioInfo(buf.AsSpan(0, read), out var sr, out var bps, out var ch))
+                                {
+                                    newSpec = AudioQualityHelper.FormatAudioSpec(sr, bps, ch, opt.Tier);
+                                }
+                            }
+                            else if (ext == ".ogg" && fi.Length >= 32)
+                            {
+                                using var fs = File.OpenRead(localCached);
+                                var readLen = (int)Math.Min(fi.Length, 256);
+                                var buf = new byte[readLen];
+                                int read = await fs.ReadAsync(buf.AsMemory(0, readLen), ct).ConfigureAwait(false);
+                                if (read > 0 && AudioQualityHelper.TryParseOggVorbisInfo(buf.AsSpan(0, read), out var sr, out var bps, out var ch))
+                                {
+                                    newSpec = AudioQualityHelper.FormatAudioSpec(sr, bps, ch, opt.Tier);
+                                }
+                            }
                         }
                     }
 
-                    // 2. 若本地未命中 FLAC 规格且存在播放直链，通过 Range: bytes=0-41 嗅探
-                    if (isFlac && newSpec == null && !string.IsNullOrEmpty(opt.PlayUrl))
+                    // 2. 若本地未命中规格且存在播放直链，通过 Range 头部嗅探
+                    if (newSpec == null && !string.IsNullOrEmpty(opt.PlayUrl))
                     {
-                        var probeResult = await TryProbeFlacRangeAsync(opt.PlayUrl, ct).ConfigureAwait(false);
+                        var probeResult = await TryProbeAudioRangeAsync(opt.PlayUrl, ext, ct).ConfigureAwait(false);
                         if (probeResult != null)
                         {
-                            if (probeResult.Value.SampleRate > 0)
+                            if (probeResult.Value.SampleRate > 0 || probeResult.Value.Channels > 0)
                             {
                                 newSpec = AudioQualityHelper.FormatAudioSpec(
                                     probeResult.Value.SampleRate,
@@ -383,13 +419,22 @@ public sealed partial class MusicApi
         }
     }
 
-    private static async Task<(int SampleRate, int BitsPerSample, int Channels, long TotalLength)?> TryProbeFlacRangeAsync(string url, CancellationToken ct)
+    private static async Task<(int SampleRate, int BitsPerSample, int Channels, long TotalLength)?> TryProbeAudioRangeAsync(string url, string extension, CancellationToken ct)
     {
         try
         {
+            long rangeEnd = extension switch
+            {
+                ".flac" => 41,
+                ".mp4" => 4095,
+                ".ogg" => 255,
+                _ => 0
+            };
+            if (rangeEnd == 0) return null;
+
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
             req.Headers.TryAddWithoutValidation("Referer", "https://y.qq.com/");
-            req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 41);
+            req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, rangeEnd);
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(3));
@@ -403,24 +448,43 @@ public sealed partial class MusicApi
                 totalLength = len;
             }
 
-            var buffer = new byte[42];
+            int bufferSize = (int)(rangeEnd + 1);
+            var buffer = new byte[bufferSize];
             using var stream = await resp.Content.ReadAsStreamAsync(cts.Token).ConfigureAwait(false);
             int totalRead = 0;
-            while (totalRead < 42)
+            while (totalRead < bufferSize)
             {
-                int r = await stream.ReadAsync(buffer.AsMemory(totalRead, 42 - totalRead), cts.Token).ConfigureAwait(false);
+                int r = await stream.ReadAsync(buffer.AsMemory(totalRead, bufferSize - totalRead), cts.Token).ConfigureAwait(false);
                 if (r <= 0) break;
                 totalRead += r;
             }
 
-            if (totalRead == 42 && AudioQualityHelper.TryParseFlacStreamInfo(buffer, out var sampleRate, out var bitsPerSample, out var channels))
+            var span = buffer.AsSpan(0, totalRead);
+            if (extension == ".flac")
             {
-                return (sampleRate, bitsPerSample, channels, totalLength);
+                if (totalRead >= 42 && AudioQualityHelper.TryParseFlacStreamInfo(span, out var sampleRate, out var bitsPerSample, out var channels))
+                {
+                    return (sampleRate, bitsPerSample, channels, totalLength);
+                }
+            }
+            else if (extension == ".mp4")
+            {
+                if (totalRead >= 64 && AudioQualityHelper.TryParseMp4AudioInfo(span, out var sampleRate, out var bitsPerSample, out var channels))
+                {
+                    return (sampleRate, bitsPerSample, channels, totalLength);
+                }
+            }
+            else if (extension == ".ogg")
+            {
+                if (totalRead >= 32 && AudioQualityHelper.TryParseOggVorbisInfo(span, out var sampleRate, out var bitsPerSample, out var channels))
+                {
+                    return (sampleRate, bitsPerSample, channels, totalLength);
+                }
             }
         }
         catch (Exception ex)
         {
-            AppLogger.Warn("MusicApi", $"TryProbeFlacRangeAsync error for {url}: {ex.Message}");
+            AppLogger.Warn("MusicApi", $"TryProbeAudioRangeAsync error for {url}: {ex.Message}");
         }
         return null;
     }
@@ -467,6 +531,7 @@ public sealed partial class MusicApi
         // 若目标档位不可用，则只向定义好的兼容档位回退，避免在特殊编码间横跳。
         foreach (var tier in AudioQualityHelper.GetFallbackTiers(preferred))
         {
+            if (!DeviceAudioCapability.IsTierSupported(tier)) continue;
             var opt = options.FirstOrDefault(o => o.Tier == tier && o.Available);
             if (opt != null && !string.IsNullOrEmpty(opt.PlayUrl))
             {

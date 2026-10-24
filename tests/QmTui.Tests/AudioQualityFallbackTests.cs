@@ -1,4 +1,5 @@
 using QmTui.Models;
+using QmTui.Player;
 using Xunit;
 
 namespace QmTui.Tests;
@@ -10,20 +11,24 @@ public class AudioQualityFallbackTests
     {
         var fallbacks = AudioQualityHelper.GetFallbackTiers(AudioQualityTier.Master);
         Assert.Equal(
-            [AudioQualityTier.Atmos, AudioQualityTier.Dolby, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+            [AudioQualityTier.Dolby, AudioQualityTier.DtsX, AudioQualityTier.Atmos, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
             fallbacks);
     }
 
     [Fact]
-    public void AtmosAndDolbyAndPremium_ShouldFallbackStepByStep()
+    public void SpatialAndDolbyAndPremium_ShouldFallbackStepByStep()
     {
         Assert.Equal(
-            [AudioQualityTier.Dolby, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
-            AudioQualityHelper.GetFallbackTiers(AudioQualityTier.Atmos));
+            [AudioQualityTier.DtsX, AudioQualityTier.Atmos, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+            AudioQualityHelper.GetFallbackTiers(AudioQualityTier.Dolby));
 
         Assert.Equal(
-            [AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
-            AudioQualityHelper.GetFallbackTiers(AudioQualityTier.Dolby));
+            [AudioQualityTier.Dolby, AudioQualityTier.Atmos, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+            AudioQualityHelper.GetFallbackTiers(AudioQualityTier.DtsX));
+
+        Assert.Equal(
+            [AudioQualityTier.Dolby, AudioQualityTier.DtsX, AudioQualityTier.Premium, AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
+            AudioQualityHelper.GetFallbackTiers(AudioQualityTier.Atmos));
 
         Assert.Equal(
             [AudioQualityTier.HiRes, AudioQualityTier.SQ, AudioQualityTier.HQ, AudioQualityTier.Standard],
@@ -390,6 +395,100 @@ public class AudioQualityFallbackTests
     {
         var spec = AudioQualityHelper.FormatAudioSpec(44100, 16, 6, AudioQualityTier.Atmos);
         Assert.Equal("5.1 环绕声", spec);
+    }
+
+    [Fact]
+    public void FormatAudioSpec_DolbyAndDtsX_FormatsAsSurround()
+    {
+        var dolbySpec = AudioQualityHelper.FormatAudioSpec(48000, 16, 6, AudioQualityTier.Dolby);
+        Assert.Equal("5.1 环绕声", dolbySpec);
+
+        var dtsXSpec = AudioQualityHelper.FormatAudioSpec(48000, 24, 8, AudioQualityTier.DtsX);
+        Assert.Equal("7.1 环绕声", dtsXSpec);
+    }
+
+    [Fact]
+    public void TryParseMp4AudioInfo_ValidAc4_ReturnsCorrectMetadata()
+    {
+        var buf = new byte[80];
+        // 放入 "stsd"
+        buf[10] = (byte)'s'; buf[11] = (byte)'t'; buf[12] = (byte)'s'; buf[13] = (byte)'d';
+        // payloadStart = 10 + 12 = 22, entryCount = 1
+        buf[25] = 1;
+        // entryStart = 26
+        // fourcc = "ac-4" at entryStart + 4 = 30
+        buf[30] = (byte)'a'; buf[31] = (byte)'c'; buf[32] = (byte)'-'; buf[33] = (byte)'4';
+
+        var ok = AudioQualityHelper.TryParseMp4AudioInfo(buf, out var sr, out var bps, out var ch);
+        Assert.True(ok);
+        Assert.Equal(48000, sr);
+        Assert.Equal(16, bps);
+        Assert.Equal(6, ch);
+    }
+
+    [Fact]
+    public void TryParseOggVorbisInfo_ValidVorbisHeader_ReturnsCorrectMetadata()
+    {
+        var buf = new byte[40];
+        // vorbisTag: [1, 'v', 'o', 'r', 'b', 'i', 's']
+        buf[4] = 1;
+        buf[5] = (byte)'v'; buf[6] = (byte)'o'; buf[7] = (byte)'r'; buf[8] = (byte)'b'; buf[9] = (byte)'i'; buf[10] = (byte)'s';
+        // channels at vIdx + 11 = 4 + 11 = 15 -> 2 channels
+        buf[15] = 2;
+        // sampleRate at vIdx + 12 = 16 (44100 = 0x0000AC44)
+        buf[16] = 0x44; buf[17] = 0xAC; buf[18] = 0x00; buf[19] = 0x00;
+
+        var ok = AudioQualityHelper.TryParseOggVorbisInfo(buf, out var sr, out var bps, out var ch);
+        Assert.True(ok);
+        Assert.Equal(44100, sr);
+        Assert.Equal(16, bps);
+        Assert.Equal(2, ch);
+    }
+
+    [Fact]
+    public void IsPureLocalOrWebDav_DistinguishesLocalImportFromDownloadedOnlineSongs()
+    {
+        var onlineSong = new Song(Mid: "003mQIjO4e38e6", Title: "Online Track", Artist: "Singer", Album: "Album", Duration: 240);
+        Assert.False(onlineSong.IsPureLocalOrWebDav);
+
+        var downloadedSong = new Song(Mid: "003mQIjO4e38e6", Title: "Downloaded Track", Artist: "Singer", Album: "Album", Duration: 240)
+        {
+            LocalFilePath = "/downloads/song.flac"
+        };
+        Assert.False(downloadedSong.IsPureLocalOrWebDav);
+
+        var localImportedSong = new Song(Mid: "local_abc1234567890", Title: "Local Track", Artist: "Singer", Album: "Album", Duration: 200)
+        {
+            LocalFilePath = "/music/local.mp3"
+        };
+        Assert.True(localImportedSong.IsPureLocalOrWebDav);
+
+        var webDavSong = new Song(Mid: "webdav_srv123_abc123", Title: "Cloud Track", Artist: "Singer", Album: "Album", Duration: 180)
+        {
+            WebDavHref = "/dav/music/track.flac"
+        };
+        Assert.True(webDavSong.IsPureLocalOrWebDav);
+    }
+
+    [Fact]
+    public void DeviceAudioCapability_Override_CorrectlyFiltersTiers()
+    {
+        try
+        {
+            DeviceAudioCapability.SetCapabilityOverride(supportsDolby: false, supportsDtsX: false);
+            Assert.False(DeviceAudioCapability.IsTierSupported(AudioQualityTier.Dolby));
+            Assert.False(DeviceAudioCapability.IsTierSupported(AudioQualityTier.DtsX));
+            Assert.True(DeviceAudioCapability.IsTierSupported(AudioQualityTier.Master));
+            Assert.True(DeviceAudioCapability.IsTierSupported(AudioQualityTier.SQ));
+
+            DeviceAudioCapability.SetCapabilityOverride(supportsDolby: true, supportsDtsX: true);
+            Assert.True(DeviceAudioCapability.IsTierSupported(AudioQualityTier.Dolby));
+            Assert.True(DeviceAudioCapability.IsTierSupported(AudioQualityTier.DtsX));
+        }
+        finally
+        {
+            DeviceAudioCapability.ResetForTesting();
+        }
     }
 }
 

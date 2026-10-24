@@ -6,6 +6,7 @@ using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using QmTui.Api;
 using QmTui.Models;
+using QmTui.Player;
 
 namespace QmTui.UI;
 
@@ -173,6 +174,7 @@ public sealed class QualityDialog : Dialog
         _options.Clear();
         foreach (var tier in AudioQualityHelper.SelectionOrder)
         {
+            if (!DeviceAudioCapability.IsTierSupported(tier)) continue;
             _options.Add(new QualityOption(tier, AudioQualityHelper.GetBadge(tier), AudioQualityHelper.GetQualityName(tier), AudioQualityHelper.GetDefaultSpec(tier), "", true));
         }
     }
