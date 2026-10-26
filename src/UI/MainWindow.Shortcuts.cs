@@ -497,9 +497,21 @@ public sealed partial class MainWindow
                     _nowPlayingView.CommentView.CloseCommentImagePreview();
                     return true;
                 }
+                if (!_nowPlayingView.IsCommentViewActive && (_activeSong == null || _activeSong.IsLocal || _activeSong.IsWebDav || _activeSong.IsPureLocalOrWebDav))
+                {
+                    _controlBar.UpdateStatus("[评论] 当前不是在线音乐，无法查看评论");
+                    return true;
+                }
                 _nowPlayingView.ToggleCommentView();
                 return true;
             }
+
+            if (!_isCommentViewActive && (_activeSong == null || _activeSong.IsLocal || _activeSong.IsWebDav || _activeSong.IsPureLocalOrWebDav))
+            {
+                _controlBar.UpdateStatus("[评论] 当前不是在线音乐，无法查看评论");
+                return true;
+            }
+
             ToggleCommentView();
             return true;
         }

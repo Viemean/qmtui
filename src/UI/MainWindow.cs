@@ -1241,6 +1241,7 @@ public sealed partial class MainWindow : Window
 
         // 沉浸式播放界面视图与控制栏联动
         _nowPlayingView = new NowPlayingView();
+        _nowPlayingView.StatusNotification += msg => _controlBar.UpdateStatus(msg);
         _nowPlayingView.BackRequested += CloseNowPlayingView;
         _nowPlayingView.SeekRequested += async (time) =>
         {

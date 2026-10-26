@@ -608,6 +608,12 @@ public sealed partial class NowPlayingView : View
 
             if (k == Key.C || ch == 'C')
             {
+                if (!_isCommentViewActive && (_currentSong == null || _currentSong.IsLocal || _currentSong.IsWebDav || _currentSong.IsPureLocalOrWebDav))
+                {
+                    StatusNotification?.Invoke("[评论] 当前不是在线音乐，无法查看评论");
+                    k.Handled = true;
+                    return;
+                }
                 ToggleCommentView();
                 k.Handled = true;
                 return;
@@ -642,6 +648,7 @@ public sealed partial class NowPlayingView : View
     public bool IsCommentViewActive => _isCommentViewActive;
     public SongCommentView CommentView => _commentView;
     public event Action<bool>? CommentViewToggled;
+    public event Action<string>? StatusNotification;
 
     public void SyncCommentFrom(SongCommentView other)
     {
@@ -656,6 +663,11 @@ public sealed partial class NowPlayingView : View
 
     public void ToggleCommentView()
     {
+        if (!_isCommentViewActive && (_currentSong == null || _currentSong.IsLocal || _currentSong.IsWebDav || _currentSong.IsPureLocalOrWebDav))
+        {
+            StatusNotification?.Invoke("[评论] 当前不是在线音乐，无法查看评论");
+            return;
+        }
         _isCommentViewActive = !_isCommentViewActive;
         AppLogger.Force("NowPlayingView", $"ToggleCommentView: _isCommentViewActive={_isCommentViewActive}");
         if (_isCommentViewActive)

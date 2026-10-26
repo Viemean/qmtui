@@ -718,6 +718,12 @@ public sealed partial class MainWindow
 
     private void ToggleCommentView()
     {
+        if (!_isCommentViewActive && (_activeSong == null || _activeSong.IsLocal || _activeSong.IsWebDav || _activeSong.IsPureLocalOrWebDav))
+        {
+            _controlBar.UpdateStatus("[评论] 当前不是在线音乐，无法查看评论");
+            return;
+        }
+
         if (_artistAlbumDetailView.Visible)
         {
             _artistAlbumDetailView.OnDeactivated();
