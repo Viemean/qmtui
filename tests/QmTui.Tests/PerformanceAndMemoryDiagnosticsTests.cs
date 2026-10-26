@@ -6,6 +6,8 @@ using QmTui.Models;
 using QmTui.UI;
 using QmTui.Utils;
 using Terminal.Gui.App;
+using Terminal.Gui.Drawing;
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Xunit;
@@ -240,5 +242,26 @@ public class PerformanceAndMemoryDiagnosticsTests
         {
             Application.Shutdown();
         }
+    }
+
+    [Fact]
+    public void ThinScrollBarView_Drag_TracksThumbSmoothly()
+    {
+        var scrollBar = new ThinScrollBarView();
+        scrollBar.UpdateMetrics(totalItems: 3000, visibleItems: 30, firstVisibleItem: 0);
+
+        int lastTarget = -1;
+        scrollBar.ScrollPositionChanged += target => lastTarget = target;
+
+        // 模拟在滑块内按下左键并向下拖动
+        scrollBar.HandleMouseEvent(MouseFlags.LeftButtonPressed, 0);
+        scrollBar.HandleMouseEvent(MouseFlags.LeftButtonPressed, 10);
+
+        Assert.True(lastTarget > 500, $"Scroll target should track drag directly, but was {lastTarget}");
+
+        scrollBar.HandleMouseEvent(MouseFlags.LeftButtonPressed, 19);
+        Assert.True(lastTarget >= 2900, $"Scroll target should reach bottom, but was {lastTarget}");
+
+        scrollBar.HandleMouseEvent(MouseFlags.LeftButtonReleased, 19);
     }
 }

@@ -408,6 +408,15 @@ public sealed partial class SongListView : FrameView
 
         _listView.MouseEvent += (s, m) =>
         {
+            if (_scrollBar.IsDragging)
+            {
+                if (_scrollBar.HandleMouseEvent(m.Flags, m.Position?.Y))
+                {
+                    m.Handled = true;
+                    return;
+                }
+            }
+
             if (_isRadioMode) return;
 
             if (m.Flags.HasFlag(MouseFlags.WheeledDown))
@@ -598,12 +607,23 @@ public sealed partial class SongListView : FrameView
         _scrollBar.Height = Dim.Fill();
         _scrollBar.ScrollPositionChanged += targetRow =>
         {
-            if (_songs.Count > 0)
+            int totalCount = _songs.Count > 0 ? _songs.Count : _customItems.Count;
+            if (totalCount > 0)
             {
-                int clamped = Math.Clamp(targetRow, 0, _songs.Count - 1);
-                _listView.SelectedItem = clamped;
-                _listView.Viewport = new Rectangle(_listView.Viewport.X, clamped, _listView.Viewport.Width, _listView.Viewport.Height);
-                UpdateSubColumnTitle(clamped);
+                int maxFirstItem = Math.Max(0, totalCount - _listView.Viewport.Height);
+                int viewportY = Math.Clamp(targetRow, 0, maxFirstItem);
+                int clamped = Math.Clamp(targetRow, 0, totalCount - 1);
+
+                int curSelected = _listView.SelectedItem ?? 0;
+                if (curSelected < viewportY || curSelected >= viewportY + _listView.Viewport.Height)
+                {
+                    _listView.SelectedItem = clamped;
+                }
+                _listView.Viewport = new Rectangle(_listView.Viewport.X, viewportY, _listView.Viewport.Width, _listView.Viewport.Height);
+                if (_songs.Count > 0)
+                {
+                    UpdateSubColumnTitle(_listView.SelectedItem ?? clamped);
+                }
             }
         };
         Add(_scrollBar);

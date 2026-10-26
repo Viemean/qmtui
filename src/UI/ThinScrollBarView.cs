@@ -19,9 +19,12 @@ public sealed class ThinScrollBarView : View
     private int _firstVisibleItem;
     private long _lastActivityTick;
     private bool _isActive;
+    private bool _isDragging;
+    private int _dragOffset;
     private object? _timeoutToken;
 
     public event Action<int>? ScrollPositionChanged;
+    public bool IsDragging => _isDragging;
 
     public ThinScrollBarView()
     {
@@ -51,7 +54,7 @@ public sealed class ThinScrollBarView : View
         // 定时检查是否超过 3 秒无活动，隐藏滚动条
         _timeoutToken = Application.AddTimeout(TimeSpan.FromMilliseconds(500), () =>
         {
-            if (_isActive && Environment.TickCount64 - _lastActivityTick > 3000)
+            if (_isActive && !_isDragging && Environment.TickCount64 - _lastActivityTick > 3000)
             {
                 _isActive = false;
                 _trackLabel.Text = "";
@@ -62,56 +65,9 @@ public sealed class ThinScrollBarView : View
 
         MouseEvent += (s, m) =>
         {
-            TriggerActivity();
-
-            if (_totalItems <= _visibleItems || _visibleItems <= 0)
-            {
-                return;
-            }
-
-            if (!m.Position.HasValue) return;
-
-            int clickY = m.Position.Value.Y;
-            int trackHeight = Viewport.Height > 0 ? Viewport.Height : (Frame.Height > 0 ? Frame.Height : 20);
-            int maxFirstItem = Math.Max(1, _totalItems - _visibleItems);
-            int thumbHeight = Math.Max(1, (int)Math.Round((double)_visibleItems / _totalItems * trackHeight));
-            int maxThumbTop = Math.Max(0, trackHeight - thumbHeight);
-            int thumbTop = maxThumbTop > 0 ? Math.Clamp((int)Math.Round((double)_firstVisibleItem / maxFirstItem * maxThumbTop), 0, maxThumbTop) : 0;
-
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked) || m.Flags.HasFlag(MouseFlags.LeftButtonPressed))
+            if (HandleMouseEvent(m.Flags, m.Position?.Y))
             {
                 m.Handled = true;
-                if (clickY < thumbTop)
-                {
-                    // 点击滑块上方：向上翻页
-                    int target = Math.Max(0, _firstVisibleItem - _visibleItems);
-                    ScrollPositionChanged?.Invoke(target);
-                }
-                else if (clickY >= thumbTop + thumbHeight)
-                {
-                    // 点击滑块下方：向下翻页
-                    int target = Math.Min(maxFirstItem, _firstVisibleItem + _visibleItems);
-                    ScrollPositionChanged?.Invoke(target);
-                }
-                else
-                {
-                    if (maxThumbTop > 0)
-                    {
-                        double ratio = (double)clickY / trackHeight;
-                        int target = Math.Clamp((int)Math.Round(ratio * maxFirstItem), 0, maxFirstItem);
-                        ScrollPositionChanged?.Invoke(target);
-                    }
-                }
-            }
-            else if (m.Flags.HasFlag(MouseFlags.WheeledUp))
-            {
-                m.Handled = true;
-                ScrollPositionChanged?.Invoke(Math.Max(0, _firstVisibleItem - 3));
-            }
-            else if (m.Flags.HasFlag(MouseFlags.WheeledDown))
-            {
-                m.Handled = true;
-                ScrollPositionChanged?.Invoke(Math.Min(maxFirstItem, _firstVisibleItem + 3));
             }
         };
     }
@@ -192,5 +148,81 @@ public sealed class ThinScrollBarView : View
             _timeoutToken = null;
         }
         base.Dispose(disposing);
+    }
+
+    internal bool HandleMouseEvent(MouseFlags flags, int? y)
+    {
+        TriggerActivity();
+
+        if (_totalItems <= _visibleItems || _visibleItems <= 0)
+        {
+            _isDragging = false;
+            return false;
+        }
+
+        int trackHeight = Viewport.Height > 0 ? Viewport.Height : (Frame.Height > 0 ? Frame.Height : 20);
+        int maxFirstItem = Math.Max(1, _totalItems - _visibleItems);
+        int thumbHeight = Math.Max(1, (int)Math.Round((double)_visibleItems / _totalItems * trackHeight));
+        int maxThumbTop = Math.Max(0, trackHeight - thumbHeight);
+        int thumbTop = maxThumbTop > 0 ? Math.Clamp((int)Math.Round((double)_firstVisibleItem / maxFirstItem * maxThumbTop), 0, maxThumbTop) : 0;
+
+        bool isLeftDown = flags.HasFlag(MouseFlags.LeftButtonPressed);
+        bool isLeftClick = flags.HasFlag(MouseFlags.LeftButtonClicked);
+        bool isLeftReleased = flags.HasFlag(MouseFlags.LeftButtonReleased);
+
+        if (isLeftReleased || (!isLeftDown && !isLeftClick))
+        {
+            _isDragging = false;
+        }
+
+        if (!y.HasValue) return false;
+
+        int clickY = y.Value;
+
+        if (_isDragging && isLeftDown)
+        {
+            if (maxThumbTop > 0)
+            {
+                int targetThumbTop = clickY - _dragOffset;
+                double ratio = Math.Clamp((double)targetThumbTop / maxThumbTop, 0.0, 1.0);
+                int target = Math.Clamp((int)Math.Round(ratio * maxFirstItem), 0, maxFirstItem);
+                ScrollPositionChanged?.Invoke(target);
+            }
+            return true;
+        }
+
+        if (isLeftDown || isLeftClick)
+        {
+            if (clickY >= thumbTop && clickY < thumbTop + thumbHeight)
+            {
+                _isDragging = true;
+                _dragOffset = clickY - thumbTop;
+            }
+            else if (clickY < thumbTop)
+            {
+                int target = Math.Max(0, _firstVisibleItem - _visibleItems);
+                ScrollPositionChanged?.Invoke(target);
+            }
+            else
+            {
+                int target = Math.Min(maxFirstItem, _firstVisibleItem + _visibleItems);
+                ScrollPositionChanged?.Invoke(target);
+            }
+            return true;
+        }
+
+        if (flags.HasFlag(MouseFlags.WheeledUp))
+        {
+            ScrollPositionChanged?.Invoke(Math.Max(0, _firstVisibleItem - 3));
+            return true;
+        }
+
+        if (flags.HasFlag(MouseFlags.WheeledDown))
+        {
+            ScrollPositionChanged?.Invoke(Math.Min(maxFirstItem, _firstVisibleItem + 3));
+            return true;
+        }
+
+        return false;
     }
 }
