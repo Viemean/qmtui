@@ -159,6 +159,31 @@ public sealed partial class SongListView
         foreach (var l in _radioDisplayLines) _displayRows.Add(l);
     }
 
+    /// <summary>
+    /// Replaces every row in one go. Each individual Add makes ListWrapper rescan the
+    /// whole collection for MaxItemLength (O(n^2)), so change notifications are suspended
+    /// during the fill and the repaint is requested once afterwards.
+    /// </summary>
+    private void ReplaceDisplayRows(IEnumerable<string> rows)
+    {
+        _listView.SuspendCollectionChangedEvent();
+        try
+        {
+            _displayRows.Clear();
+            foreach (var row in rows)
+            {
+                _displayRows.Add(row);
+            }
+        }
+        finally
+        {
+            _listView.ResumeSuspendCollectionChangedEvent();
+        }
+        // Resume does not raise CollectionChanged, so restore the content height and repaint.
+        _listView.SetContentHeight(_displayRows.Count);
+        _listView.SetNeedsDraw();
+    }
+
     private void RefreshDisplayList()
     {
         if (_isUpdatingDisplay) return;
@@ -262,11 +287,7 @@ public sealed partial class SongListView
             _lastHighlightRow = selectedIdx;
 
             var prevViewportY = _listView.Viewport.Y;
-            _displayRows.Clear();
-            foreach (var item in displayList)
-            {
-                _displayRows.Add(item);
-            }
+            ReplaceDisplayRows(displayList);
             if (prevSelected.HasValue && prevSelected.Value >= 0 && prevSelected.Value < totalCount)
             {
                 _listView.SelectedItem = prevSelected.Value;

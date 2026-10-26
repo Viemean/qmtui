@@ -782,8 +782,7 @@ public sealed partial class SongListView : FrameView
         _customItemAccepted = onAccepted;
         _customItemSelectionChanged = onSelectionChanged;
         _listView.Viewport = new Rectangle(_listView.Viewport.X, 0, _listView.Viewport.Width, _listView.Viewport.Height);
-        _displayRows.Clear();
-        foreach (var it in _customItems) _displayRows.Add(it);
+        ReplaceDisplayRows(_customItems);
         _listView.SelectedItem = _displayRows.Count > 0 ? 0 : null;
         _scrollBar.UpdateMetrics(_customItems.Count, _listView.Viewport.Height, _listView.Viewport.Y);
         SetMarqueeTitle(title);
@@ -807,8 +806,7 @@ public sealed partial class SongListView : FrameView
         int prevViewportY = _listView.Viewport.Y;
 
         _customItems.AddRange(newItems);
-        _displayRows.Clear();
-        foreach (var it in _customItems) _displayRows.Add(it);
+        ReplaceDisplayRows(_customItems);
 
         if (prevSelected >= 0 && prevSelected < _displayRows.Count)
         {

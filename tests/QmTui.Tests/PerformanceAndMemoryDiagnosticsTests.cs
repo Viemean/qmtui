@@ -7,6 +7,7 @@ using QmTui.UI;
 using QmTui.Utils;
 using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -158,4 +159,88 @@ public class PerformanceAndMemoryDiagnosticsTests
         Assert.True(allocatedBefore - allocatedAfter > 20 * 1024 * 1024, "Memory should be reclaimed after TrimNow");
     }
 #pragma warning restore CS0618
+
+    [Fact]
+    public void Benchmark_SongListView_BulkSetSongs()
+    {
+        // 回归用例：向 SongListView 一次性灌入大歌单时，逐条 Add 曾让 ListWrapper
+        // 每次重扫全表计算 MaxItemLength，3000 首约耗时 27s（实测）。
+        const int songCount = 3000;
+        var songs = new List<Song>(songCount);
+        for (int i = 0; i < songCount; i++)
+        {
+            songs.Add(new Song($"mid_{i}", $"Song title {i} with some extra text", $"Artist {i}", $"Album {i}", 240));
+        }
+
+        Application.Init();
+        try
+        {
+            var top = new View { Width = 140, Height = 40, Visible = true, CanFocus = true };
+            var listView = new SongListView { Width = 100, Height = 35, Visible = true };
+            top.Add(listView);
+
+            var sw = Stopwatch.StartNew();
+            listView.SetSongs(songs, "bulk load");
+            sw.Stop();
+
+            _output.WriteLine($"[SongListView Bulk SetSongs Benchmark]");
+            _output.WriteLine($"  - Songs: {songCount}");
+            _output.WriteLine($"  - Elapsed: {sw.ElapsedMilliseconds} ms");
+            _output.WriteLine($"  - Rows built: {listView.Songs.Count}");
+
+            var inner = listView.SubViews.OfType<ListView>().First();
+
+            Assert.Equal(songCount, listView.Songs.Count);
+            Assert.Equal(0, listView.SelectedItem ?? -1);
+            Assert.True(sw.ElapsedMilliseconds < 2000, $"SongListView bulk fill too slow: {sw.ElapsedMilliseconds} ms");
+            // Change notifications must be back on, otherwise later row highlights never repaint.
+            Assert.False(inner.Source!.SuspendCollectionChangedEvent);
+            // Content height feeds scroll clamping; a suspended fill must not leave it at 0.
+            Assert.Equal(songCount, inner.GetContentHeight());
+        }
+        finally
+        {
+            Application.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void Benchmark_SongListView_BulkSetCustomItems()
+    {
+        // 同一 O(n^2) 也出现在自定义列表入口（我的歌单 / 收藏专辑 / WebDAV 目录），
+        // 3000 项在修复前约 18s（实测）。
+        const int itemCount = 3000;
+        var items = new List<string>(itemCount);
+        for (int i = 0; i < itemCount; i++)
+        {
+            items.Add($"{i + 1:D2}  [收藏]  Playlist title {i} with extra text  (共 {i} 首)");
+        }
+
+        Application.Init();
+        try
+        {
+            var top = new View { Width = 140, Height = 40, Visible = true, CanFocus = true };
+            var listView = new SongListView { Width = 100, Height = 35, Visible = true };
+            top.Add(listView);
+
+            var sw = Stopwatch.StartNew();
+            listView.SetCustomItems(items, "bulk custom", _ => Task.CompletedTask);
+            sw.Stop();
+
+            _output.WriteLine($"[SongListView Bulk SetCustomItems Benchmark]");
+            _output.WriteLine($"  - Items: {itemCount}");
+            _output.WriteLine($"  - Elapsed: {sw.ElapsedMilliseconds} ms");
+
+            var inner = listView.SubViews.OfType<ListView>().First();
+
+            Assert.Equal(itemCount, inner.Source!.Count);
+            Assert.True(sw.ElapsedMilliseconds < 2000, $"SongListView bulk custom fill too slow: {sw.ElapsedMilliseconds} ms");
+            Assert.False(inner.Source.SuspendCollectionChangedEvent);
+            Assert.Equal(itemCount, inner.GetContentHeight());
+        }
+        finally
+        {
+            Application.Shutdown();
+        }
+    }
 }
