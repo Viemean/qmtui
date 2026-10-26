@@ -479,6 +479,33 @@ public class ConnectTests
     }
 
     [Fact]
+    public async Task TvConnectServer_StopAndRestart_CompletesEachAcceptLoop()
+    {
+        var storage = new ConnectStorage();
+        using var server = new TvConnectServer(storage, port: 19877);
+
+        server.Start();
+        Assert.True(server.IsRunning);
+        var initialLoop = server.AcceptLoopCompletion;
+        Assert.False(initialLoop.IsCompleted);
+
+        server.Stop();
+        Assert.False(server.IsRunning);
+        await initialLoop.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.True(initialLoop.IsCompleted);
+
+        server.Start();
+        Assert.True(server.IsRunning);
+        var restartedLoop = server.AcceptLoopCompletion;
+        Assert.NotSame(initialLoop, restartedLoop);
+
+        server.Stop();
+        Assert.False(server.IsRunning);
+        await restartedLoop.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.True(restartedLoop.IsCompleted);
+    }
+
+    [Fact]
     public void Song_IsLocal_IsWebDav_MutualExclusion()
     {
         var localSong = new Song("local_123", "Title", "Artist", "Album", 180)
