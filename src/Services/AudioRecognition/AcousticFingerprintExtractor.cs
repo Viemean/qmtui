@@ -43,7 +43,7 @@ public static class AcousticFingerprintExtractor
 
     private static (int, int)[] _inBrs()
     {
-        var swaps = new List<(int, int)>();
+        List<(int, int)> swaps = [];
         int j = 0;
         for (int i = 0; i < FftSize - 1; i++)
         {
@@ -352,7 +352,7 @@ public static class AcousticFingerprintExtractor
 
         for (int ch = 0; ch < ChannelCount; ch++)
         {
-            result[ch] = new List<Landmark>();
+            result[ch] = [];
             int numT = (numFrames - ch + ChannelCount - 1) / ChannelCount;
             int targetEnd = Math.Max(0, numT - TimeWindow);
 

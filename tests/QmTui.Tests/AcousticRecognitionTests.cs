@@ -129,22 +129,22 @@ public class AcousticRecognitionTests
         Assert.Equal(0, ring.AvailableBytes);
 
         // 写入 6 字节: [1, 2, 3, 4, 5, 6]
-        ring.Write(new byte[] { 1, 2, 3, 4, 5, 6 });
+        ring.Write([1, 2, 3, 4, 5, 6]);
         Assert.Equal(6, ring.AvailableBytes);
 
         var snapshot1 = ring.GetRecentBytes(4);
-        Assert.Equal(new byte[] { 3, 4, 5, 6 }, snapshot1);
+        Assert.Equal((byte[])[3, 4, 5, 6], snapshot1);
 
         // 写入 8 字节触发环形溢出覆盖: [7, 8, 9, 10, 11, 12, 13, 14]
         // 缓冲区容量 10，此时应保留最后 10 字节: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-        ring.Write(new byte[] { 7, 8, 9, 10, 11, 12, 13, 14 });
+        ring.Write([7, 8, 9, 10, 11, 12, 13, 14]);
         Assert.Equal(10, ring.AvailableBytes);
 
         var snapshot2 = ring.GetRecentBytes(5);
-        Assert.Equal(new byte[] { 10, 11, 12, 13, 14 }, snapshot2);
+        Assert.Equal((byte[])[10, 11, 12, 13, 14], snapshot2);
 
         var allSnapshot = ring.GetRecentBytes(10);
-        Assert.Equal(new byte[] { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 }, allSnapshot);
+        Assert.Equal((byte[])[5, 6, 7, 8, 9, 10, 11, 12, 13, 14], allSnapshot);
     }
 
     [Theory]
@@ -195,23 +195,23 @@ public class AcousticRecognitionTests
         };
         var onlineSong = new Song(songMid, "きみの名前 (你的名字)", "藤川千愛", "Album", 240);
 
-        // 1. 在线播放写入母本库与元数据索引
+        // 在线播放写入母本库与元数据索引
         LocalLyricAutoMatcher.SaveUnifiedCache(songMid, "album_mid_789", "きみの名前 (你的名字)", "藤川千愛", lines, onlineSong);
 
-        // 2. 本地歌曲通过元数据索引跨来源 0ms 命中该母本
+        // 本地歌曲通过元数据索引跨来源 0ms 命中该母本
         var localHit = LocalLyricAutoMatcher.TryGetCachedLyrics(localSong);
         Assert.NotNull(localHit);
         Assert.Equal(songMid, localHit.SongMid);
         Assert.Equal(2, localHit.Lines.Count);
         Assert.Equal("凝望着宛如空壳的天空", localHit.Lines[0].Trans);
 
-        // 3. WebDAV 歌曲通过元数据索引跨来源 0ms 命中该母本
+        // WebDAV 歌曲通过元数据索引跨来源 0ms 命中该母本
         var webDavHit = LocalLyricAutoMatcher.TryGetCachedLyrics(webDavSong);
         Assert.NotNull(webDavHit);
         Assert.Equal(songMid, webDavHit.SongMid);
         Assert.Equal("看啊 你的声音拯救了我", webDavHit.Lines[1].Trans);
 
-        // 4. 在线歌曲根据 Mid 直接命中母本
+        // 在线歌曲根据 Mid 直接命中母本
         var onlineHit = LocalLyricAutoMatcher.TryGetCachedLyrics(onlineSong);
         Assert.NotNull(onlineHit);
         Assert.Equal(songMid, onlineHit.SongMid);
@@ -222,13 +222,13 @@ public class AcousticRecognitionTests
     {
         var song = new Song("001", "Test Song", "Test Artist", "Album", 180);
 
-        // 1. 无歌词需匹配
+        // 无歌词需匹配
         Assert.True(LocalLyricAutoMatcher.NeedsMatching(song, []));
 
-        // 2. 占位歌词需匹配
+        // 占位歌词需匹配
         Assert.True(LocalLyricAutoMatcher.NeedsMatching(song, [new LyricLine(TimeSpan.Zero, "暂无歌词")]));
 
-        // 3. 多行且有翻译，不需要匹配
+        // 多行且有翻译，不需要匹配
         Assert.False(LocalLyricAutoMatcher.NeedsMatching(song, [
             new LyricLine(TimeSpan.Zero, "Hello", "你好"),
             new LyricLine(TimeSpan.FromSeconds(2), "World", "世界")

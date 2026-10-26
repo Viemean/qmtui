@@ -214,29 +214,29 @@ public sealed unsafe partial class DesktopNotificationService : IDisposable
                 bool hasValidCover = !string.IsNullOrEmpty(coverPath) && File.Exists(coverPath);
                 string appIcon = hasValidCover ? coverPath! : "multimedia-audio-player";
 
-                // 1. app_name (s)
+                // app_name (s)
                 nint appName = g_variant_new_string("qmtui");
 
-                // 2. replaces_id (u) - 始终使用 0 作为新切歌事件弹出桌面气泡，避免桌面环境静默替换已归档历史
+                // replaces_id (u) - 始终使用 0 作为新切歌事件弹出桌面气泡，避免桌面环境静默替换已归档历史
                 nint replacesId = g_variant_new_uint32(0);
 
-                // 3. app_icon (s)
+                // app_icon (s)
                 nint icon = g_variant_new_string(appIcon);
 
-                // 4. summary (s)
+                // summary (s)
                 nint summary = g_variant_new_string(title);
 
-                // 5. body (s)
+                // body (s)
                 nint bodyVar = g_variant_new_string(body);
 
-                // 6. actions (as)
+                // actions (as)
                 nint asType = g_variant_type_new("as");
                 nint asBuilder = g_variant_builder_new(asType);
                 g_variant_type_free(asType);
                 nint actions = g_variant_builder_end(asBuilder);
                 g_variant_builder_unref(asBuilder);
 
-                // 7. hints (a{sv})
+                // hints (a{sv})
                 nint hintsType = g_variant_type_new("a{sv}");
                 nint hintsBuilder = g_variant_builder_new(hintsType);
                 g_variant_type_free(hintsType);
@@ -261,7 +261,7 @@ public sealed unsafe partial class DesktopNotificationService : IDisposable
                 nint hints = g_variant_builder_end(hintsBuilder);
                 g_variant_builder_unref(hintsBuilder);
 
-                // 8. expire_timeout (i) - 3500ms
+                // expire_timeout (i) - 3500ms
                 nint expireTimeout = g_variant_new_int32(3500);
 
                 nint[] children = [

@@ -630,12 +630,12 @@ public sealed partial class MainWindow
                             _currentDrilldownPlaylist != null &&
                             _currentDrilldownPlaylist.DirId == targetPlaylist.DirId)
                         {
-                            // 1. 若当前正处于该歌单的页面，立即刷新该歌单曲目
+                            // 若当前正处于该歌单的页面，立即刷新该歌单曲目
                             await DrilldownPlaylistAsync(_currentDrilldownPlaylist);
                         }
                         else if (_currentViewMode == ViewMode.PlaylistsList || _isViewingPlaylistsList)
                         {
-                            // 2. 若当前处于“我的歌单”目录页面，立即刷新歌单列表以更新曲目数量
+                            // 若当前处于“我的歌单”目录页面，立即刷新歌单列表以更新曲目数量
                             await LoadPlaylistsAsync();
                         }
                     }
@@ -677,7 +677,7 @@ public sealed partial class MainWindow
     {
         try
         {
-            // 1. 若当前正处于该歌单的页面，直接在已加载曲目中比对
+            // 若当前正处于该歌单的页面，直接在已加载曲目中比对
             if (_currentViewMode == ViewMode.PlaylistDrilldown &&
                 _currentDrilldownPlaylist != null &&
                 _currentDrilldownPlaylist.DirId == targetPlaylist.DirId)
@@ -691,7 +691,7 @@ public sealed partial class MainWindow
                 }
             }
 
-            // 2. 预先查询目标歌单当前歌曲（支持最大 300 首检查）
+            // 预先查询目标歌单当前歌曲（支持最大 300 首检查）
             var existingSongs = await MusicApi.GetPlaylistSongsAsync(targetPlaylist, 1, 300).ConfigureAwait(false);
             if (existingSongs.Count > 0)
             {
@@ -704,7 +704,7 @@ public sealed partial class MainWindow
                 }
             }
 
-            // 3. 执行添加
+            // 执行添加
             var ok = await MusicApi.AddSongToPlaylistAsync(targetPlaylist, song).ConfigureAwait(false);
             return ok ? AddToPlaylistResult.Success : AddToPlaylistResult.Failed;
         }

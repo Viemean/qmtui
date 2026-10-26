@@ -92,7 +92,7 @@ public static class NativeShazamService
             var uri = sig.EncodeToUri();
             var sigMs = sw.ElapsedMilliseconds;
 
-            // 3. 构建苹果 Shazam 云端发现接口请求体
+            // 构建苹果 Shazam 云端发现接口请求体
             var uuid1 = Guid.NewGuid().ToString().ToUpper();
             var uuid2 = Guid.NewGuid().ToString().ToUpper();
             var url = $"https://amp.shazam.com/discovery/v5/zh-CN/CN/iphone/-/tag/{uuid1}/{uuid2}?sync=true&webv3=true&sampling=true&connected=&shazamapiversion=v3&sharehub=true&hubv5minorversion=v5.1&hidelb=true&video=v3";
@@ -187,7 +187,7 @@ public static class NativeShazamService
             }
         }
 
-        if (bytes.Length < 44) return Array.Empty<short>();
+        if (bytes.Length < 44) return [];
 
         // 解析 RIFF WAV Header 找到 data chunk
         int dataOffset = 12;

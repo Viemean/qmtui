@@ -99,10 +99,10 @@ public static partial class MemoryManager
             s_lastAllocatedBytes = currentAllocated;
             s_lastWorkingSetBytes = currentWorkingSet;
 
-            // 1. 触发包含 Gen 2 / LOH (大对象堆) 的强制非阻塞回收，及时释放解压图片与音频元数据字节块
+            // 触发包含 Gen 2 / LOH (大对象堆) 的强制非阻塞回收，及时释放解压图片与音频元数据字节块
             GC.Collect(2, GCCollectionMode.Forced, blocking: false, compacting: false);
 
-            // 2. 在 Linux 平台下通知 glibc 遍历释放所有未使用的 arena 虚拟页还给内核
+            // 在 Linux 平台下通知 glibc 遍历释放所有未使用的 arena 虚拟页还给内核
             if (OperatingSystem.IsLinux())
             {
                 NativeMallocTrim(0);

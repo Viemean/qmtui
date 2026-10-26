@@ -256,7 +256,7 @@ public sealed partial class NowPlayingView
 
     public void SetLyrics(List<LyricLine> lyrics, bool showTranslation)
     {
-        _currentLyrics = lyrics ?? new List<LyricLine>();
+        _currentLyrics = lyrics ?? [];
         _hasTranslation = LyricParser.HasTranslation(_currentLyrics) && LyricParser.NeedsTranslation(_currentLyrics);
         _showTranslation = _hasTranslation && showTranslation;
         if (_transBtn != null)
@@ -345,7 +345,7 @@ public sealed partial class NowPlayingView
             return;
         }
 
-        var displayLines = new List<string>();
+        List<string> displayLines = [];
         _lyricItemToLineIndex.Clear();
         _lyricLineToFirstItemIndex.Clear();
 

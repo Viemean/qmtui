@@ -436,7 +436,7 @@ public sealed partial class GstPlayer : IPlayer
             if (_disposed) break;
             if (!IsPlaying || _pipeline == 0) continue;
 
-            // 1. 监测 GStreamer Bus 异常
+            // 监测 GStreamer Bus 异常
             nint bus = 0;
             lock (_lock)
             {
@@ -470,7 +470,7 @@ public sealed partial class GstPlayer : IPlayer
                 }
             }
 
-            // 2. 轮询播放进度与断点看门狗
+            // 轮询播放进度与断点看门狗
             try
             {
                 long posNs = 0;

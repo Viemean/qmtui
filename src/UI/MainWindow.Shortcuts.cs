@@ -26,7 +26,7 @@ public sealed partial class MainWindow
 {
     private async Task HandleGlobalKeyDownAsync(Key k)
     {
-        // 0. 若当前处于任何模态弹窗中，Esc 键无条件同步响应关闭，不进入 ANSI 1004 异步延迟队列
+        // 若当前处于任何模态弹窗中，Esc 键无条件同步响应关闭，不进入 ANSI 1004 异步延迟队列
         var activeModal = _activeModalDialog ?? (Application.TopRunnableView != null && Application.TopRunnableView != this ? Application.TopRunnableView as IRunnable : null);
         if (activeModal != null)
         {
@@ -58,7 +58,7 @@ public sealed partial class MainWindow
             }
         }
 
-        // 0.5. ANSI 1004 Focus Reporting 状态机与失焦/后台按键拦截
+        // ANSI 1004 Focus Reporting 状态机与失焦/后台按键拦截
         // ESC 键可能是独立物理按压，也可能是 \x1b[O (Focus Out) 或 \x1b[I (Focus In) 的前导字符
         if (k == Key.Esc)
         {
@@ -74,7 +74,7 @@ public sealed partial class MainWindow
                 {
                     Application.Invoke(async () =>
                     {
-                        // 1. 若当前处于任何弹窗（Dialog/Window/Modal）中，立即单次关闭该弹窗退出（不受终端失焦状态阻断）
+                        // 若当前处于任何弹窗（Dialog/Window/Modal）中，立即单次关闭该弹窗退出（不受终端失焦状态阻断）
                         var modal = _activeModalDialog ?? (Application.TopRunnableView != null && Application.TopRunnableView != this ? Application.TopRunnableView as IRunnable : null);
                         if (modal != null)
                         {
@@ -99,14 +99,14 @@ public sealed partial class MainWindow
                             return;
                         }
 
-                        // 1.5. 列表即时查找浮窗处于显示状态时，按 Esc 优先收起
+                        // 列表即时查找浮窗处于显示状态时，按 Esc 优先收起
                         if (_quickSearchBar.Visible)
                         {
                             _quickSearchBar.Dismiss();
                             return;
                         }
 
-                        // 2. 搜索框处于激活状态时，按 Esc 退出搜索模式恢复焦点
+                        // 搜索框处于激活状态时，按 Esc 退出搜索模式恢复焦点
                         if (_isSearchActive || _searchField.HasFocus)
                         {
                             _isSearchActive = false;
@@ -116,7 +116,7 @@ public sealed partial class MainWindow
                             return;
                         }
 
-                        // 3. 主界面真实 Esc 处理
+                        // 主界面真实 Esc 处理
                         await HandleRealEscapeKeyAsync();
                     });
                 }
@@ -159,7 +159,7 @@ public sealed partial class MainWindow
         _lastUserActivityTick = Environment.TickCount64;
         TriggerImmersiveActivity();
 
-        // 1. 若当前处于播放列表抽屉弹窗（QueueDrawerDialog）中，顶层直连分发快捷键，避免子控件字符搜索吞噬
+        // 若当前处于播放列表抽屉弹窗（QueueDrawerDialog）中，顶层直连分发快捷键，避免子控件字符搜索吞噬
         if (Application.TopRunnableView is QueueDrawerDialog queueDrawer)
         {
             bool isE = k == Key.E || k == Key.E.WithShift ||
@@ -205,7 +205,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        // 1.5 若当前处于添加到歌单弹窗（AddToPlaylistDialog）中，按 Esc 或再次按 A 立即关闭
+        // 5 若当前处于添加到歌单弹窗（AddToPlaylistDialog）中，按 Esc 或再次按 A 立即关闭
         var addDlg = (_activeModalDialog as AddToPlaylistDialog) ?? (Application.TopRunnableView as AddToPlaylistDialog);
         if (addDlg != null)
         {
@@ -227,14 +227,14 @@ public sealed partial class MainWindow
             return;
         }
 
-        // 2. 若当前获焦控件是文本输入控件（且非主搜索框），直接放行
+        // 若当前获焦控件是文本输入控件（且非主搜索框），直接放行
         var focused = Application.Navigation?.GetFocused();
         if (focused is TextField tf && tf != _searchField)
         {
             return;
         }
 
-        // 2.5. AOD 后台息屏模式：任意键唤醒恢复主界面（按 Q/q 仍触发确认退出）
+        // AOD 后台息屏模式：任意键唤醒恢复主界面（按 Q/q 仍触发确认退出）
         if (_isAodMode)
         {
             if (k.AsRune.Value == 'q' || k.AsRune.Value == 'Q')
@@ -249,13 +249,13 @@ public sealed partial class MainWindow
             return;
         }
 
-        // 3. 搜索框处于激活打字状态：全部交由 _searchField.KeyDown 独立处理，避免双重并发触发
+        // 搜索框处于激活打字状态：全部交由 _searchField.KeyDown 独立处理，避免双重并发触发
         if (_searchField.HasFocus && _isSearchActive)
         {
             return;
         }
 
-        // 4. 全局 Tab 与 Shift+Tab 流转
+        // 全局 Tab 与 Shift+Tab 流转
         if (k == Key.Tab || k.AsRune.Value == '\t' || k.ToString().Contains("Tab"))
         {
             var curFocused = Application.Navigation?.GetFocused();
@@ -272,7 +272,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        // 5. 焦点丢失时的兜底处理（按方向键或回车将焦点恢复至中央列表）
+        // 焦点丢失时的兜底处理（按方向键或回车将焦点恢复至中央列表）
         if (!_isNowPlayingViewActive && GetFocusedWindowIndex(focused) == -1 && (k == Key.CursorUp || k == Key.CursorDown || k == Key.CursorLeft || k == Key.CursorRight || k == Key.Enter))
         {
             if (_currentViewMode == ViewMode.ListeningFootprint && _footprintView.Visible)
@@ -286,7 +286,7 @@ public sealed partial class MainWindow
             Application.Invoke(UpdateFrameBorderHighlights);
         }
 
-        // 6. 只有未在搜索框内打字时，按 F3、'/' 或 Ctrl+V 才作为激活搜索框的快捷键（大播放界面下禁止唤出搜索）
+        // 只有未在搜索框内打字时，按 F3、'/' 或 Ctrl+V 才作为激活搜索框的快捷键（大播放界面下禁止唤出搜索）
         if (k == Key.F3 || k.AsRune.Value == '/' || k == Key.V.WithCtrl)
         {
             if (_isNowPlayingViewActive) return;

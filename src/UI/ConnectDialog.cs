@@ -51,7 +51,7 @@ public sealed class ConnectDialog : Dialog
         int screenCols = Application.Driver?.Cols ?? 80;
         int screenRows = Application.Driver?.Rows ?? 24;
 
-        // 1. 先生成初始配对数据并测算二维码实际矩阵尺寸
+        // 先生成初始配对数据并测算二维码实际矩阵尺寸
         var initialPin = _storage.CurrentPinCode;
         var localIp = ConnectMdnsService.GetBestLocalIpAddress();
         var initialQrLines = GenerateQrLines(initialPin, localIp);
@@ -98,7 +98,7 @@ public sealed class ConnectDialog : Dialog
         CanFocus = true;
         SetScheme(TransparentDialogScheme);
 
-        // 2. 二维码视图配置
+        // 二维码视图配置
         _qrView = new ListView
         {
             Width = qrW,
@@ -120,7 +120,7 @@ public sealed class ConnectDialog : Dialog
         }
         Add(_qrView);
 
-        // 3. 右侧信息容器 (若左右分栏则使用 Pos.Right(_qrView) + 2 相对约束，避免遮挡)
+        // 右侧信息容器 (若左右分栏则使用 Pos.Right(_qrView) + 2 相对约束，避免遮挡)
         _rightPane = new View
         {
             CanFocus = true
@@ -150,7 +150,7 @@ public sealed class ConnectDialog : Dialog
         }
         Add(_rightPane);
 
-        // 4. 信息与提示 Label
+        // 信息与提示 Label
         _pinCodeLabel = new Label
         {
             Text = $"6位 PIN 码:  [ {initialPin} ]",
@@ -202,7 +202,7 @@ public sealed class ConnectDialog : Dialog
         _pairedLabel.SetScheme(TransparentDialogScheme);
         _rightPane.Add(_pairedLabel);
 
-        // 5. 按钮控制栏（采用双行排布，避免窄屏或长文字下右侧关闭按钮被截断）
+        // 按钮控制栏，双行排布
         _refreshPinBtn = new Button
         {
             Text = "刷新 PIN (R)",
@@ -322,7 +322,7 @@ public sealed class ConnectDialog : Dialog
 
     private async Task LoadDownloadQrCodeAsync()
     {
-        // 1. 若存在 15 分钟内的有效缓存，直接使用已缓存的直链二维码
+        // 若存在 15 分钟内的有效缓存，直接使用已缓存的直链二维码
         if (s_cachedRelease.HasValue && s_cachedRelease.Value.ExpireAt > DateTimeOffset.UtcNow)
         {
             var cached = s_cachedRelease.Value;
@@ -336,7 +336,7 @@ public sealed class ConnectDialog : Dialog
             return;
         }
 
-        // 2. 初始展示兜底发布页二维码，避免界面等待卡顿
+        // 初始展示兜底发布页二维码，避免界面等待卡顿
         Application.Invoke(() =>
         {
             if (_isDownloadMode)
@@ -345,7 +345,7 @@ public sealed class ConnectDialog : Dialog
             }
         });
 
-        // 3. 异步探测 GitHub Releases API 获取最新构建产物
+        // 异步探测 GitHub Releases API 获取最新构建产物
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/Viemean/melodist/releases/latest");

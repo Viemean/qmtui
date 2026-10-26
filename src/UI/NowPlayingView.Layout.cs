@@ -155,7 +155,7 @@ public sealed partial class NowPlayingView
             TriggerImmersiveActivity();
             TriggerInteractiveActivity();
             StartImmersiveTimer();
-            // 沉浸模式下自动取消选中歌手/专辑，需要取消沉浸模式才可以选择
+            // 全屏模式下自动取消选中歌手/专辑，需要退出全屏模式才可以选择
             _artistLink.SetInteractiveEnabled(false);
             _albumLink.SetInteractiveEnabled(false);
             SetFocus();
@@ -174,7 +174,7 @@ public sealed partial class NowPlayingView
                 }
             }
             _isInteractiveHighlightSuppressed = false;
-            // 退出沉浸模式后恢复可选择
+            // 退出全屏模式后恢复可选择
             _artistLink.SetInteractiveEnabled(true);
             _albumLink.SetInteractiveEnabled(true);
             _artistLink.SetHighlightSuppressed(false);
@@ -248,7 +248,7 @@ public sealed partial class NowPlayingView
             {
                 var now = Environment.TickCount64;
 
-                // 1. 浮动功能按钮（译/沉浸/匹配）3 秒无操作自动隐藏
+                // 浮动功能按钮（译/全屏/匹配）3 秒无操作自动隐藏
                 if (now - _lastImmersiveActivityTick > 3000)
                 {
                     if (_transBtn.Visible || _immersiveBtn.Visible || _matchLyricBtn.Visible)
@@ -260,7 +260,7 @@ public sealed partial class NowPlayingView
                     }
                 }
 
-                // 2. 交互项高亮 3 秒无操作自动隐藏
+                // 交互项高亮 3 秒无操作自动隐藏
                 if (!_isInteractiveHighlightSuppressed &&
                     _lastInteractiveActivityTick > 0 &&
                     now - _lastInteractiveActivityTick > 3000)
@@ -343,7 +343,7 @@ public sealed class InteractiveLinkView : Label
 
         MouseEvent += (s, m) =>
         {
-            if (!CanFocus) return; // 沉浸模式下禁用一切交互与选中
+            if (!CanFocus) return; // 全屏模式下禁用交互与选中
 
             if (!_isHovered)
             {
@@ -351,7 +351,7 @@ public sealed class InteractiveLinkView : Label
                 UpdateVisualScheme();
             }
 
-            // 单击仅获焦，双击才执行激活跳转（防止误触）
+            // 单击仅获焦，双击才执行激活跳转
             if (m.Flags.HasFlag(MouseFlags.LeftButtonDoubleClicked))
             {
                 SetFocus();

@@ -336,7 +336,7 @@ public sealed partial class MainWindow
             if (server != null && !string.IsNullOrEmpty(song.WebDavHref))
             {
                 var localCache = WebDavService.GetLocalCachePath(server, song.WebDavHref);
-                // 1. 若本地完整缓存已存在且有效，直接播放本地文件
+                // 若本地完整缓存已存在且有效，直接播放本地文件
                 if (File.Exists(localCache) && new FileInfo(localCache).Length > 4096)
                 {
                     playUrl = localCache;
@@ -345,7 +345,7 @@ public sealed partial class MainWindow
                 }
                 else
                 {
-                    // 2. 本地尚未缓存：直接使用流式直链 URL 起播，无需等待音频全部缓冲完毕
+                    // 本地尚未缓存：直接使用流式直链 URL 起播，无需等待音频全部缓冲完毕
                     Application.Invoke(() =>
                     {
                         if (IsStale()) return;
@@ -996,14 +996,14 @@ public sealed partial class MainWindow
 
             if (nextSong != null && !nextSong.IsLocal && !string.IsNullOrEmpty(nextSong.Mid))
             {
-                // 1. 如果本地已有音频缓存，无需网络预热
+                // 如果本地已有音频缓存，无需网络预热
                 var cached = AudioCacheService.GetCachedAudioPath(nextSong.Mid, _preferredQualityTier);
                 if (!string.IsNullOrEmpty(cached)) return;
 
-                // 2. 预热本地封面
+                // 预热本地封面
                 _ = TerminalImageHelper.EnsureSongCoverAsync(nextSong);
 
-                // 3. 预解析下一首音源链接并缓存
+                // 预解析下一首音源链接并缓存
                 var cacheKey = $"{nextSong.Mid}_{(int)_preferredQualityTier}";
                 lock (s_prefetchLock)
                 {

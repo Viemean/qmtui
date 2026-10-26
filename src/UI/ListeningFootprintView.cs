@@ -56,7 +56,7 @@ public sealed class ListeningFootprintView : FrameView
         CanFocus = true;
         TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop;
 
-        // 1. 顶部周期维度 Tab 与日期翻页导航
+        // 顶部周期维度 Tab 与日期翻页导航
         _headerBar = new View
         {
             X = 0,
@@ -121,7 +121,7 @@ public sealed class ListeningFootprintView : FrameView
         };
         Add(_headerBar);
 
-        // 2. 统计概览面板（核心收听时长、活跃时段与 Unicode 字符图表）
+        // 统计概览面板（核心收听时长、活跃时段与 Unicode 字符图表）
         _statsFrame = new FrameView
         {
             Title = "核心指标与走势",
@@ -153,7 +153,7 @@ public sealed class ListeningFootprintView : FrameView
         _statsFrame.Add(_summaryLabel, _chartLabel);
         Add(_statsFrame);
 
-        // 3. 常听歌手分布面板
+        // 常听歌手分布面板
         _singersFrame = new FrameView
         {
             Title = "常听歌手分布",
@@ -238,7 +238,7 @@ public sealed class ListeningFootprintView : FrameView
         _singersFrame.Add(_singersLabel, _favoritesListView);
         Add(_singersFrame);
 
-        // 4. 单曲收听排行榜列表
+        // 单曲收听排行榜列表
         _rankingFrame = new FrameView
         {
             Title = "单曲收听排行",
@@ -405,11 +405,11 @@ public sealed class ListeningFootprintView : FrameView
     {
         UpdateTabStyles();
 
-        // 1. 日期导航文本
+        // 日期导航文本
         string displayDate = FormatDateKey(report.Period, report.DateKey);
         _dateNavigatorLabel.Text = $"[<] {displayDate} [>]";
 
-        // 2. 指标汇总
+        // 指标汇总
         var sbSummary = new StringBuilder();
         if (report.Period == ListeningReportPeriod.Day)
         {
@@ -455,10 +455,10 @@ public sealed class ListeningFootprintView : FrameView
         }
         _summaryLabel.Text = sbSummary.ToString().TrimEnd();
 
-        // 3. 走势字符图表（Unicode 柱状字符）
+        // 走势字符图表（Unicode 柱状字符）
         _chartLabel.Text = BuildAsciiChart(report.Period, report.DateKey, report.ChartPoints);
 
-        // 4. 计算可用宽度
+        // 计算可用宽度
         int viewWidth = _singersFrame.Viewport.Width;
         if (viewWidth <= 0)
         {
@@ -470,7 +470,7 @@ public sealed class ListeningFootprintView : FrameView
             viewWidth = curW > 4 ? curW - 4 : 52;
         }
 
-        // 5. 常听歌手分布条 / 高光时刻 / 每月最爱歌曲
+        // 常听歌手分布条 / 高光时刻 / 每月最爱歌曲
         if (report.Period == ListeningReportPeriod.Year)
         {
             _singersFrame.Title = "每月最爱歌曲";
@@ -523,7 +523,7 @@ public sealed class ListeningFootprintView : FrameView
             }
         }
 
-        // 6. 单曲收听排行榜
+        // 单曲收听排行榜
         _rankSongs.Clear();
         _rankSongs.AddRange(report.RankSongs);
 
@@ -788,7 +788,7 @@ public sealed class ListeningFootprintView : FrameView
             long min = s.ListenTimeSec / 60;
             string singerName = s.SingerName;
             int nameCols = singerName.GetColumns();
-            string padding = new string(' ', Math.Max(0, maxNameCols - nameCols));
+            string padding = new(' ', Math.Max(0, maxNameCols - nameCols));
 
             string durationStr = min > 0 ? $"{min,4} 分钟" : $"{s.ListenTimeSec,4} 秒";
             sb.AppendLine($"#{i + 1} {singerName}{padding}  {durationStr}");

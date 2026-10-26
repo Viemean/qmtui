@@ -538,7 +538,7 @@ public sealed partial class SongListView : FrameView
 
         Add(_listView);
 
-        // 右下角悬浮操作图标：[▲] 返回顶部 与 [●] 定位到当前播放歌曲（精致括号包装，中间保留 1 行适中间隔）
+        // 右下角悬浮操作图标：[▲] 返回顶部 与 [●] 定位到当前播放歌曲
         _scrollTopBtn = new Label
         {
             Text = "[▲]",

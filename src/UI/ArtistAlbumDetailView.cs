@@ -61,7 +61,7 @@ public sealed class ArtistAlbumDetailView : View
         Height = Dim.Fill();
         CanFocus = true;
 
-        // 1. 上半部分：图片展示容器（约占 58% 高度，增大立绘画幅）
+        // 上半部分：图片展示容器（约占 58% 高度，增大立绘画幅）
         _imageContainer = new View
         {
             X = 0,
@@ -92,7 +92,7 @@ public sealed class ArtistAlbumDetailView : View
         _imageContainer.Add(_titleLabel, _subLabel);
         Add(_imageContainer);
 
-        // 2. 下半部分：富文本简介框架（紧贴图片容器下方）
+        // 下半部分：富文本简介框架（紧贴图片容器下方）
         _descFrame = new FrameView
         {
             Title = "简介",

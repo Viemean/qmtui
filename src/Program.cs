@@ -85,11 +85,11 @@ public static partial class Program
         {
             try
             {
-                // 1. 忽略 SIGPIPE（向断开的管道写入数据时避免进程被内核终止）
+                // 忽略 SIGPIPE
                 signal(SIGPIPE, SIG_IGN);
                 QmTui.Utils.AppLogger.Info("Signal", "Ignored SIGPIPE via libc signal(13, SIG_IGN)");
 
-                // 2. 捕获 SIGHUP（SSH 会话断开时退出应用）
+                // 捕获 SIGHUP（SSH 会话断开时退出应用）
                 sighupReg = PosixSignalRegistration.Create(PosixSignal.SIGHUP, ctx =>
                 {
                     QmTui.Utils.AppLogger.Warn("Signal", "SIGHUP received (SSH session disconnected). Stopping application.");
@@ -103,14 +103,14 @@ public static partial class Program
                     }
                 });
 
-                // 3. 响应 SIGTERM（系统关机或 kill 退出）
+                // 响应 SIGTERM（系统关机或 kill 退出）
                 sigtermReg = PosixSignalRegistration.Create(PosixSignal.SIGTERM, ctx =>
                 {
                     QmTui.Utils.AppLogger.Warn("Signal", "SIGTERM received. Requesting shutdown.");
                     Application.Invoke(() => Application.RequestStop());
                 });
 
-                // 4. 响应 SIGINT (Ctrl+C)
+                // 响应 SIGINT (Ctrl+C)
                 sigintReg = PosixSignalRegistration.Create(PosixSignal.SIGINT, ctx =>
                 {
                     QmTui.Utils.AppLogger.Warn("Signal", "SIGINT received. Requesting stop.");

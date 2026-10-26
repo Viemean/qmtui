@@ -508,7 +508,7 @@ public sealed class ListenTogetherManager : IDisposable
                         break;
                     }
 
-                    // 1. 成员数更新与房客进入自动起播
+                    // 成员数更新与房客进入自动起播
                     var current = CurrentRoom;
                     if (current != null)
                     {
@@ -539,7 +539,7 @@ public sealed class ListenTogetherManager : IDisposable
                         }
                     }
 
-                    // 2. 好友空间数据定期同步（两分钟周期）
+                    // 好友空间数据定期同步（两分钟周期）
                     if (state.UsersCount >= 2)
                     {
                         var myEnc = UserSession.Current.EncryptedUin;
@@ -562,7 +562,7 @@ public sealed class ListenTogetherManager : IDisposable
                         }
                     }
 
-                    // 3. 在播期间本地乐观累加听歌时长（每 60 秒累加 1 分钟）
+                    // 在播期间本地乐观累加听歌时长（每 60 秒累加 1 分钟）
                     if (state.UsersCount >= 2 && state.PlayStatus == 1 && SpaceStats != null)
                     {
                         _accumulatedPlayMs += 1500;
@@ -577,7 +577,7 @@ public sealed class ListenTogetherManager : IDisposable
                     long currentTick = Environment.TickCount64;
                     bool isWithinActionWindow = (currentTick - _lastLocalActionTick) < 3000;
 
-                    // 4. 切歌与歌单版本对齐
+                    // 切歌与歌单版本对齐
                     if (state.CurrentSongId > 0)
                     {
                         bool isMediaVersionChanged = state.MediaVersion > 0 && _lastObservedMediaVersion > 0 && state.MediaVersion != _lastObservedMediaVersion;
@@ -710,7 +710,7 @@ public sealed class ListenTogetherManager : IDisposable
                         }
                     }
 
-                    // 5. 对齐播放与暂停状态
+                    // 对齐播放与暂停状态
                     if (IsWaitingForGuestAutoPlay)
                     {
                         if (IsPlayingGetter?.Invoke() == true)
@@ -773,7 +773,7 @@ public sealed class ListenTogetherManager : IDisposable
                         }
                     }
 
-                    // 6. 播放进度偏移容限校准（阈值 3000ms）
+                    // 播放进度偏移容限校准（阈值 3000ms）
                     if (state.UsersCount >= 2 && !IsWaitingForGuestAutoPlay && !isWithinActionWindow)
                     {
                         var localSong = CurrentSongGetter?.Invoke();

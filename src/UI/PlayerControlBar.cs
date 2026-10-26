@@ -94,7 +94,7 @@ public sealed partial class PlayerControlBar : FrameView
         KeyBindings.Remove(Key.Tab);
         KeyBindings.Remove(Key.Tab.WithShift);
 
-        // 1. 左侧曲目信息：统一展示为“歌曲名字 - 歌手 - 专辑名字”，支持按列独立点击
+        // 左侧曲目信息：统一展示为“歌曲名字 - 歌手 - 专辑名字”，支持按列独立点击
         _nowPlayingLabel = new Label
         {
             Text = "暂无播放曲目",
@@ -144,7 +144,7 @@ public sealed partial class PlayerControlBar : FrameView
             }
         };
 
-        // 2. 第 0 行右侧控制区（单曲信息与交互）：
+        // 第 0 行右侧控制区（单曲信息与交互）：
         // 音质按钮在最右侧，左侧依次为转存、分享、添加、收藏（由 UpdateQualityPosition 统一动态布局）
 
         _qualityBtn = new Button
@@ -212,7 +212,7 @@ public sealed partial class PlayerControlBar : FrameView
         };
         Add(_shareBtn);
 
-        // 3. 第 1 行：
+        // 第 1 行：
         // 左侧：进度条 (30格) + 紧邻右侧的 [ 收藏 ] 按钮
         // 右侧：[ 随机 ] + [ 上一首 ] + [ 暂停 ] + [ 下一首 ]
 
@@ -292,7 +292,7 @@ public sealed partial class PlayerControlBar : FrameView
         };
         Add(_addBtn);
 
-        // 3. 第 1 行右侧控制区（播放引擎走带与输出）：
+        // 第 1 行右侧控制区（播放引擎走带与输出）：
         // [ 模式 ] -> [ 上一首 ] -> [ 播放/暂停 ] -> [ 下一首 ] -> [ 音量 ]
 
         _volumeBtn = new Button

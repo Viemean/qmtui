@@ -291,7 +291,7 @@ public static partial class WebDavService
     /// <returns>目录下的条目列表；请求失败或解析异常返回空列表。</returns>
     public static async Task<List<WebDavItem>> ListDirectoryAsync(WebDavServer server, string relativeHref)
     {
-        var items = new List<WebDavItem>();
+        List<WebDavItem> items = [];
         try
         {
             var client = GetHttpClient(server);
@@ -443,8 +443,8 @@ public static partial class WebDavService
     /// <returns>扫描完成后的有效音频文件条目总数。</returns>
     public static async Task<int> ScanFolderRecursiveAsync(WebDavServer server, string folderHref, Action<string>? progress = null)
     {
-        var discovered = new List<WebDavItem>();
-        var queue = new Queue<string>();
+        List<WebDavItem> discovered = [];
+        Queue<string> queue = new();
         queue.Enqueue(folderHref);
 
         progress?.Invoke("正在深度检索 WebDAV 目录树...");
@@ -455,7 +455,7 @@ public static partial class WebDavService
         {
             var current = queue.Dequeue();
             var list = await ListDirectoryAsync(server, current);
-            var folderNewItems = new List<WebDavItem>();
+            List<WebDavItem> folderNewItems = [];
 
             foreach (var item in list)
             {

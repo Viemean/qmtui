@@ -252,7 +252,7 @@ public sealed class ConnectMdnsService : IDisposable
         bw.Write((byte)0x00); bw.Write((byte)0x00); // NSCOUNT = 0
         bw.Write((byte)0x00); bw.Write((byte)0x03); // ARCOUNT = 3
 
-        // 1. Answer: PTR Record (_melodist-connect._tcp.local -> serviceInstanceFqdn)
+        // Answer: PTR Record (_melodist-connect._tcp.local -> serviceInstanceFqdn)
         WriteDnsName(bw, ServiceType);
         bw.Write((byte)0x00); bw.Write((byte)0x0C); // TYPE: PTR (12)
         bw.Write((byte)0x00); bw.Write((byte)0x01); // CLASS: IN (1)
@@ -268,7 +268,7 @@ public sealed class ConnectMdnsService : IDisposable
             bw.Write(rdata);
         }
 
-        // 2. Additional: SRV Record (serviceInstanceFqdn -> Priority 0, Weight 0, Port, hostTargetFqdn)
+        // Additional: SRV Record (serviceInstanceFqdn -> Priority 0, Weight 0, Port, hostTargetFqdn)
         WriteDnsName(bw, serviceInstanceFqdn);
         bw.Write((byte)0x00); bw.Write((byte)0x21); // TYPE: SRV (33)
         bw.Write((byte)0x80); bw.Write((byte)0x01); // CLASS: IN (1) + Cache Flush
@@ -288,7 +288,7 @@ public sealed class ConnectMdnsService : IDisposable
             bw.Write(rdata);
         }
 
-        // 3. Additional: TXT Record (serviceInstanceFqdn -> id, name, token, pin, host)
+        // Additional: TXT Record (serviceInstanceFqdn -> id, name, token, pin, host)
         WriteDnsName(bw, serviceInstanceFqdn);
         bw.Write((byte)0x00); bw.Write((byte)0x10); // TYPE: TXT (16)
         bw.Write((byte)0x80); bw.Write((byte)0x01); // CLASS: IN (1) + Cache Flush
@@ -319,7 +319,7 @@ public sealed class ConnectMdnsService : IDisposable
             bw.Write(rdata);
         }
 
-        // 4. Additional: A Record (hostTargetFqdn -> IPv4)
+        // Additional: A Record (hostTargetFqdn -> IPv4)
         WriteDnsName(bw, hostTargetFqdn);
         bw.Write((byte)0x00); bw.Write((byte)0x01); // TYPE: A (1)
         bw.Write((byte)0x80); bw.Write((byte)0x01); // CLASS: IN (1) + Cache Flush

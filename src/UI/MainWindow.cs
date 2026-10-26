@@ -260,7 +260,7 @@ public sealed partial class MainWindow : Window
         Height = Dim.Fill();
         SetScheme(MikuTheme.Base);
 
-        // 1. 顶部搜索栏与用户信息
+        // 顶部搜索栏与用户信息
         _searchLabel = new Label
         {
             Text = "搜索:",
@@ -431,7 +431,7 @@ public sealed partial class MainWindow : Window
         };
         Add(_searchField);
 
-        // 2. 左侧导航栏（固定 14 宽，小窗友好）
+        // 左侧导航栏（固定 14 宽）
         _sidebarFrame = new FrameView
         {
             Title = "",
@@ -515,7 +515,7 @@ public sealed partial class MainWindow : Window
         };
         Add(_sidebarFrame);
 
-        // 2.1 左侧下半部分常驻直角正方形迷你封面视窗
+        // 1 左侧下半部分常驻直角正方形迷你封面视窗
         _miniCoverView = new MiniCoverView
         {
             X = 0,
@@ -526,7 +526,7 @@ public sealed partial class MainWindow : Window
         _miniCoverView.CoverClicked += ToggleNowPlayingView;
         Add(_miniCoverView);
 
-        // 3. 中央歌曲列表视窗（解耦封装）
+        // 中央歌曲列表视窗（解耦封装）
         _songListView = new SongListView
         {
             X = Pos.Right(_sidebarFrame),
@@ -630,7 +630,7 @@ public sealed partial class MainWindow : Window
         _footprintView.TabNavigationRequested += forward => SwitchNextFocusWindow(forward);
         Add(_footprintView);
 
-        // 3.5. 主列表即时查找悬浮窗 (G 键触发) - 置于中央歌曲列表视窗内靠上居中，避免与右侧分割线重叠
+        // 主列表即时查找悬浮窗 (G 键触发) - 置于中央歌曲列表视窗内靠上居中，避免与右侧分割线重叠
         _quickSearchBar = new QuickSearchFloatingBar
         {
             X = Pos.Center(),
@@ -765,7 +765,7 @@ public sealed partial class MainWindow : Window
             Application.Invoke(UpdateFrameBorderHighlights);
         };
 
-        // 4. 右侧实时歌词视窗（标题由冗长文案简化为“歌词”）
+        // 右侧实时歌词视窗（标题由冗长文案简化为“歌词”）
         _lyricFrame = new FrameView
         {
             Title = "",
@@ -1116,7 +1116,7 @@ public sealed partial class MainWindow : Window
         };
         Add(_controlBar);
 
-        // 底部快捷键操作指南（独立放置在控制栏UI方框下方最底行，干净平整无边框干扰）
+        // 底部快捷键操作指南
         _hotkeyHintLabel = new Label
         {
             Text = " [V]播放界面  [K]一起听  [B]通知  [M]静音  [- / +]音量  [/]搜索  [E]队列  [G]查找  [C]评论",
@@ -1239,7 +1239,7 @@ public sealed partial class MainWindow : Window
 
         _songListView.StatusNotification += msg => _controlBar.UpdateStatus(msg);
 
-        // 沉浸式播放界面视图与控制栏联动
+        // 全屏播放界面视图与控制栏联动
         _nowPlayingView = new NowPlayingView();
         _nowPlayingView.StatusNotification += msg => _controlBar.UpdateStatus(msg);
         _nowPlayingView.BackRequested += CloseNowPlayingView;
@@ -1304,7 +1304,7 @@ public sealed partial class MainWindow : Window
         }
         _controlBar.NowPlayingClicked += ToggleNowPlayingView;
 
-        // 窗口整体尺寸改变时同步更新沉浸式播放界面的封面或详情页写真
+        // 窗口整体尺寸改变时同步更新全屏播放界面的封面或详情页写真
         ViewportChanged += (s, e) =>
         {
             UpdateSidebarLayout();
@@ -1326,7 +1326,7 @@ public sealed partial class MainWindow : Window
             }
         };
 
-        // 鼠标活动唤醒沉浸模式下自动隐藏的图标与刷新无操作看门狗
+        // 鼠标活动唤醒全屏模式下自动隐藏的图标与刷新无操作看门狗
         MouseEvent += (s, m) =>
         {
             IsTerminalWindowFocused = true;
@@ -1500,7 +1500,7 @@ public sealed partial class MainWindow : Window
         int topOffset = _isImmersiveMode ? 0 : 1;
         int availableHeight = totalHeight - topOffset - bottomReserve;
 
-        const int coverBoxHeight = 8; // 边框 2 行 + 6 行 1:1 正方形满幅小封面（12列宽） = 8 行严丝合缝贴合
+        const int coverBoxHeight = 8;
         bool canShowCover = availableHeight >= (12 + coverBoxHeight) && TerminalImageHelper.IsImageSupported;
         if (canShowCover)
         {
@@ -1816,14 +1816,14 @@ public sealed partial class MainWindow : Window
         if (_userStatusBtn == null || _recognizeBtn == null || _webBtn == null || _themeBtn == null || _searchField == null ||
             _searchSongsBtn == null || _searchPlaylistsBtn == null || _searchAlbumsBtn == null) return;
 
-        // 1. 最右侧：主题切换按钮 [主题:自动] / [主题:亮色] / [主题:暗色] (右侧保留 1 列安全留白)
+        // 最右侧：主题切换按钮 [主题:自动] / [主题:亮色] / [主题:暗色] (右侧保留 1 列安全留白)
         var themeText = GetThemeButtonText();
         _themeBtn.Text = themeText;
         int themeBtnWidth = GetVisualWidth(themeText);
         int themeAnchorOffset = themeBtnWidth + 1;
         _themeBtn.X = Pos.AnchorEnd(themeAnchorOffset);
 
-        // 2. Web 协同按钮 [W] Web (排在主题按钮左侧，间隔 2 列)
+        // Web 协同按钮 [W] Web (排在主题按钮左侧，间隔 2 列)
         var isWebRunning = (_standaloneWebServer?.IsRunning == true) || (_player is WebPlayer);
         var webText = isWebRunning ? "[W] Web:开" : "[W] Web";
         _webBtn.Text = webText;
@@ -1831,21 +1831,21 @@ public sealed partial class MainWindow : Window
         int webAnchorOffset = themeAnchorOffset + 2 + webBtnWidth;
         _webBtn.X = Pos.AnchorEnd(webAnchorOffset);
 
-        // 3. 账号按钮 [U] 登录 / [U] 账号: ... (排在 Web 按钮左侧，间隔 2 列)
+        // 账号按钮 [U] 登录 / [U] 账号: ... (排在 Web 按钮左侧，间隔 2 列)
         var statusText = GetUserStatusText();
         _userStatusBtn.Text = statusText;
         int userBtnWidth = GetVisualWidth(statusText);
         int userAnchorOffset = webAnchorOffset + 2 + userBtnWidth;
         _userStatusBtn.X = Pos.AnchorEnd(userAnchorOffset);
 
-        // 4. 识曲按钮 [R] 识曲 (排在账号按钮左侧，间隔 2 列)
+        // 识曲按钮 [R] 识曲 (排在账号按钮左侧，间隔 2 列)
         const string recText = "[R] 识曲";
         _recognizeBtn.Text = recText;
         int recBtnWidth = GetVisualWidth(recText);
         int recAnchorOffset = userAnchorOffset + 2 + recBtnWidth;
         _recognizeBtn.X = Pos.AnchorEnd(recAnchorOffset);
 
-        // 4. 上下文操作按钮动态布局（[1...] [2...] [3...]）
+        // 上下文操作按钮动态布局（[1...] [2...] [3...]）
         int contextButtonsWidth = 0;
         if (_searchSongsBtn?.Visible == true)
         {

@@ -313,7 +313,7 @@ public class ConnectTests
     {
         var seekCmd = new SeekCommand(PositionMs: 45000);
 
-        // 1. 验证仅包含 data (JsonElement) 时能够正确解析 (Melodist Kotlin 默认行为)
+        // 验证仅包含 data (JsonElement) 时能够正确解析 (Melodist Kotlin 默认行为)
         var msgWithData = ConnectMessage.Create(ConnectActions.CmdSeek, seekCmd, ConnectJsonContext.Default.SeekCommand);
         // 模拟清空 payload 仅保留 data
         var jsonWithOnlyData = $"{{\"action\":\"{ConnectActions.CmdSeek}\",\"data\":{{\"positionMs\":45000}}}}";
@@ -323,7 +323,7 @@ public class ConnectTests
         Assert.NotNull(decodedFromData);
         Assert.Equal(45000, decodedFromData.PositionMs);
 
-        // 2. 验证仅包含 payload (字符串) 时的向后兼容解析
+        // 验证仅包含 payload (字符串) 时的向后兼容解析
         var jsonWithOnlyPayload = $"{{\"action\":\"{ConnectActions.CmdSeek}\",\"payload\":\"{{\\\"positionMs\\\":45000}}\"}}";
         var parsedOnlyPayload = JsonSerializer.Deserialize(jsonWithOnlyPayload, ConnectJsonContext.Default.ConnectMessage);
         Assert.NotNull(parsedOnlyPayload);
@@ -331,7 +331,7 @@ public class ConnectTests
         Assert.NotNull(decodedFromPayload);
         Assert.Equal(45000, decodedFromPayload.PositionMs);
 
-        // 3. 验证通过 ConnectMessage.Create 生成的消息同时包含 data 与 payload
+        // 验证通过 ConnectMessage.Create 生成的消息同时包含 data 与 payload
         Assert.NotNull(msgWithData.Data);
         Assert.NotEmpty(msgWithData.Payload);
         Assert.Contains("45000", msgWithData.Payload);
@@ -588,7 +588,7 @@ public class ConnectTests
             var encodedPath = Uri.EscapeDataString(tempFile);
             var streamUrl = $"http://127.0.0.1:{server.ActualPort}/stream/local?path={encodedPath}";
 
-            // 1. 测试 HEAD 请求
+            // 测试 HEAD 请求
             var headReq = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Head, streamUrl);
             var headResp = await httpClient.SendAsync(headReq);
             Assert.Equal(System.Net.HttpStatusCode.OK, headResp.StatusCode);
@@ -596,7 +596,7 @@ public class ConnectTests
             Assert.Equal(1024, headResp.Content.Headers.ContentLength);
             Assert.True(headResp.Headers.Contains("Accept-Ranges"));
 
-            // 2. 测试 Range: bytes=10-19 分片请求
+            // 测试 Range: bytes=10-19 分片请求
             var rangeReq = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, streamUrl);
             rangeReq.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(10, 19);
             var rangeResp = await httpClient.SendAsync(rangeReq);
@@ -610,13 +610,13 @@ public class ConnectTests
                 Assert.Equal(testData[10 + i], chunk[i]);
             }
 
-            // 3. 测试 416 超范围
+            // 测试 416 超范围
             var badRangeReq = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, streamUrl);
             badRangeReq.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(2000, 3000);
             var badRangeResp = await httpClient.SendAsync(badRangeReq);
             Assert.Equal(System.Net.HttpStatusCode.RequestedRangeNotSatisfiable, badRangeResp.StatusCode);
 
-            // 4. 测试 404 不存在文件
+            // 测试 404 不存在文件
             var notFoundUrl = $"http://127.0.0.1:{server.ActualPort}/stream/local?path=%2Fnot_found_file.flac";
             var notFoundResp = await httpClient.GetAsync(notFoundUrl);
             Assert.Equal(System.Net.HttpStatusCode.NotFound, notFoundResp.StatusCode);
@@ -636,7 +636,7 @@ public class ConnectTests
         Directory.CreateDirectory(coverDir);
         var coverFilename = $"test_cover_{Guid.NewGuid():N}.jpg";
         var coverFilePath = Path.Combine(coverDir, coverFilename);
-        var dummyCoverData = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46 };
+        byte[] dummyCoverData = [ 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46 ];
         await File.WriteAllBytesAsync(coverFilePath, dummyCoverData);
 
         try

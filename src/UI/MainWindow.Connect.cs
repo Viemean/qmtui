@@ -83,9 +83,9 @@ public sealed partial class MainWindow
                         }
 
                         // 对齐移动端流媒体中转与直连策略：
-                        // 1. AudioSource STREAM_PROXY
-                        // 2. Song.MediaMid 为 http/https 流
-                        // 3. Song.LocalFilePath 为 http/https 流或本地有效文件
+                        // AudioSource STREAM_PROXY
+                        // Song.MediaMid 为 http/https 流
+                        // Song.LocalFilePath 为 http/https 流或本地有效文件
                         string? overrideUrl = null;
                         if (cmd.AudioSource?.SourceType == AudioSourceType.STREAM_PROXY && !string.IsNullOrEmpty(cmd.AudioSource.StreamUrl))
                         {
@@ -175,7 +175,7 @@ public sealed partial class MainWindow
 
                         if (_queueSyncChunks.Count == cmd.TotalChunks)
                         {
-                            var fullList = new List<Song>();
+                            List<Song> fullList = [];
                             for (int i = 0; i < cmd.TotalChunks; i++)
                             {
                                 if (_queueSyncChunks.TryGetValue(i, out var list))

@@ -29,7 +29,7 @@ public sealed partial class LoginService
                 var completed = await Task.WhenAny(receiving, Task.Delay(TimeSpan.FromSeconds(25), ct)).ConfigureAwait(false);
                 if (completed != receiving)
                 {
-                    await socket.SendAsync(new byte[] { 0xC0, 0 }, WebSocketMessageType.Binary, true, ct).ConfigureAwait(false);
+                    await socket.SendAsync((byte[])[0xC0, 0], WebSocketMessageType.Binary, true, ct).ConfigureAwait(false);
                     continue;
                 }
                 var packet = await receiving.ConfigureAwait(false);
@@ -104,14 +104,14 @@ public sealed partial class LoginService
 
     private static async Task SendConnectAsync(ClientWebSocket socket, string id, CancellationToken ct)
     {
-        var properties = new List<byte>();
+        List<byte> properties = [];
         StringProperty(properties, 0x15, "pass");
         UserProperty(properties, "tmeAppID", "qqmusic");
         UserProperty(properties, "business", "management");
         UserProperty(properties, "hashTag", id);
         UserProperty(properties, "clientTag", "management.user");
         UserProperty(properties, "userID", id);
-        var body = new List<byte>();
+        List<byte> body = [];
         WriteString(body, "MQTT");
         body.AddRange([5, 2, 0, 45]);
         WriteVbi(body, properties.Count);
@@ -122,7 +122,7 @@ public sealed partial class LoginService
 
     private static async Task SubscribeMqttAsync(ClientWebSocket socket, string id, CancellationToken ct)
     {
-        var properties = new List<byte>();
+        List<byte> properties = [];
         UserProperty(properties, "authorization", "tmelogin");
         UserProperty(properties, "pubsub", "unicast");
         var body = new List<byte> { 0, 1 };

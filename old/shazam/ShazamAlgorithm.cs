@@ -62,7 +62,7 @@ public sealed class ShazamAlgorithm
     private int _spreadPos;
     private int _spreadNumWritten;
 
-    // 临时 FFT 实虚部计算缓存 (避免任何堆内存分配)
+    // 临时 FFT 实虚部计算缓存
     private readonly float[] _re = new float[WindowSize];
     private readonly float[] _im = new float[WindowSize];
 
@@ -113,14 +113,14 @@ public sealed class ShazamAlgorithm
 
     private void Process128Chunk(ReadOnlySpan<short> chunk, ShazamSignature signature)
     {
-        // 1. 写入采样环形缓冲
+        // 写入采样环形缓冲
         for (int i = 0; i < StepSize; i++)
         {
             _sampleRingBuffer[(_sampleBufferPos + i) % WindowSize] = chunk[i];
         }
         _sampleBufferPos = (_sampleBufferPos + StepSize) % WindowSize;
 
-        // 2. 按时间从旧到新提取 2048 样本并加 Hanning 窗
+        // 按时间从旧到新提取 2048 样本并加 Hanning 窗
         for (int i = 0; i < WindowSize; i++)
         {
             int ringIdx = (_sampleBufferPos + i) % WindowSize;
@@ -128,12 +128,12 @@ public sealed class ShazamAlgorithm
             _im[i] = 0f;
         }
 
-        // 3. 执行 2048 点快速傅里叶变换 (FFT)
+        // 执行 2048 点快速傅里叶变换 (FFT)
         ComputeFft(_re, _im);
 
-        // 4. 计算归一化功率谱并写入 fftOutputs
+        // 计算归一化功率谱并写入 fftOutputs
         var currentFft = _fftOutputs[_fftOutputsPos];
-        const float invScale = 1.0f / 131072.0f; // 1 / (1 << 17)
+        const float invScale = 1.0f / 131072.0f;
         for (int i = 0; i < HalfWindow; i++)
         {
             float power = (_re[i] * _re[i] + _im[i] * _im[i]) * invScale;
@@ -142,10 +142,10 @@ public sealed class ShazamAlgorithm
 
         _fftOutputsPos = (_fftOutputsPos + 1) % HistoryBufferSize;
 
-        // 5. 执行 Peak Spreading
+        // 执行 Peak Spreading
         DoPeakSpreading(currentFft);
 
-        // 6. 若历史累积足够，执行 Peak 提取
+        // 若历史累积足够，执行 Peak 提取
         if (_spreadNumWritten >= 46)
         {
             DoPeakRecognition(signature);

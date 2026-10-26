@@ -33,7 +33,7 @@ public sealed partial class MainWindow
     {
         _isImmersiveMode = enable;
 
-        // 1. 上方搜索框与账号状态栏显隐
+        // 上方搜索框与账号状态栏显隐
         _searchLabel.Visible = !enable;
         _searchField.Visible = !enable;
         _userStatusBtn.Visible = !enable;
@@ -41,11 +41,11 @@ public sealed partial class MainWindow
         _webBtn.Visible = !enable;
         UpdateTopContextButtons();
 
-        // 2. 下方控制栏与快捷栏显隐
+        // 下方控制栏与快捷栏显隐
         _controlBar.Visible = !enable;
         _hotkeyHintLabel.Visible = !enable;
 
-        // 3. 主视窗尺寸自适应：沉浸时自第 0 行顶格起，高度延伸至铺满最底行
+        // 主视窗尺寸自适应：全屏时自第 0 行顶格起，高度延伸至铺满最底行
         int topY = enable ? 0 : 1;
         var fillHeight = enable ? Dim.Fill(0) : Dim.Fill(5);
 
@@ -347,7 +347,7 @@ public sealed partial class MainWindow
         _miniCoverView.Visible = false;
         _miniCoverView.ClearCover();
 
-        // 若处于沉浸式大封面播放或写真详情，显式调用注销并清空终端 Kitty 图像协议缓冲区
+        // 若处于全屏大封面播放或写真详情，显式调用注销并清空终端 Kitty 图像协议缓冲区
         if (_nowPlayingView.Visible)
         {
             _nowPlayingView.OnDeactivated();

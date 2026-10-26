@@ -120,10 +120,10 @@ public sealed partial class MusicApi
                 totalCount = tProp.GetInt32();
             }
 
-            var hotList = new List<SongComment>();
+            List<SongComment> hotList = [];
             if (page == 0)
             {
-                var seenHotIds = new HashSet<string>();
+                HashSet<string> seenHotIds = [];
                 string[] hotKeys = ["CommentList3", "CommentList2"];
                 foreach (var key in hotKeys)
                 {
@@ -141,7 +141,7 @@ public sealed partial class MusicApi
                 }
             }
 
-            var normalList = new List<SongComment>();
+            List<SongComment> normalList = [];
             bool serverHasMore = false;
             string lastSeqNo = "";
             if (dataObj.TryGetProperty("CommentList", out var commentListObj))
@@ -269,7 +269,7 @@ public sealed partial class MusicApi
 
             int moreComment = root.TryGetProperty("morecomment", out var mc) && mc.ValueKind == JsonValueKind.Number ? mc.GetInt32() : 0;
 
-            var hotList = new List<SongComment>();
+            List<SongComment> hotList = [];
             if (root.TryGetProperty("hot_comment", out var hc) && hc.TryGetProperty("commentlist", out var hArr) && hArr.ValueKind == JsonValueKind.Array)
             {
                 foreach (var elem in hArr.EnumerateArray())
@@ -279,7 +279,7 @@ public sealed partial class MusicApi
                 }
             }
 
-            var normalList = new List<SongComment>();
+            List<SongComment> normalList = [];
             if (root.TryGetProperty("comment", out var cm) && cm.TryGetProperty("commentlist", out var cArr) && cArr.ValueKind == JsonValueKind.Array)
             {
                 foreach (var elem in cArr.EnumerateArray())

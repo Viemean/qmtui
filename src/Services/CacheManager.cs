@@ -197,8 +197,8 @@ public static class CacheManager
         {
             MaxTotalSizeBytes = GetAdaptiveMaxSizeBytes();
 
-            // 1. 扫描三大目录实际物理文件
-            var fileList = new List<FileInfo>();
+            // 扫描三大目录实际物理文件
+            List<FileInfo> fileList = [];
             ScanDirectorySafe(AudioDir, fileList);
             ScanDirectorySafe(WebDavDir, fileList);
             ScanDirectorySafe(CoversDir, fileList);
@@ -241,7 +241,7 @@ public static class CacheManager
 
             AppLogger.Info("CacheManager", $"Total cache size ({totalBytes / 1024 / 1024} MB) exceeds limit ({MaxTotalSizeBytes / 1024 / 1024} MB), starting SLRU eviction...");
 
-            // 2. 划分 Probation 试听段 (hits == 1) 与 Protected 常用段 (hits >= 2)
+            // 划分 Probation 试听段 (hits == 1) 与 Protected 常用段 (hits >= 2)
             var probationList = new List<KeyValuePair<string, CacheEntry>>();
             var protectedList = new List<KeyValuePair<string, CacheEntry>>();
 

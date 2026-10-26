@@ -222,7 +222,7 @@ public sealed class FolderManageDialog : Dialog
         _folders.Clear();
         _folders.AddRange(LocalMusicService.GetFolders());
 
-        var displayList = new List<string>();
+        List<string> displayList = [];
         if (_folders.Count == 0)
         {
             displayList.Add("(当前暂无已添加的目录，请按 A 键添加)");

@@ -18,7 +18,7 @@ public static class AudioSliceDecoder
     private const int SliceDurationSeconds = 8;
     private const int BytesPerSample = 2; // 16-bit
     private const int BytesPerSecond = TargetSampleRate * BytesPerSample; // 32000 bytes/s
-    private const int TargetSliceBytes = SliceDurationSeconds * BytesPerSecond; // 256000 bytes (128000 samples)
+    private const int TargetSliceBytes = SliceDurationSeconds * BytesPerSecond;
 
     /// <summary>
     /// 对本地音频文件或流式 URL 切片解码，返回 16000Hz 单声道 short[] PCM 样本
@@ -70,7 +70,7 @@ public static class AudioSliceDecoder
             byte[] buffer = new byte[TargetSliceBytes];
             byte[] tempSkip = new byte[65536];
 
-            // 1. 跳过前导静音/前奏字节
+            // 跳过前导静音/前奏字节
             int skipped = 0;
             while (skipped < skipBytes)
             {
@@ -81,7 +81,7 @@ public static class AudioSliceDecoder
                 skipped += read;
             }
 
-            // 2. 读取目标 8 秒切片 PCM
+            // 读取目标 8 秒切片 PCM
             int totalRead = 0;
             while (totalRead < TargetSliceBytes)
             {

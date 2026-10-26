@@ -17,7 +17,7 @@ internal static partial class ThemeDetector
     {
         try
         {
-            // 1. 检查终端环境变量 COLORFGBG (格式通常为 "fg;bg" 或 "fg;...;bg")
+            // 检查终端环境变量 COLORFGBG (格式通常为 "fg;bg" 或 "fg;...;bg")
             var colorFgBg = Environment.GetEnvironmentVariable("COLORFGBG");
             if (!string.IsNullOrEmpty(colorFgBg))
             {
@@ -33,7 +33,7 @@ internal static partial class ThemeDetector
                 }
             }
 
-            // 2. Kitty 终端环境探测
+            // Kitty 终端环境探测
             var isKitty = Environment.GetEnvironmentVariable("KITTY_PID") != null ||
                           Environment.GetEnvironmentVariable("KITTY_WINDOW_ID") != null ||
                           string.Equals(Environment.GetEnvironmentVariable("TERM"), "xterm-kitty", StringComparison.OrdinalIgnoreCase);
@@ -45,7 +45,7 @@ internal static partial class ThemeDetector
                 }
             }
 
-            // 3. Alacritty 终端环境探测
+            // Alacritty 终端环境探测
             var isAlacritty = Environment.GetEnvironmentVariable("ALACRITTY_WINDOW_ID") != null ||
                               Environment.GetEnvironmentVariable("ALACRITTY_LOG") != null;
             if (isAlacritty)
@@ -56,7 +56,7 @@ internal static partial class ThemeDetector
                 }
             }
 
-            // 4. Linux 桌面外观偏好检测 (gsettings)
+            // Linux 桌面外观偏好检测 (gsettings)
             if (OperatingSystem.IsLinux())
             {
                 if (TryDetectDesktopAppearance(out bool isDesktopLight))

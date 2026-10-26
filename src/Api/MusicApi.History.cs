@@ -195,7 +195,7 @@ public sealed partial class MusicApi
                 return ([], newUpdateTime);
             }
 
-            var songs = new List<Song>();
+            List<Song> songs = [];
             foreach (var itemElem in songListElem.EnumerateArray())
             {
                 var trackElem = itemElem.TryGetProperty("track", out var tr) ? tr

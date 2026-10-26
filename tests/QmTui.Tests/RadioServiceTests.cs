@@ -12,7 +12,7 @@ public class RadioServiceTests
 
     private static List<Song> MakeSongs(int count, string prefix = "radio_mid")
     {
-        var list = new List<Song>();
+        List<Song> list = [];
         for (int i = 1; i <= count; i++)
         {
             list.Add(new Song($"{prefix}_{i}", $"Radio Song {i}", $"Artist {i}", "Album", 200, "", i));

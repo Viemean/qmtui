@@ -97,7 +97,7 @@ public sealed partial class MainWindow
         var items = await WebDavService.ListDirectoryAsync(server, href);
         _currentWebDavItems = items;
 
-        var displayLines = new List<string>();
+        List<string> displayLines = [];
         bool hasParentBack = _webDavPathHistory.Count > 0 || (!string.IsNullOrEmpty(href) && href != "/" && href != server.RootPath);
         if (hasParentBack)
         {

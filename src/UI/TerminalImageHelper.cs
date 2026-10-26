@@ -45,7 +45,7 @@ public static partial class TerminalImageHelper
         {
             if (s_isImageSupported.HasValue) return s_isImageSupported.Value;
 
-            // 0. 允许通过环境变量显式禁用或强制开启图片支持 (用于调试或特定终端覆盖)
+            // 允许通过环境变量显式禁用或强制开启图片支持 (用于调试或特定终端覆盖)
             var disableEnv = Environment.GetEnvironmentVariable("QQMUSIC_DISABLE_IMAGE") ?? Environment.GetEnvironmentVariable("QQMUSIC_NO_IMAGE");
             if (disableEnv == "1" || disableEnv?.Equals("true", StringComparison.OrdinalIgnoreCase) == true)
             {
@@ -70,7 +70,7 @@ public static partial class TerminalImageHelper
                 return false;
             }
 
-            // 1. 探测 Kitty 环境变量
+            // 探测 Kitty 环境变量
             var kittyWindowId = Environment.GetEnvironmentVariable("KITTY_WINDOW_ID");
             var kittyPid = Environment.GetEnvironmentVariable("KITTY_PID");
             var term = Environment.GetEnvironmentVariable("TERM") ?? "";
@@ -83,7 +83,7 @@ public static partial class TerminalImageHelper
                 return true;
             }
 
-            // 2. 探测原生支持 Kitty Graphics Protocol 独立渲染层的终端（Ghostty, Rio 等）
+            // 探测原生支持 Kitty Graphics Protocol 独立渲染层的终端（Ghostty, Rio 等）
             if (termProgram.Equals("ghostty", StringComparison.OrdinalIgnoreCase) ||
                 termProgram.Equals("rio", StringComparison.OrdinalIgnoreCase) ||
                 term.Equals("rio", StringComparison.OrdinalIgnoreCase))

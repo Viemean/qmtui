@@ -140,7 +140,7 @@ public sealed unsafe partial class MprisService : IDisposable
 
         try
         {
-            // 1. 启动专用 GLib 事件循环后台线程（驱动 GIO D-Bus 消息派发）
+            // 启动专用 GLib 事件循环后台线程（驱动 GIO D-Bus 消息派发）
             _mainLoop = g_main_loop_new(0, 0);
             _loopThread = new Thread(() =>
             {
@@ -155,7 +155,7 @@ public sealed unsafe partial class MprisService : IDisposable
             };
             _loopThread.Start();
 
-            // 2. 连接会话总线 (Session Bus)
+            // 连接会话总线 (Session Bus)
             _connection = g_bus_get_sync(G_BUS_TYPE_SESSION, 0, out nint connErr);
             if (_connection == 0)
             {
@@ -163,7 +163,7 @@ public sealed unsafe partial class MprisService : IDisposable
                 return Task.CompletedTask;
             }
 
-            // 3. 解析 MPRIS2 Introspection XML
+            // 解析 MPRIS2 Introspection XML
             _nodeInfo = g_dbus_node_info_new_for_xml(IntrospectionXml, out nint xmlErr);
             if (_nodeInfo == 0)
             {
@@ -174,13 +174,13 @@ public sealed unsafe partial class MprisService : IDisposable
             nint rootIface = g_dbus_node_info_lookup_interface(_nodeInfo, "org.mpris.MediaPlayer2");
             nint playerIface = g_dbus_node_info_lookup_interface(_nodeInfo, "org.mpris.MediaPlayer2.Player");
 
-            // 4. 构建 VTable（Native AOT UnmanagedCallersOnly 函数指针）
+            // 构建 VTable（Native AOT UnmanagedCallersOnly 函数指针）
             _vtable = (GDBusInterfaceVTable*)NativeMemory.AllocZeroed((nuint)sizeof(GDBusInterfaceVTable));
             _vtable->MethodCall = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, nint, nint, nint, nint, nint, void>)&OnMethodCall;
             _vtable->GetProperty = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, nint, nint, nint, nint, nint>)&OnGetProperty;
             _vtable->SetProperty = (nint)(delegate* unmanaged[Cdecl]<nint, nint, nint, nint, nint, nint, nint, nint, int>)&OnSetProperty;
 
-            // 5. 在 /org/mpris/MediaPlayer2 上注册两个接口
+            // 在 /org/mpris/MediaPlayer2 上注册两个接口
             _rootRegId = g_dbus_connection_register_object(
                 _connection,
                 MprisObjectPath,
@@ -197,7 +197,7 @@ public sealed unsafe partial class MprisService : IDisposable
                 0, 0, out _
             );
 
-            // 6. 申请 MPRIS2 熟知总线名称；只有成为所有者后才对外宣告就绪。
+            // 申请 MPRIS2 熟知总线名称；只有成为所有者后才对外宣告就绪。
             _busNameResult = RequestBusName(ServiceName);
             _isReady = _rootRegId != 0 && _playerRegId != 0 && _busNameResult is 1 or 4;
             if (_isReady)

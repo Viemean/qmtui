@@ -193,7 +193,7 @@ public sealed partial class SongListView
     public List<int> PerformInListSearch(string keyword)
     {
         _searchMatchedRows.Clear();
-        var matched = new List<int>();
+        List<int> matched = [];
         if (string.IsNullOrWhiteSpace(keyword))
         {
             _listView.SetNeedsDraw();

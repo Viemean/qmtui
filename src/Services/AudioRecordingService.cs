@@ -288,7 +288,7 @@ public sealed class AudioRecordingSession : IDisposable
         {
             int totalBytes = (int)_pcmStream.Length;
             int sampleCount = totalBytes / 2;
-            if (sampleCount == 0) return Array.Empty<short>();
+            if (sampleCount == 0) return [];
 
             var rawBytes = _pcmStream.GetBuffer();
             var samples = new short[sampleCount];
@@ -304,12 +304,12 @@ public sealed class AudioRecordingSession : IDisposable
             // 保留足够的低频内容，对不同型号麦克风频响兼容性更好
             if (_source == AudioRecordSource.Microphone && sampleCount > 1)
             {
-                // 1. DC 去除：减去全段均值，消除直流偏置对 FFT 功率谱的干扰
+                // DC 去除：减去全段均值，消除直流偏置对 FFT 功率谱的干扰
                 long dcSum = 0;
                 for (int i = 0; i < sampleCount; i++) dcSum += samples[i];
                 int dcOffset = (int)(dcSum / sampleCount);
 
-                // 2. 预加重：y[n] = x[n] - α·x[n-1]，α=0.87（温和一阶高通）
+                // 预加重：y[n] = x[n] - α·x[n-1]，α=0.87（温和一阶高通）
                 const float alpha = 0.87f;
                 int prev = samples[0] - dcOffset;
                 samples[0] = (short)Math.Clamp(prev, short.MinValue, short.MaxValue);

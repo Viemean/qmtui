@@ -322,7 +322,7 @@ public sealed partial class PlayerControlBar
 
     private void HandleInfoClick(int clickX)
     {
-        // 用户要求：控制栏点击容易误触进入歌手/专辑界面，取消控制栏点击歌手/专辑界面的行为，统一触发全屏沉浸播放视窗
+        // 控制栏点击歌手/专辑界面的行为统一触发全屏播放视窗
         NowPlayingClicked?.Invoke();
     }
 

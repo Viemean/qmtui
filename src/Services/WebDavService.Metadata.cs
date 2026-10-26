@@ -18,7 +18,7 @@ public static partial class WebDavService
 
     public static List<Song> DeduplicateSongs(IEnumerable<Song> songs)
     {
-        var result = new List<Song>();
+        List<Song> result = [];
         var seenFingerprints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var s in songs)
@@ -177,14 +177,14 @@ public static partial class WebDavService
             return serverUri;
         }
 
-        // 1. 若为完整绝对 URL 直接使用
+        // 若为完整绝对 URL 直接使用
         if (Uri.TryCreate(relativeHref, UriKind.Absolute, out var absUri) &&
             (absUri.Scheme == Uri.UriSchemeHttp || absUri.Scheme == Uri.UriSchemeHttps))
         {
             return absUri;
         }
 
-        // 2. 解码后进行绝对/相对路径判定
+        // 解码后进行绝对/相对路径判定
         var decoded = Uri.UnescapeDataString(relativeHref);
         var path = decoded.StartsWith('/') ? decoded : "/" + decoded;
 
@@ -348,7 +348,7 @@ public static partial class WebDavService
         int completed = 0;
         int enrichedCount = 0;
         using var semaphore = new SemaphoreSlim(8, 8); // 8 线程并发嗅探
-        var tasks = new List<Task>();
+        List<Task> tasks = [];
 
         foreach (var songCache in toScan)
         {
@@ -444,7 +444,7 @@ public static partial class WebDavService
                 var client = GetHttpClient(server);
                 var uri = BuildFullUri(server, song.WebDavHref);
 
-                // 1. 初始拉取前 4MB 头部（足够覆盖绝大多数高清大图）
+                // 初始拉取前 4MB 头部（足够覆盖绝大多数高清大图）
                 long rangeEnd = 4 * 1024 * 1024 - 1;
                 byte[]? headerData = await FetchRangeBytesAsync(client, uri, 0, rangeEnd, ct).ConfigureAwait(false);
                 if (headerData != null && headerData.Length > 0)
@@ -725,14 +725,14 @@ public static partial class WebDavService
     {
         if (server == null || string.IsNullOrEmpty(song.WebDavHref)) return [];
 
-        // 1. 本地完整音频缓存命中，直接走 LocalMusicService 读内嵌歌词
+        // 本地完整音频缓存命中，直接走 LocalMusicService 读内嵌歌词
         var localAudio = GetLocalCachePath(server, song.WebDavHref);
         if (File.Exists(localAudio) && new FileInfo(localAudio).Length > 4096)
         {
             return await LocalMusicService.GetLyricsAsync(song with { LocalFilePath = localAudio }).ConfigureAwait(false);
         }
 
-        // 2. 本地 .lrc 缓存文件命中
+        // 本地 .lrc 缓存文件命中
         var lrcCachePath = GetLocalLrcCachePath(server, song.WebDavHref);
         if (File.Exists(lrcCachePath) && new FileInfo(lrcCachePath).Length > 0)
         {
@@ -748,7 +748,7 @@ public static partial class WebDavService
             }
         }
 
-        // 3. 内存配置缓存中的 EmbeddedLyrics 命中
+        // 内存配置缓存中的 EmbeddedLyrics 命中
         WebDavSongCache? cached;
         lock (s_lock)
         {
@@ -760,7 +760,7 @@ public static partial class WebDavService
             if (parsed.Count > 0) return parsed;
         }
 
-        // 4. 远端同名 .lrc 文件探测
+        // 远端同名 .lrc 文件探测
         var remoteLrcText = await TryDownloadRemoteLrcAsync(server, song.WebDavHref, ct).ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(remoteLrcText))
         {
@@ -768,7 +768,7 @@ public static partial class WebDavService
             if (parsed.Count > 0) return parsed;
         }
 
-        // 5. HTTP Range 头部内嵌歌词提取（复用 EnsureCoverAsync 的同一段头部 Range 逻辑）
+        // HTTP Range 头部内嵌歌词提取（复用 EnsureCoverAsync 的同一段头部 Range 逻辑）
         try
         {
             var client = GetHttpClient(server);

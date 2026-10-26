@@ -617,7 +617,7 @@ public sealed class PlaybackQueueService
             var root = doc.RootElement;
 
             int savedIndex = root.TryGetProperty("current_index", out var idxEl) ? idxEl.GetInt32() : -1;
-            var songs = new List<Song>();
+            List<Song> songs = [];
 
             if (root.TryGetProperty("songs", out var songsEl) && songsEl.ValueKind == System.Text.Json.JsonValueKind.Array)
             {

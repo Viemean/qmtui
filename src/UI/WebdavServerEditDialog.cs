@@ -37,7 +37,7 @@ public sealed class WebdavServerEditDialog : Dialog
         Y = Pos.Center();
         SetScheme(TransparentDialogScheme);
 
-        // 1. 站点名称
+        // 站点名称
         Add(new Label { Text = "站点名称:", X = 2, Y = 0 });
         _nameInput = new TextField
         {
@@ -50,7 +50,7 @@ public sealed class WebdavServerEditDialog : Dialog
         _nameInput.EnableMiddleClickPaste();
         Add(_nameInput);
 
-        // 2. 服务器 URL
+        // 服务器 URL
         Add(new Label { Text = "服务 URL:", X = 2, Y = 2 });
         _urlInput = new TextField
         {
@@ -63,7 +63,7 @@ public sealed class WebdavServerEditDialog : Dialog
         _urlInput.EnableMiddleClickPaste();
         Add(_urlInput);
 
-        // 3. 用户名
+        // 用户名
         Add(new Label { Text = "用 户 名:", X = 2, Y = 4 });
         _userInput = new TextField
         {
@@ -76,7 +76,7 @@ public sealed class WebdavServerEditDialog : Dialog
         _userInput.EnableMiddleClickPaste();
         Add(_userInput);
 
-        // 4. 密码
+        // 密码
         Add(new Label { Text = "密    码:", X = 2, Y = 6 });
         _passInput = new TextField
         {
@@ -90,7 +90,7 @@ public sealed class WebdavServerEditDialog : Dialog
         _passInput.EnableMiddleClickPaste();
         Add(_passInput);
 
-        // 5. 根路径
+        // 根路径
         Add(new Label { Text = "初始路径:", X = 2, Y = 8 });
         _rootPathInput = new TextField
         {
@@ -103,7 +103,7 @@ public sealed class WebdavServerEditDialog : Dialog
         _rootPathInput.EnableMiddleClickPaste();
         Add(_rootPathInput);
 
-        // 6. 信任自签名证书（单层方括号切换控件）
+        // 信任自签名证书（单层方括号切换控件）
         _trustSelfSigned = _server.TrustSelfSigned;
         Add(new Label { Text = "安全选项:", X = 2, Y = 10 });
         _trustCertLabel = new Label
@@ -136,7 +136,7 @@ public sealed class WebdavServerEditDialog : Dialog
         _trustCertLabel.HasFocusChanged += (s, e) => UpdateTrustCertLabel();
         Add(_trustCertLabel);
 
-        // 7. 状态提示（初始为空，无需冗余提示信息）
+        // 状态提示（初始为空，无需冗余提示信息）
         _statusLabel = new Label
         {
             Text = "",

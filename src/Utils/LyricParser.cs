@@ -33,7 +33,7 @@ public static partial class LyricParser
     {
         if (string.IsNullOrWhiteSpace(lrcText)) return [];
 
-        var list = new List<(TimeSpan Timestamp, string Text, int Order)>();
+        List<(TimeSpan Timestamp, string Text, int Order)> list = [];
         int lineOrder = 0;
         Span<TimeSpan> tsBuf = stackalloc TimeSpan[8];
 
@@ -272,7 +272,7 @@ public static partial class LyricParser
 
             if (!isMeta && transItems.Count > 0)
             {
-                // 1. 精确匹配 (< 80ms)
+                // 精确匹配 (< 80ms)
                 var exact = transItems.Find(t => Math.Abs((t.Timestamp - orig.Timestamp).TotalMilliseconds) < 80);
                 if (exact.Text != null && !usedSet.Contains(exact) &&
                     exact.Text != "//" && !exact.Text.Contains("享有") && !exact.Text.Contains("大模型") && !exact.Text.Contains("翻译贡献"))
@@ -282,7 +282,7 @@ public static partial class LyricParser
                 }
                 else if (cleanTrans.Count > 0)
                 {
-                    // 2. 300ms 紧凑容差候选匹配 (取时间距离最小的候选，避免跨句抢配)
+                    // 300ms 紧凑容差候选匹配，取时间距离最小的候选
                     var candidates = cleanTrans.FindAll(t => !usedSet.Contains(t) && Math.Abs((t.Timestamp - orig.Timestamp).TotalMilliseconds) <= 300);
                     if (candidates.Count > 0)
                     {
@@ -300,7 +300,7 @@ public static partial class LyricParser
                         transText = best.Text;
                         usedSet.Add(best);
                     }
-                    // 3. 总行数完全一致时的同索引保底回退
+                    // 总行数完全一致时的同索引保底回退
                     else if (cleanTrans.Count == origItems.Count && i < cleanTrans.Count && !usedSet.Contains(cleanTrans[i]))
                     {
                         transText = cleanTrans[i].Text;

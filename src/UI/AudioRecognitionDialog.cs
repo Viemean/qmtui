@@ -395,7 +395,7 @@ public sealed class AudioRecognitionDialog : Dialog
 
         AppLogger.Force("AudioRecognitionDialog", $"Starting recognition process. FixedSource: {_currentSource}");
 
-        // 检测系统内录输出可用性 (避免在无任何声卡输出时静音等待)
+        // 检测系统内录输出可用性
         if (_currentSource == AudioRecordSource.SystemInternal && !AudioDeviceHelper.HasInternalRecordDevice())
         {
             ShowDeviceUnavailable("未检测到可用的系统内录通道 (无声卡输出)", "请连接耳机/扬声器，或按 T 切换为麦克风外录");

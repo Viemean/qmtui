@@ -121,7 +121,7 @@ class ElectronMusicPlayer {
       setMobileLyricsView(!isCurrentlyShowing);
     });
 
-    // 2. 手机端便捷交互：点击歌曲信息区可返回显示大封面图片
+    // 手机端便捷交互：点击歌曲信息区可返回显示大封面图片
     if (this.trackMeta) {
       this.trackMeta.addEventListener('click', (e) => {
         if (e.target.closest('.btn-like') || e.target.closest('.quality-btn-sync')) return;
@@ -269,7 +269,7 @@ class ElectronMusicPlayer {
       }
     });
 
-    // 用户在页面任意触碰时，若存在被浏览器策略挂起的待播放曲目，立即静默触发起播 (避开主播放按钮避免事件冲突)
+    // 用户在页面任意触碰时，若存在被浏览器策略挂起的待播放曲目，立即静默触发起播
     document.addEventListener(
       'pointerdown',
       (e) => {
@@ -607,12 +607,12 @@ class ElectronMusicPlayer {
   handleStateUpdate(data) {
     if (!data) return;
 
-    // 1. 歌曲元数据切换
+    // 歌曲元数据切换
     if (data.song) {
       this.handleTrackChange(data.song);
     }
 
-    // 2. 切歌阶段通知：若新音频流尚未准备好，平滑暂停并重置进度
+    // 切歌阶段通知：若新音频流尚未准备好，平滑暂停并重置进度
     if (data.type === 'song_change' || (!data.streamUrl && data.type !== 'play')) {
       if (data.type === 'song_change') {
         this.currentStreamUrl = '';
@@ -622,7 +622,7 @@ class ElectronMusicPlayer {
       }
     }
 
-    // 3. 音频流地址更新
+    // 音频流地址更新
     if (data.streamUrl) {
       const streamUrl = data.streamUrl;
       if (this.currentStreamUrl !== streamUrl || !this.audioElement.src) {
@@ -653,7 +653,7 @@ class ElectronMusicPlayer {
       }
     }
 
-    // 4. 播放/暂停状态对齐
+    // 播放/暂停状态对齐
     if (data.isPlaying !== undefined && this.state.isPlaying !== !!data.isPlaying) {
       this.state.isPlaying = !!data.isPlaying;
       this.updatePlayStateUI();
@@ -681,7 +681,7 @@ class ElectronMusicPlayer {
       this.updateMediaSessionPosition();
     }
 
-    // 5. 进度与总时长对齐
+    // 进度与总时长对齐
     if (data.type === 'seek' && data.position !== undefined) {
       this.state.currentPosition = data.position;
       if (this.audioElement.src) {
@@ -717,23 +717,23 @@ class ElectronMusicPlayer {
     }
     this.updateProgressUI();
 
-    // 6. 歌词渲染
+    // 歌词渲染
     if (data.lyrics) {
       this.parseAndRenderLyrics(data.lyrics);
     }
 
-    // 7. 收藏状态双向同步
+    // 收藏状态双向同步
     if (data.isFavorite !== undefined) {
       this.state.isLiked = !!data.isFavorite;
       this.updateLikeUI();
     }
 
-    // 8. 循环模式双向同步
+    // 循环模式双向同步
     if (data.mode) {
       this.updatePlaybackModeUI(data.mode);
     }
 
-    // 9. 音质标识双向同步
+    // 音质标识双向同步
     if (data.qualityBadge) {
       this.updateQualityUI(data.qualityBadge);
     }
@@ -982,7 +982,7 @@ class ElectronMusicPlayer {
     const idx = this.state.activeLyricIndex;
     if (idx < 0) return;
 
-    // 1. 更新移动端居中歌词滚动
+    // 更新移动端居中歌词滚动
     const mobileItems = this.mobileLyricsInner.querySelectorAll('.lyric-item');
     for (let i = 0; i < mobileItems.length; i++) {
       mobileItems[i].classList.toggle('active', i === idx);
@@ -995,7 +995,7 @@ class ElectronMusicPlayer {
       container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
     }
 
-    // 2. 更新桌面端多行歌词高亮与局部居中滚动
+    // 更新桌面端多行歌词高亮与局部居中滚动
     const desktopItems = this.desktopLyricsInner.querySelectorAll('.lyric-item');
     for (let i = 0; i < desktopItems.length; i++) {
       desktopItems[i].classList.toggle('active', i === idx);
@@ -1176,7 +1176,7 @@ class ElectronMusicPlayer {
       const monetBg = `hsl(${targetHue}, ${sPct}%, ${lPct}%)`;
       document.documentElement.style.setProperty('--play-monet-bg', monetBg);
     } else {
-      // 浅色主题: 对标 Electron 计算微亮通透莫奈背景色 (L: 29%, S: 24%~44%)，确保白色操作按钮和文字具备高对比度
+      // 浅色主题: 对标 Electron 计算背景色 (L: 29%, S: 24%~44%)，设置操作按钮和文字对比度
       const sPct = Math.min(Math.max(Math.round(targetSat * 65), 24), 44);
       const lPct = 29;
       const monetBg = `hsl(${targetHue}, ${sPct}%, ${lPct}%)`;

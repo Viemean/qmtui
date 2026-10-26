@@ -94,7 +94,7 @@ public sealed partial class NowPlayingView : View
 
         bool isImageSupported = TerminalImageHelper.IsImageSupported;
 
-        // 1. 左侧面板：纯净无边框封面容器 (终端支持图片显示协议时显示并占 48% 宽度；不支持时完全隐藏)
+        // 左侧面板：纯净无边框封面容器 (终端支持图片显示协议时显示并占 48% 宽度；不支持时完全隐藏)
         _coverContainer = new View
         {
             X = 0,
@@ -230,7 +230,7 @@ public sealed partial class NowPlayingView : View
         _coverContainer.Add(_songInfoContainer);
         Add(_coverContainer);
 
-        // 2. 右侧面板：纯净无边框大视窗歌词 (无图终端模式下占满全宽并水平居中歌词)
+        // 右侧面板：纯净无边框大视窗歌词 (无图终端模式下占满全宽并水平居中歌词)
         _lyricContainer = new View
         {
             X = isImageSupported ? Pos.Right(_coverContainer) : 0,
@@ -453,14 +453,14 @@ public sealed partial class NowPlayingView : View
 
         Add(_lyricContainer);
 
-        // 鼠标活动唤醒沉浸模式下自动隐藏的图标与交互高亮
+        // 鼠标活动唤醒全屏模式下自动隐藏的图标与交互高亮
         MouseEvent += (s, m) =>
         {
             TriggerImmersiveActivity();
             TriggerInteractiveActivity();
         };
 
-        // 键盘快捷键监听：按 P 切换沉浸，按 Esc/V 退出沉浸或返回主界面
+        // 键盘快捷键监听：按 P 切换全屏，按 Esc/V 退出全屏或返回主界面
         KeyDown += (s, k) =>
         {
             TriggerImmersiveActivity();

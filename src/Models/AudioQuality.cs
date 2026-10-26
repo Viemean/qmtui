@@ -200,7 +200,7 @@ public static class AudioQualityHelper
 
     public static AudioQualityTier DetermineLocalOrWebDavTier(string? quality, string? filePath = null)
     {
-        // 1. 若有实际文件路径，优先基于文件扩展名与编码特性判定，避免旧缓存默认的"标准 128k"造成误判
+        // 若有实际文件路径，优先基于文件扩展名与编码特性判定，避免旧缓存默认的"标准 128k"造成误判
         if (!string.IsNullOrEmpty(filePath))
         {
             var ext = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
@@ -230,7 +230,7 @@ public static class AudioQualityHelper
             }
         }
 
-        // 2. 若无路径或未匹配扩展名，则解析 quality 字符串
+        // 若无路径或未匹配扩展名，则解析 quality 字符串
         if (!string.IsNullOrEmpty(quality))
         {
             return Parse(quality);

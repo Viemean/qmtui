@@ -23,7 +23,7 @@ public static class ClipboardService
 
         bool success = false;
 
-        // 1. Wayland 环境优先尝试 wl-copy
+        // Wayland 环境优先尝试 wl-copy
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")))
         {
             if (TryRunWithStdin("wl-copy", text))
@@ -32,7 +32,7 @@ public static class ClipboardService
             }
         }
 
-        // 2. X11 环境（或 Wayland 未能成功）尝试 xclip / xsel
+        // X11 环境（或 Wayland 未能成功）尝试 xclip / xsel
         if (!success && !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
         {
             if (TryRunWithStdin("xclip", text, "-selection", "clipboard") ||
@@ -42,7 +42,7 @@ public static class ClipboardService
             }
         }
 
-        // 3. 增强：发送 ANSI OSC 52 剪贴板转义码至标准输出（兼容现代终端如 Kitty, Alacritty, Konsole 等）
+        // 增强：发送 ANSI OSC 52 剪贴板转义码至标准输出（兼容现代终端如 Kitty, Alacritty, Konsole 等）
         try
         {
             var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
@@ -65,7 +65,7 @@ public static class ClipboardService
     /// <param name="primary">是否优先读取鼠标选区 (Primary Selection，通常用于鼠标中键粘贴)</param>
     public static string GetText(bool primary = false)
     {
-        // 1. Wayland 环境优先尝试 wl-paste
+        // Wayland 环境优先尝试 wl-paste
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")))
         {
             var text = primary
@@ -74,7 +74,7 @@ public static class ClipboardService
             if (!string.IsNullOrEmpty(text)) return text;
         }
 
-        // 2. X11 环境（或 Wayland 未能成功）尝试 xclip / xsel
+        // X11 环境（或 Wayland 未能成功）尝试 xclip / xsel
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
         {
             var text = primary

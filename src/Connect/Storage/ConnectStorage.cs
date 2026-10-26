@@ -132,7 +132,7 @@ public sealed class ConnectStorage
 
                 if (root.TryGetProperty("paired_devices", out var devicesProp) && devicesProp.ValueKind == JsonValueKind.Array)
                 {
-                    var list = new List<ConnectDevice>();
+                    List<ConnectDevice> list = [];
                     foreach (var elem in devicesProp.EnumerateArray())
                     {
                         var dev = JsonSerializer.Deserialize(elem.GetRawText(), ConnectJsonContext.Default.ConnectDevice);

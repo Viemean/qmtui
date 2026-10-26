@@ -244,8 +244,8 @@ public static class LocalMusicService
             return [];
         }
 
-        // 1. 发现所有有效音频文件（跳过隐藏项）
-        var foundFiles = new List<string>();
+        // 发现所有有效音频文件（跳过隐藏项）
+        List<string> foundFiles = [];
         foreach (var folder in folders)
         {
             if (!Directory.Exists(folder)) continue;
@@ -253,7 +253,7 @@ public static class LocalMusicService
             await Task.Run(() => ScanDirectoryRecursive(new DirectoryInfo(folder), foundFiles));
         }
 
-        // 2. 建立现有缓存映射 (按路径)
+        // 建立现有缓存映射 (按路径)
         Dictionary<string, LocalSongCache> cacheMap;
         lock (s_lock)
         {
@@ -268,7 +268,7 @@ public static class LocalMusicService
         var total = foundFiles.Count;
         var processed = 0;
 
-        // 3. 并行并发提取元数据（限制并发数以防占用过多系统进程）
+        // 并行并发提取元数据（限制并发数以防占用过多系统进程）
         var parallelOptions = new ParallelOptions
         {
             MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount / 2, 2, 8)
@@ -307,7 +307,7 @@ public static class LocalMusicService
             }
         });
 
-        // 4. 排序并保存缓存
+        // 排序并保存缓存
         var songList = new List<LocalSongCache>(updatedSongs);
         songList.Sort((a, b) => string.Compare(a.Title, b.Title, StringComparison.CurrentCultureIgnoreCase));
 
@@ -516,7 +516,7 @@ public static class LocalMusicService
             return [];
         }
 
-        // 1. 同名 .lrc 文件检查
+        // 同名 .lrc 文件检查
         var lrcPath = Path.ChangeExtension(targetPath, ".lrc");
         if (File.Exists(lrcPath))
         {
@@ -532,7 +532,7 @@ public static class LocalMusicService
             }
         }
 
-        // 2. 内嵌歌词读取
+        // 内嵌歌词读取
         string? embeddedLyrics = null;
         lock (s_lock)
         {
@@ -630,7 +630,7 @@ public static class LocalMusicService
             }
         }
 
-        // 1. 尝试使用 ATL.NET 内存直读从音频文件中提取内嵌封面
+        // 尝试使用 ATL.NET 内存直读从音频文件中提取内嵌封面
         var tempExtractImg = Path.Combine(s_cacheDir, $"raw_{md5}.tmp");
         try
         {
@@ -662,7 +662,7 @@ public static class LocalMusicService
 
         if (cancellationToken.IsCancellationRequested) return null;
 
-        // 2. 回退：查找同目录下的常见封面命名
+        // 回退：查找同目录下的常见封面命名
         var dir = Path.GetDirectoryName(song.LocalFilePath);
         if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
         {

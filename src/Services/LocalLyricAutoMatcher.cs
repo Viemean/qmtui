@@ -93,7 +93,7 @@ public static class LocalLyricAutoMatcher
             return null;
         }
 
-        // 1. 优先检索本地统一多级缓存 (SongMid 母本 -> 路径快表 -> 元数据软索引)
+        // 优先检索本地统一多级缓存 (SongMid 母本 -> 路径快表 -> 元数据软索引)
         var cached = TryGetCachedLyrics(song, playUrl);
         if (cached != null && cached.Lines.Count > 0)
         {
@@ -109,7 +109,7 @@ public static class LocalLyricAutoMatcher
             return (dummySong, domainLyrics);
         }
 
-        // 2. 定位有效的本地/已缓存音频文件或 WebDAV/本地流式 URL
+        // 定位有效的本地/已缓存音频文件或 WebDAV/本地流式 URL
         string? audioPathOrUrl = null;
         if (song.IsLocal && !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath))
         {
@@ -158,7 +158,7 @@ public static class LocalLyricAutoMatcher
 
         try
         {
-            // 3. 本地/WebDAV 音频切片声学指纹识别 (避开前奏静音，提取 15s~23s)
+            // 本地/WebDAV 音频切片声学指纹识别 (避开前奏静音，提取 15s~23s)
             string logTarget = audioPathOrUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? song.Title : Path.GetFileName(audioPathOrUrl);
             AppLogger.Info("LocalLyricAutoMatcher", $"开始执行 GStreamer 音频切片声学识别: {logTarget}");
             var pcmSamples = await AudioSliceDecoder.ExtractSlicePcmAsync(audioPathOrUrl, song.Duration, cancellationToken).ConfigureAwait(false);
@@ -178,7 +178,7 @@ public static class LocalLyricAutoMatcher
             var matchedSong = acrResult.MatchedSong;
             AppLogger.Info("LocalLyricAutoMatcher", $"[ACR 识别成功] 命中官方曲目: {matchedSong.Title} - {matchedSong.Artist} (Mid: {matchedSong.Mid})");
 
-            // 4. 优先检查识别到的 SongMid 是否已存在于本地母本缓存（例如在线播放时已缓存），若命中则无需重复网络请求
+            // 优先检查识别到的 SongMid 是否已存在于本地母本缓存（例如在线播放时已缓存），若命中则无需重复网络请求
             var midCached = ReadMasterCacheByMid(matchedSong.Mid);
             List<LyricLine>? officialLyrics = null;
             if (midCached != null && midCached.Lines.Count > 0)
@@ -207,7 +207,7 @@ public static class LocalLyricAutoMatcher
                 return null;
             }
 
-            // 5. 将结果持久化至统一歌词母本库，并建立路径与元数据关联索引
+            // 将结果持久化至统一歌词母本库，并建立路径与元数据关联索引
             SaveUnifiedCache(matchedSong.Mid, matchedSong.AlbumMid, matchedSong.Title, matchedSong.Artist, officialLyrics, song, playUrl);
 
             return (matchedSong, officialLyrics);
@@ -227,7 +227,7 @@ public static class LocalLyricAutoMatcher
 
     public static CachedMatchedLyricData? TryGetCachedLyrics(Song song, string? playUrl = null)
     {
-        // 1. 若具有合法官方 SongMid，直接查询母本
+        // 若具有合法官方 SongMid，直接查询母本
         if (!string.IsNullOrWhiteSpace(song.Mid) &&
             !song.Mid.StartsWith("local_", StringComparison.OrdinalIgnoreCase) &&
             !song.Mid.StartsWith("webdav_", StringComparison.OrdinalIgnoreCase))
@@ -236,7 +236,7 @@ public static class LocalLyricAutoMatcher
             if (byMid != null) return byMid;
         }
 
-        // 2. 物理路径快表查询
+        // 物理路径快表查询
         string? pathTarget = !string.IsNullOrEmpty(song.LocalFilePath)
             ? song.LocalFilePath
             : (!string.IsNullOrEmpty(song.WebDavHref) ? song.WebDavHref : playUrl);
@@ -260,7 +260,7 @@ public static class LocalLyricAutoMatcher
             }
         }
 
-        // 3. 元数据软索引查询 (CleanTitle + CleanArtist + 时长档)
+        // 元数据软索引查询 (CleanTitle + CleanArtist + 时长档)
         if (!string.IsNullOrWhiteSpace(song.Title))
         {
             string metaKey = ComputeMetaKey(song.Title, song.Artist, song.Duration);
@@ -317,7 +317,7 @@ public static class LocalLyricAutoMatcher
 
         try
         {
-            // 1. 写入 SongMid 母本库
+            // 写入 SongMid 母本库
             string masterFile = Path.Combine(s_lyricsDir, $"mid_{songMid}.json");
             var items = lyrics.ConvertAll(CachedLyricLineItem.FromDomain);
             var data = new CachedMatchedLyricData(songMid, albumMid, title, artist, items);
@@ -326,7 +326,7 @@ public static class LocalLyricAutoMatcher
             File.WriteAllText(tmp, json, Encoding.UTF8);
             File.Move(tmp, masterFile, overwrite: true);
 
-            // 2. 建立物理路径快表
+            // 建立物理路径快表
             string? pathTarget = song != null && !string.IsNullOrEmpty(song.LocalFilePath)
                 ? song.LocalFilePath
                 : (song != null && !string.IsNullOrEmpty(song.WebDavHref) ? song.WebDavHref : playUrl);
@@ -338,7 +338,7 @@ public static class LocalLyricAutoMatcher
                 File.WriteAllText(pathIndexFile, songMid, Encoding.UTF8);
             }
 
-            // 3. 建立元数据软索引
+            // 建立元数据软索引
             string effectiveTitle = !string.IsNullOrWhiteSpace(title) ? title : (song?.Title ?? "");
             string effectiveArtist = !string.IsNullOrWhiteSpace(artist) ? artist : (song?.Artist ?? "");
             double effectiveDuration = song != null && song.Duration > 0 ? song.Duration : 0;

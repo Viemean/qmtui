@@ -47,17 +47,17 @@ public static class AudioExportService
 
         try
         {
-            // 1. 获取源音频文件路径
+            // 获取源音频文件路径
             string? sourcePath = await ResolveSourceAudioPathAsync(song, qualityTier, ct).ConfigureAwait(false);
             if (string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))
             {
                 return new ExportResult(false, $"无法获取《{song.Title}》的本地音频数据或获取失败");
             }
 
-            // 2. 识别音频容器真实格式并确定文件扩展名
+            // 识别音频容器真实格式并确定文件扩展名
             string ext = InferAudioExtension(sourcePath, qualityTier);
 
-            // 3. 准备导出目标目录与文件名
+            // 准备导出目标目录与文件名
             string outputDir = string.IsNullOrWhiteSpace(customOutputDir) ? s_defaultExportDir : customOutputDir;
             if (!Directory.Exists(outputDir))
             {
@@ -77,10 +77,10 @@ public static class AudioExportService
                 counter++;
             }
 
-            // 4. 执行文件拷贝
+            // 执行文件拷贝
             File.Copy(sourcePath, destPath, overwrite: false);
 
-            // 5. 依托 ATL.NET 写入元数据、内嵌封面与双语歌词
+            // 依托 ATL.NET 写入元数据、内嵌封面与双语歌词
             await InjectMetadataAndAssetsAsync(destPath, song, qualityTier, ct).ConfigureAwait(false);
 
             AppLogger.Info("AudioExportService", $"Successfully exported: {destPath}");
@@ -237,12 +237,12 @@ public static class AudioExportService
 
             var track = new ATL.Track(destPath);
 
-            // 1. 基础 Tag 信息
+            // 基础 Tag 信息
             if (!string.IsNullOrWhiteSpace(song.Title)) track.Title = song.Title;
             if (!string.IsNullOrWhiteSpace(song.Artist)) track.Artist = song.Artist;
             if (!string.IsNullOrWhiteSpace(song.Album)) track.Album = song.Album;
 
-            // 2. 内嵌高清封面（标准/HQ 下载 1200 高清，HQ 以上下载原图）
+            // 内嵌高清封面（标准/HQ 下载 1200 高清，HQ 以上下载原图）
             try
             {
                 byte[]? coverBytes = await ResolveCoverArtBytesAsync(song, tier, ct).ConfigureAwait(false);
@@ -257,7 +257,7 @@ public static class AudioExportService
                 AppLogger.Warn("AudioExportService", $"Failed to embed cover picture: {ex.Message}");
             }
 
-            // 3. 内嵌双语歌词
+            // 内嵌双语歌词
             try
             {
                 string? lrcText = await FetchLyricsLrcTextAsync(song, ct).ConfigureAwait(false);
@@ -278,7 +278,7 @@ public static class AudioExportService
                 AppLogger.Warn("AudioExportService", $"Failed to embed lyrics: {ex.Message}");
             }
 
-            // 4. 原子化持久化保存回写
+            // 原子化持久化保存回写
             track.Save();
             AppLogger.Info("AudioExportService", $"Successfully injected metadata, cover and lyrics into {destPath}");
         }
@@ -364,7 +364,7 @@ public static class AudioExportService
     {
         if (rawBytes == null || rawBytes.Length <= MaxRawCoverBytes)
         {
-            return rawBytes ?? Array.Empty<byte>();
+            return rawBytes ?? [];
         }
 
         try
@@ -412,7 +412,7 @@ public static class AudioExportService
     /// <returns>封面图像原始二进制字节数组；获取失败返回 <see langword="null"/>。</returns>
     public static async Task<byte[]?> ResolveCoverArtBytesAsync(Song song, AudioQualityTier tier, CancellationToken ct = default)
     {
-        // 1. 本地音频优先读取嵌入封面或本地文件
+        // 本地音频优先读取嵌入封面或本地文件
         if (song.IsLocal && !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath))
         {
             try
@@ -426,7 +426,7 @@ public static class AudioExportService
             catch { }
         }
 
-        // 2. 根据音质等级生成候选 URL 链（HQ 音质以上下载原图，标准与 HQ 下载 1200 高清）
+        // 根据音质等级生成候选 URL 链（HQ 音质以上下载原图，标准与 HQ 下载 1200 高清）
         string coverUrl = !string.IsNullOrWhiteSpace(song.CoverUrl)
             ? song.CoverUrl
             : (!string.IsNullOrWhiteSpace(song.AlbumMid) ? $"https://y.qq.com/music/photo_new/T002R300x300M000{song.AlbumMid}.jpg?max_age=2592000" : "");

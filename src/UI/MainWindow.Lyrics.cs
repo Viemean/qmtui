@@ -62,14 +62,14 @@ public sealed partial class MainWindow
         }
 
         var showTrans = _showTranslation;
-        var displayLines = new List<string>();
+        List<string> displayLines = [];
         _lyricItemToLineIndex.Clear();
         _lyricLineToFirstItemIndex.Clear();
 
         int viewH = _lyricListView.Viewport.Height > 0 ? _lyricListView.Viewport.Height : 15;
         int padLines = Math.Max(2, (viewH / 2) - 1);
 
-        // 1. 顶部预留视口半高空行留白，使第一句歌词可滚动至屏幕正中央
+        // 顶部预留视口半高空行留白，使第一句歌词可滚动至屏幕正中央
         for (int p = 0; p < padLines; p++)
         {
             displayLines.Add("");
@@ -81,7 +81,7 @@ public sealed partial class MainWindow
             var l = _currentLyrics[i];
             _lyricLineToFirstItemIndex[i] = displayLines.Count;
 
-            // 2. 原文行（水平居中，按宽度自动断行）
+            // 原文行（水平居中，按宽度自动断行）
             var origWrapped = WrapLyricText(l.Text, usableWidth);
             foreach (var oLine in origWrapped)
             {
@@ -89,7 +89,7 @@ public sealed partial class MainWindow
                 _lyricItemToLineIndex.Add(i);
             }
 
-            // 3. 翻译行（若启用且非空，紧贴原文下方，水平居中与自动断行）
+            // 翻译行（若启用且非空，紧贴原文下方，水平居中与自动断行）
             if (showTrans && !string.IsNullOrWhiteSpace(l.Trans))
             {
                 var transWrapped = WrapLyricText(l.Trans, usableWidth);
@@ -100,12 +100,12 @@ public sealed partial class MainWindow
                 }
             }
 
-            // 4. 句落之间插入单个空行作为间隔
+            // 句落之间插入单个空行作为间隔
             displayLines.Add("");
             _lyricItemToLineIndex.Add(-1);
         }
 
-        // 5. 底部预留视口半高空行留白，使最后一句歌词可滚动至屏幕正中央
+        // 底部预留视口半高空行留白，使最后一句歌词可滚动至屏幕正中央
         for (int p = 0; p < padLines; p++)
         {
             displayLines.Add("");
@@ -154,7 +154,7 @@ public sealed partial class MainWindow
 
     public static List<string> WrapLyricText(string text, int maxWidth)
     {
-        var lines = new List<string>();
+        List<string> lines = [];
         if (string.IsNullOrWhiteSpace(text)) return lines;
         if (maxWidth <= 4)
         {
@@ -232,7 +232,7 @@ public sealed partial class MainWindow
 
     private static List<string> TokenizeText(string text)
     {
-        var tokens = new List<string>();
+        List<string> tokens = [];
         int i = 0;
         while (i < text.Length)
         {
@@ -585,7 +585,7 @@ public sealed partial class MainWindow
 
         var songKey = GetSongIdentityKey(song);
 
-        // 1. 若当前已处于在线匹配状态，则执行撤销操作：恢复内嵌原始歌词并删除本地生成的 .lrc
+        // 若当前已处于在线匹配状态，则执行撤销操作：恢复内嵌原始歌词并删除本地生成的 .lrc
         if (s_matchedOnlineSongKeys.Remove(songKey))
         {
             // 删除本次在线匹配生成的 .lrc 覆盖文件
@@ -660,7 +660,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        // 2. 首次按 Y 发起在线检索匹配
+        // 首次按 Y 发起在线检索匹配
         lock (s_originalLyricsBackup)
         {
             s_originalLyricsBackup[songKey] = _currentLyrics.ToList();

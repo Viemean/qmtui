@@ -297,7 +297,7 @@ public sealed partial class MusicApi
             if (dataElem.TryGetProperty("mediaVersion", out var mvProp)) mediaVersion = mvProp.GetInt64();
 
             int usersCount = 1;
-            var encUins = new List<string>();
+            List<string> encUins = [];
             if (dataElem.TryGetProperty("users", out var usersElem) && usersElem.ValueKind == JsonValueKind.Array)
             {
                 usersCount = usersElem.GetArrayLength();
@@ -544,7 +544,7 @@ public sealed partial class MusicApi
             if (!reqOper.TryGetProperty("data", out var dataElem)) return [];
             if (!dataElem.TryGetProperty("songList", out var listElem) || listElem.ValueKind != JsonValueKind.Array) return [];
 
-            var result = new List<long>();
+            List<long> result = [];
             foreach (var item in listElem.EnumerateArray())
             {
                 if (item.TryGetProperty("songID", out var idElem))
@@ -613,7 +613,7 @@ public sealed partial class MusicApi
                 if (!reqTrack.TryGetProperty("data", out var dataElem)) return [];
                 if (!dataElem.TryGetProperty("tracks", out var tracksElem) || tracksElem.ValueKind != JsonValueKind.Array) return [];
 
-                var parsedSongs = new List<Song>();
+                List<Song> parsedSongs = [];
                 foreach (var track in tracksElem.EnumerateArray())
                 {
                     var s = ParseSongFromElement(track);
@@ -629,7 +629,7 @@ public sealed partial class MusicApi
         });
 
         var results = await Task.WhenAll(fetchTasks).ConfigureAwait(false);
-        var songMap = new Dictionary<long, Song>();
+        Dictionary<long, Song> songMap = [];
         foreach (var list in results)
         {
             foreach (var s in list)
@@ -661,7 +661,7 @@ public sealed partial class MusicApi
 
         var cleanText = rawText.Trim();
 
-        // 1. 尝试匹配完整 HTTP/HTTPS 链接
+        // 尝试匹配完整 HTTP/HTTPS 链接
         string? matchedUrl = null;
         var urlMatch = s_urlRegex.Match(cleanText);
         if (urlMatch.Success)
@@ -708,7 +708,7 @@ public sealed partial class MusicApi
             }
         }
 
-        // 2. 兜底正则匹配房间号 (LUGC 开头)
+        // 兜底正则匹配房间号 (LUGC 开头)
         var lugcMatch = s_lugcRegex.Match(cleanText);
         if (lugcMatch.Success)
         {

@@ -29,10 +29,10 @@ public static class AcousticRecognitionService
 
         try
         {
-            // 1. 16000Hz 降采样到 8000Hz (单声道 2 点低通移动平均)
+            // 16000Hz 降采样到 8000Hz (单声道 2 点低通移动平均)
             short[] pcm8k = Downsample16kTo8k(pcm16k);
 
-            // 2. 纯 C# 原生算法提取声学特征
+            // 纯 C# 原生算法提取声学特征
             var feature = AcousticFingerprintExtractor.Extract(pcm8k);
 
             if (feature == null || feature.Data.Length == 0)
@@ -41,7 +41,7 @@ public static class AcousticRecognitionService
                 return null;
             }
 
-            // 3. 发起云端声学识别检索请求
+            // 发起云端声学识别检索请求
             var response = await AcousticRecognizeClient.SearchAsync(feature, cancellationToken);
             if (response.Success && response.Song != null)
             {

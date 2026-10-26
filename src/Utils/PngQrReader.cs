@@ -23,7 +23,7 @@ public static class PngQrReader
             int w = image.Width;
             int h = image.Height;
 
-            // 1. 精确探测黑色有效内容区域边界 (去除原始图片自带的边缘留白)
+            // 精确探测黑色有效内容区域边界 (去除原始图片自带的边缘留白)
             int minX = w, minY = h, maxX = -1, maxY = -1;
             for (int y = 0; y < h; y++)
             {
@@ -47,7 +47,7 @@ public static class PngQrReader
                 return ["未检测到有效的二维码数据"];
             }
 
-            // 2. 基于左上角定位图案 (7 个模块宽度的黑色顶边) 动态计算模块物理尺寸
+            // 基于左上角定位图案 (7 个模块宽度的黑色顶边) 动态计算模块物理尺寸
             int cornerLen = 0;
             while (minX + cornerLen <= maxX)
             {
@@ -75,7 +75,7 @@ public static class PngQrReader
                 }
             }
 
-            // 3. 四周统一增加 2 个模块的标准白色静区 (Quiet Zone)
+            // 四周统一增加 2 个模块的标准白色静区 (Quiet Zone)
             const int quietZone = 2;
             int outputSize = numModules + quietZone * 2;
             var grid = new bool[outputSize, outputSize];
@@ -107,7 +107,7 @@ public static class PngQrReader
                 }
             }
 
-            // 4. 构建半块字符行 (复用统一渲染器)
+            // 构建半块字符行 (复用统一渲染器)
             return QrCodeRenderer.RenderToBlockText(grid);
         }
         catch (Exception ex)

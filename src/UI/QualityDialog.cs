@@ -181,7 +181,7 @@ public sealed class QualityDialog : Dialog
 
     private void RefreshDisplayList()
     {
-        var displayList = new List<string>();
+        List<string> displayList = [];
         int selectedIndex = -1;
 
         for (int i = 0; i < _options.Count; i++)

@@ -247,7 +247,7 @@ public sealed class WebdavManageDialog : Dialog
     private void UpdateDisplayItems()
     {
         var active = WebDavService.GetActiveServer();
-        var displayItems = new List<string>();
+        List<string> displayItems = [];
         int selIndex = 0;
 
         for (int i = 0; i < _servers.Count; i++)

@@ -39,8 +39,8 @@ public class ListeningFootprintTests
             TopSingers: singers,
             RankSongs: songs,
             AvailableDates: new List<string> { "20261013" },
-            HighLights: new List<ListeningHighlight>(),
-            FavoriteSongsOfMonth: new List<ListeningMonthFavoriteSong>()
+            HighLights: [],
+            FavoriteSongsOfMonth: []
         );
 
         Assert.Equal(ListeningReportPeriod.Day, report.Period);

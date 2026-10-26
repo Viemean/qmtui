@@ -90,7 +90,7 @@ public class AudioExportServiceTests
     [Fact]
     public void SanitizeCoverArt_ValidLargeImage_CompressesAndMaintainsResolution()
     {
-        // 构造一个 1200x1200 的未压缩大尺寸 PNG 图像（保证其体积超出 2.5MB 门禁）
+        // 构造一个 1200x1200 的未压缩大尺寸 PNG 图像
         int width = 1200;
         int height = 1200;
         var rawPixels = new byte[width * height * 3];

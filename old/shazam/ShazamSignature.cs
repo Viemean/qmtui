@@ -16,10 +16,10 @@ public sealed class ShazamSignature
 
     public ShazamSignature()
     {
-        BandPeaks[ShazamFrequencyBand.Hz250To520] = new List<ShazamFrequencyPeak>();
-        BandPeaks[ShazamFrequencyBand.Hz520To1450] = new List<ShazamFrequencyPeak>();
-        BandPeaks[ShazamFrequencyBand.Hz1450To3500] = new List<ShazamFrequencyPeak>();
-        BandPeaks[ShazamFrequencyBand.Hz3500To5500] = new List<ShazamFrequencyPeak>();
+        BandPeaks[ShazamFrequencyBand.Hz250To520] = [];
+        BandPeaks[ShazamFrequencyBand.Hz520To1450] = [];
+        BandPeaks[ShazamFrequencyBand.Hz1450To3500] = [];
+        BandPeaks[ShazamFrequencyBand.Hz3500To5500] = [];
     }
 
     /// <summary>

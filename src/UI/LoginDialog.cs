@@ -22,14 +22,14 @@ public sealed class LoginDialog : Dialog
 
     private static Scheme TransparentDialogScheme => MikuTheme.TransparentDialog;
 
-    // 1. 网页登录容器 (默认首选)
+    // 网页登录容器 (默认首选)
     private readonly View _webContainer;
     private readonly Label _webLanUrlLabel;
     private readonly Label _webLocalUrlLabel;
     private readonly Label _webStatusLabel;
     private readonly Button _openBrowserBtn;
 
-    // 2. 终端字符扫码容器
+    // 终端字符扫码容器
     private readonly View _qrContainer;
     private readonly Label _qrStatusLabel;
     private readonly Label _qrTipLabel;

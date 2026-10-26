@@ -409,7 +409,7 @@ public static partial class TerminalImageHelper
     /// <param name="col">屏幕 1-based 列坐标</param>
     /// <param name="row">屏幕 1-based 行坐标</param>
     /// <param name="cols">占据列宽（若 rows 为 0，终端将按原图物理宽高比自适应行数）</param>
-    /// <param name="rows">占据行高（若为 0，则基于 cols 保持 1:1 原画比例，避免拉伸）</param>
+    /// <param name="rows">占据行高，若为 0 则基于 cols 保持 1:1 比例</param>
     /// <param name="imageId">可选 Kitty 图像 ID（0 为未指定，将触发全局清屏；>0 为精准 ID 覆盖）</param>
     public static void RenderKittyImage(string filePath, int col, int row, int cols, int rows, uint imageId = 0)
     {

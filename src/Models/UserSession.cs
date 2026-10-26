@@ -141,7 +141,7 @@ public sealed class UserSession
     {
         lock (s_saveLock)
         {
-            var cookiePairs = new List<string>();
+            List<string> cookiePairs = [];
             foreach (var kvp in Cookies)
             {
                 cookiePairs.Add($"\"{JsonEscape(kvp.Key)}\":\"{JsonEscape(kvp.Value)}\"");
@@ -165,7 +165,7 @@ public sealed class UserSession
                     "}";
             }
 
-            var singerList = new List<string>();
+            List<string> singerList = [];
             foreach (var smid in FavoriteSingers)
             {
                 singerList.Add($"\"{JsonEscape(smid)}\"");

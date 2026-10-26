@@ -105,7 +105,7 @@ public sealed partial class SongListView
 
         int cardWidth = Math.Clamp(totalWidth - 4, 38, 64);
         int indent = Math.Max(0, (totalWidth - cardWidth) / 2);
-        string pad = new string(' ', indent);
+        string pad = new(' ', indent);
         string borderLine = pad + "+" + new string('-', cardWidth - 2) + "+";
         int innerW = cardWidth - 4;
 

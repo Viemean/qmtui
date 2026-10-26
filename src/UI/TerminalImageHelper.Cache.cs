@@ -769,7 +769,7 @@ public static partial class TerminalImageHelper
 
         if (cancellationToken.IsCancellationRequested) return null;
 
-        // 1. 若拥有 AlbumMid，优先获取专辑 1200 分辨率封面
+        // 若拥有 AlbumMid，优先获取专辑 1200 分辨率封面
         if (!string.IsNullOrWhiteSpace(song.AlbumMid))
         {
             var albumCover = await EnsureAlbumCoverAsync(song.AlbumMid, cancellationToken).ConfigureAwait(false);
@@ -781,7 +781,7 @@ public static partial class TerminalImageHelper
 
         if (cancellationToken.IsCancellationRequested) return null;
 
-        // 2. 若无 AlbumMid 或拉取不到（单曲），自动解析单曲专属视觉 MID 并拉取 T062 原画大图
+        // 若无 AlbumMid 或拉取不到（单曲），自动解析单曲专属视觉 MID 并拉取 T062 原画大图
         if (!string.IsNullOrWhiteSpace(song.Mid))
         {
             var vsMid = await MusicApi.GetSongVisualMidAsync(song.Mid, cancellationToken).ConfigureAwait(false);

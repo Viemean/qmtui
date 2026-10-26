@@ -312,7 +312,7 @@ public sealed partial class MusicApi
             if (ti.TryGetProperty("file", out var fi) && fi.TryGetProperty("size_flac", out var sf)) sf.TryGetInt64(out flacSize);
         }
 
-        var tasks = new List<Task>();
+        List<Task> tasks = [];
         for (int i = 0; i < options.Count; i++)
         {
             var index = i;
@@ -327,7 +327,7 @@ public sealed partial class MusicApi
                     string? newSpec = null;
                     long realSize = opt.FileSizeBytes;
 
-                    // 1. 优先检查本地磁盘缓存
+                    // 优先检查本地磁盘缓存
                     if (!string.IsNullOrEmpty(songMid))
                     {
                         var localCached = AudioCacheService.GetCachedAudioPath(songMid, opt.Tier);
@@ -374,7 +374,7 @@ public sealed partial class MusicApi
                         }
                     }
 
-                    // 2. 若本地未命中规格且存在播放直链，通过 Range 头部嗅探
+                    // 若本地未命中规格且存在播放直链，通过 Range 头部嗅探
                     if (newSpec == null && !string.IsNullOrEmpty(opt.PlayUrl))
                     {
                         var probeResult = await TryProbeAudioRangeAsync(opt.PlayUrl, ext, ct).ConfigureAwait(false);
@@ -395,7 +395,7 @@ public sealed partial class MusicApi
                         }
                     }
 
-                    // 3. 兜底处理：若仍未获取到有效文件大小且有直链，使用 HEAD 请求探测 Content-Length
+                    // 兜底处理：若仍未获取到有效文件大小且有直链，使用 HEAD 请求探测 Content-Length
                     bool needsSizeCorrection = (opt.Tier == AudioQualityTier.HiRes && (realSize <= 0 || (flacSize > 0 && realSize <= flacSize)))
                                                || realSize <= 0;
                     if (needsSizeCorrection && !string.IsNullOrEmpty(opt.PlayUrl))
@@ -407,7 +407,7 @@ public sealed partial class MusicApi
                         }
                     }
 
-                    // 4. 组装更新后的 QualityOption
+                    // 组装更新后的 QualityOption
                     var updated = opt;
                     if (realSize > 0 && realSize != opt.FileSizeBytes)
                     {
@@ -737,14 +737,14 @@ public sealed partial class MusicApi
             return [new LyricLine(TimeSpan.Zero, "暂无歌词")];
         }
 
-        // 1. 优先读取统一母本缓存 (mid_<songMid>.json)
+        // 优先读取统一母本缓存 (mid_<songMid>.json)
         var masterCached = LocalLyricAutoMatcher.ReadMasterCacheByMid(songMid);
         if (masterCached != null && masterCached.Lines.Count > 0)
         {
             return masterCached.Lines.ConvertAll(l => l.ToDomain());
         }
 
-        // 2. 兼容读取旧版 MetadataCacheService 缓存
+        // 兼容读取旧版 MetadataCacheService 缓存
         var cached = MetadataCacheService.GetLyrics(songMid);
         if (cached != null && cached.Count > 0)
         {
@@ -753,7 +753,7 @@ public sealed partial class MusicApi
 
         try
         {
-            // 3. 调用 PlayLyricInfo 接口以获取原生原文与翻译歌词
+            // 调用 PlayLyricInfo 接口以获取原生原文与翻译歌词
             var jsonPayload = $"{{\"comm\":{{\"ct\":24,\"cv\":0}},\"playLyricInfo\":{{\"module\":\"music.musichallSong.PlayLyricInfo\",\"method\":\"GetPlayLyricInfo\",\"param\":{{\"songMID\":\"{songMid}\",\"songID\":0,\"qrc\":0,\"trans\":1,\"roma\":1,\"isHQ\":1}}}}}}";
 
             using var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -785,7 +785,7 @@ public sealed partial class MusicApi
             AppLogger.Error("MusicApi", "GetLyricsAsync PlayLyricInfo error, falling back", ex);
         }
 
-        // 4. 兜底备用：传统 fcg_query_lyric_new.fcg 接口
+        // 兜底备用：传统 fcg_query_lyric_new.fcg 接口
         try
         {
             var url = $"https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid={songMid}&format=json&nobase64=1";

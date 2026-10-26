@@ -90,7 +90,7 @@ public class LyricParserTests
         var noLyrics = LyricParser.ParseSingleLrc("[00:00.00]暂无歌词");
         Assert.True(LyricParser.IsPlaceholderLyrics(noLyrics));
 
-        var emptyList = new List<QmTui.Models.LyricLine>();
+        List<QmTui.Models.LyricLine> emptyList = [];
         Assert.True(LyricParser.IsPlaceholderLyrics(emptyList));
 
         var normalLrc = LyricParser.ParseSingleLrc("[00:01.00]Hello world\n[00:05.00]Second line of song");

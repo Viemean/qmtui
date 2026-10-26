@@ -11,7 +11,7 @@ namespace QmTui.Services;
 /// </summary>
 public static class ListeningFootprintCacheService
 {
-    private const long RecentDataTtlMs = 60_000L; // 当前进行中周期的内存缓存寿命（60 秒）
+    private const long RecentDataTtlMs = 60_000L;
 
     private static readonly string s_cacheDir = Path.Combine(AppPathHelper.CacheDir, "footprint");
     private static readonly ConcurrentDictionary<string, ListeningReportData> s_memoryCache = new();
@@ -83,7 +83,7 @@ public static class ListeningFootprintCacheService
         string cacheKey = $"{(int)period}_{dateKey}";
         bool isHistorical = IsHistoricalPeriod(period, date);
 
-        // 1. 非强制刷新时优先命中 L1 内存缓存
+        // 非强制刷新时优先命中 L1 内存缓存
         if (!forceRefresh && s_memoryCache.TryGetValue(cacheKey, out var memReport))
         {
             if (isHistorical)
@@ -98,7 +98,7 @@ public static class ListeningFootprintCacheService
             }
         }
 
-        // 2. 历史周期优先命中 L2 磁盘持久化缓存
+        // 历史周期优先命中 L2 磁盘持久化缓存
         if (!forceRefresh && isHistorical)
         {
             var diskReport = LoadFromDisk(cacheKey);
@@ -109,10 +109,10 @@ public static class ListeningFootprintCacheService
             }
         }
 
-        // 3. 回源云端 RPC 请求
+        // 回源云端 RPC 请求
         var rawReport = await MusicApi.GetListeningRecordReportAsync(period, date, ct).ConfigureAwait(false);
 
-        // 4. 聚合与排序可用日期集合
+        // 聚合与排序可用日期集合
         var knownDates = s_availableDatesByPeriod.GetOrAdd(period, _ => []);
         lock (knownDates)
         {
@@ -128,7 +128,7 @@ public static class ListeningFootprintCacheService
 
         var mergedAvailableDates = knownDates.Count > 0 ? knownDates.ToArray() : rawReport.AvailableDates;
 
-        // 5. 今日日视图应用乐观更新与单调递增保障
+        // 今日日视图应用乐观更新与单调递增保障
         string todayStr = DateTime.Now.ToString("yyyyMMdd");
         bool isTodayView = period == ListeningReportPeriod.Day && (string.IsNullOrWhiteSpace(date) || date == todayStr);
 
@@ -167,7 +167,7 @@ public static class ListeningFootprintCacheService
             };
         }
 
-        // 6. 写入双级缓存
+        // 写入双级缓存
         s_memoryCache[cacheKey] = finalReport;
         s_fetchTimeMap[cacheKey] = Environment.TickCount64;
 

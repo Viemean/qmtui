@@ -68,7 +68,7 @@ public sealed class RollingAudioBuffer
         lock (_lock)
         {
             int takeBytes = Math.Min(maxBytes, _count);
-            if (takeBytes <= 0) return Array.Empty<byte>();
+            if (takeBytes <= 0) return [];
 
             byte[] result = new byte[takeBytes];
             int start = (_head - takeBytes + _buffer.Length) % _buffer.Length;
@@ -144,7 +144,7 @@ public static class AudioPreRollManager
     /// <returns>提取并清空当前预录音频环形缓冲区的 PCM 字节数组。</returns>
     public static byte[] TakePreRollBytes(int maxBytes = 16000 * 2 * 3)
     {
-        if (!s_isEnabled) return Array.Empty<byte>();
+        if (!s_isEnabled) return [];
         return s_buffer.GetRecentBytes(maxBytes);
     }
 

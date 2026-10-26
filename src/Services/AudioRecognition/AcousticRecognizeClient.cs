@@ -208,10 +208,10 @@ public static class AcousticRecognizeClient
             int duration = songItem.TryGetProperty("interval", out var intProp) ? intProp.GetInt32() : 0;
 
             string artist = "";
-            var singers = new List<ArtistInfo>();
+            List<ArtistInfo> singers = [];
             if (songItem.TryGetProperty("singer", out var singerProp) && singerProp.ValueKind == JsonValueKind.Array)
             {
-                var artistNames = new List<string>();
+                List<string> artistNames = [];
                 foreach (var s in singerProp.EnumerateArray())
                 {
                     string sName = s.TryGetProperty("name", out var snProp) ? snProp.GetString() ?? "" : "";

@@ -451,7 +451,7 @@ public sealed partial class MainWindow
 
             RunModalDialog(dlg);
 
-            // 等待 Dialog 完全退栈并从界面销毁后再触发播放与切换沉浸界面
+            // 等待 Dialog 完全退栈并从界面销毁后再触发播放与切换全屏界面
             if (selectedSong != null)
             {
                 _ = Task.Run(async () =>

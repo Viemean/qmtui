@@ -899,7 +899,7 @@ public sealed class SongCommentView : View
             return;
         }
 
-        // 1. 精彩热评区（默认只展示前 3 条，超过 3 条支持折叠与展开）
+        // 精彩热评区（默认只展示前 3 条，超过 3 条支持折叠与展开）
         if (_hotComments.Count > 0)
         {
             _displayItems.Add(new DisplayItem(ItemType.Header, $"── 精彩热评 (共 {_hotComments.Count} 条) ──"));
@@ -923,7 +923,7 @@ public sealed class SongCommentView : View
             }
         }
 
-        // 2. 最新评论流
+        // 最新评论流
         if (_normalComments.Count > 0)
         {
             _displayItems.Add(new DisplayItem(ItemType.Header, $"── 最新评论 (共 {_totalCommentCount} 条) ──"));
@@ -934,7 +934,7 @@ public sealed class SongCommentView : View
             }
         }
 
-        // 3. 底部状态指示
+        // 底部状态指示
         if (_isLoading)
         {
             _displayItems.Add(new DisplayItem(ItemType.EmptyOrStatus, "  [ 正在加载更多评论... ]"));
@@ -1020,7 +1020,7 @@ public sealed class SongCommentView : View
 
     private static List<string> WrapText(string text, int maxWidth)
     {
-        var lines = new List<string>();
+        List<string> lines = [];
         if (string.IsNullOrEmpty(text)) return lines;
 
         var rawLines = text.Split(s_lineSeparators, StringSplitOptions.RemoveEmptyEntries);

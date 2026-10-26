@@ -118,7 +118,7 @@ public static class AcrCloudService
                             album = alName.GetString() ?? "";
                         }
 
-                        var artists = new List<string>();
+                        List<string> artists = [];
                         if (firstMusic.TryGetProperty("artists", out var artArr) && artArr.ValueKind == JsonValueKind.Array)
                         {
                             foreach (var art in artArr.EnumerateArray())

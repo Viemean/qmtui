@@ -168,7 +168,7 @@ public sealed partial class MusicApi
                 ? rd
                 : default;
 
-            var availableDates = new List<string>();
+            List<string> availableDates = [];
             if (barData.ValueKind == JsonValueKind.Object &&
                 barData.TryGetProperty("availableDates", out var adElem) &&
                 adElem.ValueKind == JsonValueKind.Array)
@@ -260,7 +260,7 @@ public sealed partial class MusicApi
                 }
             }
 
-            var chartPoints = new List<ListeningChartPoint>();
+            List<ListeningChartPoint> chartPoints = [];
             if (activePeriodObj.ValueKind == JsonValueKind.Object &&
                 activePeriodObj.TryGetProperty("chart", out var chartObj) &&
                 chartObj.TryGetProperty("chartInfo", out var chartInfo) &&
@@ -317,7 +317,7 @@ public sealed partial class MusicApi
                 }
             }
 
-            var topSingers = new List<ListeningSingerStat>();
+            List<ListeningSingerStat> topSingers = [];
             JsonElement singersElem = default;
             if (activePeriodObj.ValueKind == JsonValueKind.Object && activePeriodObj.TryGetProperty("singers", out var sList))
             {
@@ -363,7 +363,7 @@ public sealed partial class MusicApi
                 }
             }
 
-            var highLights = new List<ListeningHighlight>();
+            List<ListeningHighlight> highLights = [];
             if (barData.ValueKind == JsonValueKind.Object &&
                 barData.TryGetProperty("highLights", out var hlArray) &&
                 hlArray.ValueKind == JsonValueKind.Array)
@@ -380,7 +380,7 @@ public sealed partial class MusicApi
                 }
             }
 
-            var rankSongs = new List<ListeningRankSong>();
+            List<ListeningRankSong> rankSongs = [];
             if (rankData.ValueKind == JsonValueKind.Object &&
                 rankData.TryGetProperty("rank", out var rankArray) &&
                 rankArray.ValueKind == JsonValueKind.Array)
@@ -399,7 +399,7 @@ public sealed partial class MusicApi
                 }
             }
 
-            var favoriteSongs = new List<ListeningMonthFavoriteSong>();
+            List<ListeningMonthFavoriteSong> favoriteSongs = [];
             if (barData.ValueKind == JsonValueKind.Object &&
                 barData.TryGetProperty("SongOfMonth", out var somObj) &&
                 somObj.ValueKind == JsonValueKind.Object)

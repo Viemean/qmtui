@@ -282,10 +282,10 @@ public sealed partial class LoginService
     /// </summary>
     private static async Task ExchangeCheckSigCookiesAsync(string redirectUrl, string qrsig, string nick, CancellationToken ct)
     {
-        var cookieDict = new Dictionary<string, string>();
+        Dictionary<string, string> cookieDict = [];
         string uin = "";
 
-        // 1. 尝试从 redirectUrl 的 query 参数中直接提取 uin
+        // 尝试从 redirectUrl 的 query 参数中直接提取 uin
         if (!string.IsNullOrEmpty(redirectUrl))
         {
             var uinMatch = UinQueryRegex().Match(redirectUrl);
@@ -296,7 +296,7 @@ public sealed partial class LoginService
             }
         }
 
-        // 2. 发起 check_sig 请求
+        // 发起 check_sig 请求
         if (!string.IsNullOrEmpty(redirectUrl))
         {
             try
@@ -508,7 +508,7 @@ public sealed partial class LoginService
                 return true;
             }
 
-            // 1. 若存有 psrf_qqopenid 与 psrf_qqaccess_token，尝试通过官方 QQLogin 接口带 forceRefreshToken 续期
+            // 若存有 psrf_qqopenid 与 psrf_qqaccess_token，尝试通过官方 QQLogin 接口带 forceRefreshToken 续期
             if (UserSession.Current.Cookies.TryGetValue("psrf_qqopenid", out var openid) && !string.IsNullOrEmpty(openid) &&
                 UserSession.Current.Cookies.TryGetValue("psrf_qqaccess_token", out var accessToken) && !string.IsNullOrEmpty(accessToken))
             {
@@ -519,7 +519,7 @@ public sealed partial class LoginService
                 }
             }
 
-            // 2. 若存有 refresh_token 与 musicid/uin，尝试通过官方 App LoginServer 接口续期
+            // 若存有 refresh_token 与 musicid/uin，尝试通过官方 App LoginServer 接口续期
             if (UserSession.Current.Cookies.TryGetValue("refresh_token", out var refreshToken) && !string.IsNullOrEmpty(refreshToken))
             {
                 var musicId = UserSession.Current.Uin;
@@ -537,7 +537,7 @@ public sealed partial class LoginService
                 }
             }
 
-            // 3. 若存有 p_skey，自动走 OAuth2 重授权换票流程
+            // 若存有 p_skey，自动走 OAuth2 重授权换票流程
             if (UserSession.Current.Cookies.TryGetValue("p_skey", out var pskey) && !string.IsNullOrEmpty(pskey))
             {
                 AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting automatic OAuth2 exchange via p_skey...");
@@ -767,7 +767,7 @@ public sealed partial class LoginService
             var gtk = GetACSRFToken(p_skey);
             AppLogger.Info("LoginService", $"Calculated g_tk: {gtk} for p_skey");
 
-            // 1. POST https://graph.qq.com/oauth2.0/authorize
+            // POST https://graph.qq.com/oauth2.0/authorize
             var authUrl = "https://graph.qq.com/oauth2.0/authorize";
             using var authReq = new HttpRequestMessage(HttpMethod.Post, authUrl);
 
@@ -824,7 +824,7 @@ public sealed partial class LoginService
 
             AppLogger.Info("LoginService", $"Successfully captured OAuth code: {code}");
 
-            // 2. 调用 u.y.qq.com 接口换取专属 musickey
+            // 调用 u.y.qq.com 接口换取专属 musickey
             var musicLoginUrl = "https://u.y.qq.com/cgi-bin/musicu.fcg";
             var payload = $"{{\"comm\":{{\"ct\":19,\"cv\":1,\"tmeLoginType\":\"1\"}},\"login\":{{\"module\":\"QQConnectLogin.LoginServer\",\"method\":\"QQLogin\",\"param\":{{\"onlyNeedAccessToken\":0,\"forceRefreshToken\":0,\"appid\":100497308,\"code\":\"{code}\"}}}}}}";
 
@@ -919,7 +919,7 @@ public sealed partial class LoginService
         if (string.IsNullOrWhiteSpace(rawCookie)) return false;
 
         AppLogger.Info("LoginService", $"Importing raw cookie (length: {rawCookie.Length})");
-        var dict = new Dictionary<string, string>();
+        Dictionary<string, string> dict = [];
         var pairs = rawCookie.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         foreach (var p in pairs)

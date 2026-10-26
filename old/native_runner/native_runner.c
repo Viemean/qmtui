@@ -1,7 +1,7 @@
 /*
  * native_runner.c - 声学特征提取器
- * 1. 经典模式: native_runner <model_path> <pcm_path|-> <out_feat_path|->
- * 2. 常驻长连接协议模式: native_runner --server <model_path>
+ * 经典模式: native_runner <model_path> <pcm_path|-> <out_feat_path|->
+ * 常驻长连接协议模式: native_runner --server <model_path>
  */
 
 typedef unsigned char uint8_t;
@@ -141,7 +141,7 @@ int real_main(int argc, char** argv) {
     // 模式 A: 常驻长连接协议 (Server Mode)
     // ==========================================
     if (is_server) {
-        // 1. 发送就绪魔数
+        // 发送就绪魔数
         uint8_t ready_magic[4] = { 0x51, 0x41, 0x46, 0x50 };
         write_exact(1, ready_magic, 4);
 
