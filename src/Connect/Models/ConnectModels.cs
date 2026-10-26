@@ -214,6 +214,14 @@ public sealed record ConnectSong(
             catch { }
         }
 
+        var isStreamUrl = !string.IsNullOrEmpty(MediaMid) &&
+            (MediaMid.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+             MediaMid.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+
+        var effectiveMediaMid = isStreamUrl
+            ? MediaMid!
+            : (string.IsNullOrEmpty(MediaMid) || MediaMid.Contains("://") || MediaMid.Contains('/') ? mid : MediaMid);
+
         var singers = SingerList?.Select(a => new ArtistInfo(a.Name, a.Mid, a.Id)).ToList() ?? [];
         var song = new Song(
             Mid: mid,
@@ -221,14 +229,15 @@ public sealed record ConnectSong(
             Artist: string.IsNullOrEmpty(Singer) ? "未知歌手" : Singer,
             Album: string.IsNullOrEmpty(Album) ? "" : Album,
             Duration: DurationSeconds,
-            MediaMid: string.IsNullOrEmpty(MediaMid) || MediaMid.Contains("://") || MediaMid.Contains('/') ? mid : MediaMid,
+            MediaMid: effectiveMediaMid,
             Id: SongId,
             AlbumMid: string.IsNullOrEmpty(AlbumMid) ? "" : AlbumMid
         )
         {
             LocalFilePath = localPath,
             CoverUrl = CoverUrl,
-            Singers = singers
+            Singers = singers,
+            PlayUrl = isStreamUrl ? MediaMid : null
         };
 
         if (IsWebDav || mid.StartsWith("webdav_", StringComparison.OrdinalIgnoreCase))
@@ -291,7 +300,10 @@ public sealed record ConnectSong(
                 effectiveSongMid = "local_" + effectiveSongMid["pc_local_".Length..];
                 effectiveIsLocal = true;
             }
-            if (effectiveMediaMid.Contains("/stream/local") && effectiveMediaMid.Contains($":{port}/"))
+            if (effectiveMediaMid.Contains("/stream/local") &&
+                Uri.TryCreate(effectiveMediaMid, UriKind.Absolute, out var emmUri) &&
+                emmUri.Port == port &&
+                (emmUri.IsLoopback || emmUri.Host.Equals(QmTui.Connect.Discovery.ConnectMdnsService.GetBestLocalIpAddress(), StringComparison.OrdinalIgnoreCase)))
             {
                 // 清除指向本机不可用端口的无效流地址，防止手机端直接复用导致 404
                 effectiveMediaMid = effectiveSongMid;

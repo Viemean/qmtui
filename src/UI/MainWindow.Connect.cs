@@ -1,3 +1,5 @@
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text;
 using Terminal.Gui.App;
 using QmTui.Connect.Discovery;
@@ -105,8 +107,8 @@ public sealed partial class MainWindow
                         }
 
                         // 本地流直通回环绕过 (Loopback Bypass)：
-                        // 若 overrideUrl 指向本机的 /stream/local?path=...，直接解析为本地物理文件播放，消除本机 HTTP 代理开销
-                        if (!string.IsNullOrEmpty(overrideUrl) && overrideUrl.Contains("/stream/local"))
+                        // 仅当 overrideUrl 指向当前 PC 本机的 /stream/local?path=... 时，尝试解析为本地物理文件播放以消除本机 HTTP 代理开销
+                        if (!string.IsNullOrEmpty(overrideUrl) && _connectServer != null && IsPcLocalLoopbackUrl(overrideUrl, _connectServer.ActualPort))
                         {
                             var qIdx = overrideUrl.IndexOf("path=", StringComparison.OrdinalIgnoreCase);
                             if (qIdx >= 0)
@@ -120,18 +122,20 @@ public sealed partial class MainWindow
                                         overrideUrl = localPath;
                                         song.LocalFilePath = localPath;
                                     }
-                                    else if (overrideUrl.Contains($":{_connectServer.ActualPort}/stream/local"))
+                                    else
                                     {
-                                        AppLogger.Warn("MainWindow.Connect", $"Detected loopback stream for missing PC file: {localPath}, clearing overrideUrl to request mobile stream proxy");
-                                        overrideUrl = null;
-                                        song = song with { MediaMid = song.Mid };
+                                        AppLogger.Warn("MainWindow.Connect", $"Detected PC loopback stream for missing PC file: {localPath}");
                                     }
                                 }
                                 catch { }
                             }
                         }
 
-                        await PlaySongAsync(song, startPosition: cmd.StartPositionMs / 1000.0, overridePlayUrl: overrideUrl).ConfigureAwait(false);
+                        await PlaySongAsync(
+                            song,
+                            startPosition: cmd.StartPositionMs / 1000.0,
+                            overridePlayUrl: overrideUrl,
+                            allowRemoteStreamRequest: false).ConfigureAwait(false);
                         BroadcastConnectPlayerState();
                         BroadcastConnectQueueState();
                     }
@@ -643,5 +647,36 @@ public sealed partial class MainWindow
         _mprisService.UpdateVolume(vol);
         UserSession.Current.Volume = vol;
         BroadcastConnectPlayerState();
+    }
+
+    private static bool IsPcLocalLoopbackUrl(string url, int serverPort)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+        if (uri.Port != serverPort) return false;
+        if (!uri.AbsolutePath.StartsWith("/stream/local", StringComparison.OrdinalIgnoreCase)) return false;
+
+        if (uri.IsLoopback) return true;
+
+        var bestIp = ConnectMdnsService.GetBestLocalIpAddress();
+        if (uri.Host.Equals(bestIp, StringComparison.OrdinalIgnoreCase)) return true;
+
+        try
+        {
+            foreach (var iface in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (iface.OperationalStatus != OperationalStatus.Up) continue;
+                foreach (var addr in iface.GetIPProperties().UnicastAddresses)
+                {
+                    if (addr.Address.AddressFamily == AddressFamily.InterNetwork &&
+                        uri.Host.Equals(addr.Address.ToString(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        return false;
     }
 }
