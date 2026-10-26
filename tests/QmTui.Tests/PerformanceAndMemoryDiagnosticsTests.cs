@@ -22,7 +22,6 @@ public class PerformanceAndMemoryDiagnosticsTests
         _output = output;
     }
 
-#pragma warning disable CS0618
     [Fact]
     public void Benchmark_LyricParser_ThroughputAndAllocation()
     {
@@ -158,7 +157,6 @@ public class PerformanceAndMemoryDiagnosticsTests
 
         Assert.True(allocatedBefore - allocatedAfter > 20 * 1024 * 1024, "Memory should be reclaimed after TrimNow");
     }
-#pragma warning restore CS0618
 
     [Fact]
     public void Benchmark_SongListView_BulkSetSongs()
