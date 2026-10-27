@@ -506,32 +506,7 @@ public sealed class LoginDialog : Dialog
 
     private static void TryOpenBrowser(string url)
     {
-        if (string.IsNullOrWhiteSpace(url)) return;
-        try
-        {
-            using var proc = Process.Start(new ProcessStartInfo
-            {
-                FileName = "xdg-open",
-                Arguments = $"\"{url}\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
-        }
-        catch
-        {
-            try
-            {
-                using var proc = Process.Start(new ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true
-                });
-            }
-            catch
-            {
-                // Ignore headless or browser missing error
-            }
-        }
+        BrowserLauncher.OpenUrl(url);
     }
 
     public void CloseSelf()
