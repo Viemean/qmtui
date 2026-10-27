@@ -176,7 +176,10 @@ public static partial class Program
                 Application.Init();
                 if (Application.Driver != null)
                 {
-                    Application.Driver.Clipboard = new QmTui.Services.LinuxSystemClipboard();
+                    if (OperatingSystem.IsLinux())
+                    {
+                        Application.Driver.Clipboard = new QmTui.Services.LinuxSystemClipboard();
+                    }
                     Application.Driver.Force16Colors = false;
                 }
                 try

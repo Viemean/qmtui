@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using QmTui.Utils;
+using Terminal.Gui.App;
 
 namespace QmTui.Services;
 
@@ -19,6 +20,19 @@ public static class ClipboardService
         if (string.IsNullOrEmpty(text))
         {
             return false;
+        }
+
+        if (!OperatingSystem.IsLinux() && Application.Driver?.Clipboard != null)
+        {
+            try
+            {
+                Application.Driver.Clipboard.SetClipboardData(text);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ClipboardService", $"Terminal.Gui 驱动剪贴板写入失败: {ex.Message}");
+            }
         }
 
         bool success = false;
@@ -65,6 +79,19 @@ public static class ClipboardService
     /// <param name="primary">是否优先读取鼠标选区 (Primary Selection，通常用于鼠标中键粘贴)</param>
     public static string GetText(bool primary = false)
     {
+        if (!OperatingSystem.IsLinux() && Application.Driver?.Clipboard != null)
+        {
+            try
+            {
+                var text = Application.Driver.Clipboard.GetClipboardData();
+                if (!string.IsNullOrEmpty(text)) return text;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ClipboardService", $"Terminal.Gui 驱动剪贴板读取失败: {ex.Message}");
+            }
+        }
+
         // Wayland 环境优先尝试 wl-paste
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")))
         {
