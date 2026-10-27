@@ -46,6 +46,7 @@
   <ItemGroup>
     <EmbeddedResource Include="www/**" />
     <None Update="www/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+    <None Include="qmtui-recorder.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('qmtui-recorder.exe')" />
   </ItemGroup>
 
 </Project>

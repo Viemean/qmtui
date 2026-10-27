@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using QmTui.Utils;
@@ -88,10 +89,38 @@ internal static partial class PulseAudioSimpleNative
 }
 
 /// <summary>
-/// 实时流式录音会话，基于 libpulse-simple 原生直连 PulseAudio / PipeWire
+/// 实时流式录音会话，基于 libpulse-simple (Linux) 与 qmtui-recorder.exe (Windows) 原生直连
 /// </summary>
 public sealed class AudioRecordingSession : IDisposable
 {
+    private static readonly Lock s_windowsLock = new();
+    private static Process? s_windowsProcess;
+    private static EventWaitHandle? s_evtLoopback;
+    private static EventWaitHandle? s_evtMic;
+    private static EventWaitHandle? s_evtStop;
+    private static AudioRecordingSession? s_activeSession;
+
+    static AudioRecordingSession()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+            {
+                try
+                {
+                    if (s_windowsProcess is { HasExited: false })
+                    {
+                        s_windowsProcess.Kill();
+                    }
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    AppLogger.Debug("AudioRecording", $"ProcessExit kill recorder process: {ex.Message}");
+                }
+            };
+        }
+    }
+
     private readonly AudioRecordSource _source;
     private IntPtr _pulseHandle;
     private readonly MemoryStream _pcmStream = new(64 * 1024);
@@ -106,7 +135,19 @@ public sealed class AudioRecordingSession : IDisposable
         {
             lock (_lock)
             {
-                return _pulseHandle != IntPtr.Zero && !_isDisposed;
+                if (_isDisposed) return false;
+                if (OperatingSystem.IsWindows())
+                {
+                    lock (s_windowsLock)
+                    {
+                        return s_windowsProcess != null && !s_windowsProcess.HasExited;
+                    }
+                }
+                if (OperatingSystem.IsLinux())
+                {
+                    return _pulseHandle != IntPtr.Zero;
+                }
+                return false;
             }
         }
     }
@@ -117,6 +158,14 @@ public sealed class AudioRecordingSession : IDisposable
         if (initialPreRollBytes != null && initialPreRollBytes.Length > 0)
         {
             _pcmStream.Write(initialPreRollBytes, 0, initialPreRollBytes.Length);
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            EnsureWindowsProcessStarted();
+            s_activeSession = this;
+            TriggerWindowsEvent(source == AudioRecordSource.Microphone ? s_evtMic : s_evtLoopback);
+            return;
         }
 
         if (!OperatingSystem.IsLinux())
@@ -355,24 +404,112 @@ public sealed class AudioRecordingSession : IDisposable
         }
     }
 
+    private static void EnsureWindowsProcessStarted()
+    {
+        lock (s_windowsLock)
+        {
+            if (s_windowsProcess != null && !s_windowsProcess.HasExited) return;
+
+            int pid = Environment.ProcessId;
+            s_evtLoopback = new EventWaitHandle(false, EventResetMode.AutoReset, $"Local\\QmTui_Record_Loopback_{pid}");
+            s_evtMic = new EventWaitHandle(false, EventResetMode.AutoReset, $"Local\\QmTui_Record_Mic_{pid}");
+            s_evtStop = new EventWaitHandle(false, EventResetMode.AutoReset, $"Local\\QmTui_Record_Stop_{pid}");
+
+            string exeName = "qmtui-recorder.exe";
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string exePath = Path.Combine(baseDir, exeName);
+            if (!File.Exists(exePath)) exePath = exeName;
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = exePath,
+                Arguments = $"--idle --parent-pid {pid}",
+                RedirectStandardInput = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = false,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            s_windowsProcess = Process.Start(psi);
+            if (s_windowsProcess != null && !s_windowsProcess.HasExited)
+            {
+                new Thread(WindowsReaderLoop) { IsBackground = true, Name = "WindowsAudioReaderThread" }.Start();
+                AppLogger.Force("AudioRecording", $"Started persistent WASAPI recorder daemon PID: {s_windowsProcess.Id}");
+            }
+        }
+    }
+
+    private static void TriggerWindowsEvent(EventWaitHandle? evtHandle)
+    {
+        try
+        {
+            evtHandle?.Set();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AudioRecording", $"Failed to trigger recorder event: {ex.Message}");
+        }
+    }
+
+    private static void WindowsReaderLoop()
+    {
+        var proc = s_windowsProcess;
+        if (proc == null) return;
+        byte[] buffer = new byte[2048];
+        try
+        {
+            var stream = proc.StandardOutput.BaseStream;
+            while (!proc.HasExited)
+            {
+                int read = stream.Read(buffer, 0, buffer.Length);
+                if (read <= 0) break;
+                s_activeSession?.OnPcm(buffer, read);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AudioRecording", $"WindowsReaderLoop ended: {ex.Message}");
+        }
+    }
+
+    private void OnPcm(byte[] buffer, int count)
+    {
+        lock (_lock)
+        {
+            if (!_isDisposed)
+            {
+                _pcmStream.Write(buffer, 0, count);
+            }
+        }
+    }
+
     public void Dispose()
     {
         if (_isDisposed) return;
         _isDisposed = true;
 
-        try { _cts.Cancel(); } catch { }
-        try { _recordThread?.Join(500); } catch { }
+        if (OperatingSystem.IsWindows())
+        {
+            if (s_activeSession == this) s_activeSession = null;
+            if (_source == AudioRecordSource.Microphone)
+            {
+                TriggerWindowsEvent(s_evtStop);
+            }
+        }
+
+        _cts.Cancel();
+        if (_recordThread?.IsAlive == true)
+        {
+            _recordThread.Join(500);
+        }
 
         // 若录音线程未启动或已停止，在此做兜底释放
         lock (_lock)
         {
             if (_pulseHandle != IntPtr.Zero && (_recordThread == null || !_recordThread.IsAlive))
             {
-                try
-                {
-                    PulseAudioSimpleNative.pa_simple_free(_pulseHandle);
-                }
-                catch { }
+                PulseAudioSimpleNative.pa_simple_free(_pulseHandle);
                 _pulseHandle = IntPtr.Zero;
             }
         }

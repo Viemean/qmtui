@@ -35,14 +35,19 @@ public static class AppLogger
                     Directory.CreateDirectory(logDir);
                 }
 
-                // 若日志文件超过 5MB，安全轮转备份一次，防止无限膨胀
-                if (File.Exists(filePath) && new FileInfo(filePath).Length > 5 * 1024 * 1024)
+                try
                 {
-                    var backupPath = filePath + ".old";
-                    File.Move(filePath, backupPath, overwrite: true);
+                    if (File.Exists(filePath) && new FileInfo(filePath).Length > 5 * 1024 * 1024)
+                    {
+                        var backupPath = filePath + ".old";
+                        File.Move(filePath, backupPath, overwrite: true);
+                    }
+                }
+                catch
+                {
                 }
 
-                File.AppendAllText(filePath, $"=== qmtui Session Started at {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} (Debug: {s_debugEnabled}) ===\n", Encoding.UTF8);
+                AppendLog(filePath, $"=== qmtui Session Started at {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} (PID: {Environment.ProcessId}, Debug: {s_debugEnabled}) ===\n");
             }
         }
         catch
@@ -117,16 +122,20 @@ public static class AppLogger
     private static void Log(string level, string module, string message)
     {
         var line = $"[{DateTime.Now:HH:mm:ss.fff}] [{level}] [{module}] {message}\n";
+        var filePath = LogFilePath;
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            AppendLog(filePath, line);
+        }
+    }
+
+    private static void AppendLog(string filePath, string text)
+    {
         try
         {
-            lock (s_lock)
-            {
-                var filePath = LogFilePath;
-                if (!string.IsNullOrEmpty(filePath))
-                {
-                    File.AppendAllText(filePath, line, Encoding.UTF8);
-                }
-            }
+            var bytes = Encoding.UTF8.GetBytes(text);
+            using var fs = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            fs.Write(bytes);
         }
         catch
         {

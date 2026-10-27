@@ -135,6 +135,8 @@ public static class AudioDeviceHelper
 
     private static bool ProbeAudioOutputSinks()
     {
+        if (!OperatingSystem.IsLinux()) return true;
+
         try
         {
             const string procCards = "/proc/asound/cards";

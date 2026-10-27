@@ -1,4 +1,6 @@
 using System.Buffers.Binary;
+using System.Diagnostics;
+using System.IO;
 using QmTui.Models;
 using QmTui.Utils;
 
@@ -110,11 +112,11 @@ public static class AudioPreRollManager
 
     public static bool IsEnabled
     {
-        get => OperatingSystem.IsLinux() && s_isEnabled;
+        get => (OperatingSystem.IsLinux() || OperatingSystem.IsWindows()) && s_isEnabled;
         set
         {
             s_isEnabled = value;
-            if (!value || !OperatingSystem.IsLinux())
+            if (!value || (!OperatingSystem.IsLinux() && !OperatingSystem.IsWindows()))
             {
                 s_buffer.Clear();
                 s_hasSignal = false;
@@ -162,14 +164,15 @@ public static class AudioPreRollManager
     /// </summary>
     public static void EnsureStarted()
     {
-        if (!OperatingSystem.IsLinux() || !s_isEnabled) return;
+        if ((!OperatingSystem.IsLinux() && !OperatingSystem.IsWindows()) || !s_isEnabled) return;
         lock (s_lock)
         {
             if (s_workerThread != null && s_workerThread.IsAlive) return;
 
             s_cts?.Dispose();
             s_cts = new CancellationTokenSource();
-            s_workerThread = new Thread(WorkerLoop)
+            ThreadStart entry = OperatingSystem.IsWindows() ? WindowsWorkerLoop : WorkerLoop;
+            s_workerThread = new Thread(entry)
             {
                 IsBackground = true,
                 Name = "AudioPreRollThread",
@@ -308,6 +311,140 @@ public static class AudioPreRollManager
             {
                 try { PulseAudioSimpleNative.pa_simple_free(localHandle); } catch { }
             }
+        }
+    }
+
+    private static void WindowsWorkerLoop()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        byte[] buffer = new byte[2048]; // ~64ms of 16000Hz 16-bit mono
+        var token = s_cts?.Token ?? CancellationToken.None;
+        Process? proc = null;
+        Stream? stream = null;
+
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                if (!s_isEnabled)
+                {
+                    CloseWindowsProcess(ref proc, ref stream);
+                    Thread.Sleep(300);
+                    continue;
+                }
+
+                if (s_isSleeping)
+                {
+                    CloseWindowsProcess(ref proc, ref stream);
+                    Thread.Sleep(2500);
+                    continue;
+                }
+
+                if (proc == null || proc.HasExited || stream == null)
+                {
+                    CloseWindowsProcess(ref proc, ref stream);
+
+                    string exeName = "qmtui-recorder.exe";
+                    string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                    string exePath = Path.Combine(baseDir, exeName);
+                    if (!File.Exists(exePath)) exePath = exeName;
+
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        Arguments = $"--loopback --parent-pid {Environment.ProcessId}",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = false,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+
+                    try
+                    {
+                        proc = Process.Start(psi);
+                        if (proc == null || proc.HasExited)
+                        {
+                            Thread.Sleep(1000);
+                            continue;
+                        }
+                        stream = proc.StandardOutput.BaseStream;
+                    }
+                    catch
+                    {
+                        Thread.Sleep(1000);
+                        continue;
+                    }
+                }
+
+                int read = 0;
+                try
+                {
+                    read = stream.Read(buffer, 0, buffer.Length);
+                }
+                catch
+                {
+                    read = 0;
+                }
+
+                if (read <= 0)
+                {
+                    CloseWindowsProcess(ref proc, ref stream);
+                    Thread.Sleep(500);
+                    continue;
+                }
+
+                long sumSquares = 0;
+                int sampleCount = read / 2;
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    short sample = BinaryPrimitives.ReadInt16LittleEndian(buffer.AsSpan(i * 2, 2));
+                    sumSquares += (long)sample * sample;
+                }
+                double rms = sampleCount > 0 ? Math.Sqrt((double)sumSquares / sampleCount) : 0;
+
+                if (rms > 80)
+                {
+                    s_hasSignal = true;
+                    s_consecutiveSilenceChunks = 0;
+                }
+                else
+                {
+                    s_consecutiveSilenceChunks++;
+                    if (s_consecutiveSilenceChunks > 90)
+                    {
+                        CloseWindowsProcess(ref proc, ref stream);
+                        s_isSleeping = true;
+                        s_hasSignal = false;
+                        s_buffer.Clear();
+                        continue;
+                    }
+                }
+
+                s_buffer.Write(buffer.AsSpan(0, read));
+            }
+        }
+        finally
+        {
+            CloseWindowsProcess(ref proc, ref stream);
+        }
+    }
+
+    private static void CloseWindowsProcess(ref Process? proc, ref Stream? stream)
+    {
+        if (stream != null)
+        {
+            try { stream.Dispose(); } catch { }
+            stream = null;
+        }
+        if (proc != null)
+        {
+            try
+            {
+                if (!proc.HasExited) proc.Kill();
+            }
+            catch { }
+            try { proc.Dispose(); } catch { }
+            proc = null;
         }
     }
 }

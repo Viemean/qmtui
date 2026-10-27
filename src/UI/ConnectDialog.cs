@@ -162,7 +162,9 @@ public sealed class ConnectDialog : Dialog
 
         _addrLabel = new Label
         {
-            Text = $"服务地址:   {localIp}:{_server.ActualPort}",
+            Text = _server.IsLoopbackOnly
+                ? $"服务地址:   127.0.0.1:{_server.ActualPort} (仅本地)"
+                : $"服务地址:   {localIp}:{_server.ActualPort}",
             X = canStack ? Pos.Center() : 0,
             Y = canStack ? 2 : 2
         };
@@ -455,7 +457,9 @@ public sealed class ConnectDialog : Dialog
         var localIp = ConnectMdnsService.GetBestLocalIpAddress();
 
         _pinCodeLabel.Text = $"6位 PIN 码:  [ {pin} ]";
-        _addrLabel.Text = $"服务地址:   {localIp}:{_server.ActualPort}";
+        _addrLabel.Text = _server.IsLoopbackOnly
+            ? $"服务地址:   127.0.0.1:{_server.ActualPort} (仅本地)"
+            : $"服务地址:   {localIp}:{_server.ActualPort}";
         _statusLabel.Text = $"在线连接:   {_server.ConnectedCount} 个设备";
         _tipLabel.Text = _canSplit
             ? "连接说明:\n1. 手机打开 Melodist Mobile\n2. 扫描左侧二维码，或局域网\n   发现后输入上方 6位 PIN 码"

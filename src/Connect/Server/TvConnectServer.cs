@@ -69,6 +69,7 @@ public sealed class TvConnectServer : IDisposable
 
     public int Port => _port;
     public int ActualPort { get; private set; } = 8765;
+    public bool IsLoopbackOnly { get; private set; }
     public bool IsRunning => _listener?.IsListening ?? false;
     public int ConnectedCount => _activeClients.Count;
     internal Task AcceptLoopCompletion { get; private set; } = Task.CompletedTask;
@@ -176,6 +177,24 @@ public sealed class TvConnectServer : IDisposable
                     {
                         AppLogger.Warn("TvConnectServer", $"Could not bind to http://+:{candidate}/: {ex2.Message}");
                         try { testListener?.Close(); } catch { }
+
+                        try
+                        {
+                            testListener = new HttpListener();
+                            testListener.Prefixes.Add($"http://localhost:{candidate}/");
+                            testListener.Prefixes.Add($"http://127.0.0.1:{candidate}/");
+                            testListener.Start();
+                            _listener = testListener;
+                            ActualPort = candidate;
+                            IsLoopbackOnly = true;
+                            AppLogger.Warn("TvConnectServer", $"Melodist Connect bound to localhost:{ActualPort} only. LAN access is restricted by Windows http.sys permissions. Run as Administrator or execute: netsh http add urlacl url=http://+:{ActualPort}/ sddl=D:(A;;GX;;;WD)");
+                            break;
+                        }
+                        catch (Exception ex3)
+                        {
+                            AppLogger.Warn("TvConnectServer", $"Could not bind to loopback port {candidate}: {ex3.Message}");
+                            try { testListener?.Close(); } catch { }
+                        }
                     }
                 }
             }

@@ -8,6 +8,7 @@ TestResults/
 *.tar.gz
 pkg/
 qmtui
+*.exe
 
 # 临时与缓存产物
 *.dbg
