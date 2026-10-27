@@ -60,6 +60,12 @@ public static partial class TerminalImageHelper
                 return true;
             }
 
+            if (OperatingSystem.IsWindows())
+            {
+                s_isImageSupported = false;
+                return false;
+            }
+
             // 显式排除 WezTerm：WezTerm 将 Kitty 协议图像绑定至字符单元格，TUI 字符重绘易导致图像擦除丢失
             var termProgram = Environment.GetEnvironmentVariable("TERM_PROGRAM") ?? "";
             if (termProgram.Equals("WezTerm", StringComparison.OrdinalIgnoreCase) ||
