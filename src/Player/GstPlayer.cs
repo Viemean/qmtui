@@ -114,7 +114,14 @@ public sealed partial class GstPlayer : IPlayer
         }
         catch (DllNotFoundException dllEx)
         {
-            AppLogger.Warn("GstPlayer", $"GStreamer library {LibGst} not found on this system: {dllEx.Message}");
+            if (OperatingSystem.IsWindows())
+            {
+                AppLogger.Warn("GstPlayer", $"GStreamer 动态库 {LibGst} 加载失败或缺少依赖：{dllEx.Message}。若系统未安装 Visual C++ 2015-2022 运行库，请前往微软官方下载安装：https://aka.ms/vc14/vc_redist.x64.exe");
+            }
+            else
+            {
+                AppLogger.Warn("GstPlayer", $"当前系统未找到 GStreamer 动态库 {LibGst}：{dllEx.Message}");
+            }
             _pipeline = 0;
         }
         catch (Exception ex)

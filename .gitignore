@@ -4,6 +4,8 @@ obj/
 TestResults/
 *.pkg.tar.*
 *.deb
+*.zip
+*.tar.gz
 pkg/
 qmtui
 

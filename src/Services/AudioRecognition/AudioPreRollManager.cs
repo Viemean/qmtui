@@ -110,11 +110,11 @@ public static class AudioPreRollManager
 
     public static bool IsEnabled
     {
-        get => s_isEnabled;
+        get => OperatingSystem.IsLinux() && s_isEnabled;
         set
         {
             s_isEnabled = value;
-            if (!value)
+            if (!value || !OperatingSystem.IsLinux())
             {
                 s_buffer.Clear();
                 s_hasSignal = false;
@@ -162,7 +162,7 @@ public static class AudioPreRollManager
     /// </summary>
     public static void EnsureStarted()
     {
-        if (!s_isEnabled) return;
+        if (!OperatingSystem.IsLinux() || !s_isEnabled) return;
         lock (s_lock)
         {
             if (s_workerThread != null && s_workerThread.IsAlive) return;
@@ -181,6 +181,7 @@ public static class AudioPreRollManager
 
     private static unsafe void WorkerLoop()
     {
+        if (!OperatingSystem.IsLinux()) return;
         byte[] buffer = new byte[2048]; // ~64ms of 16000Hz 16-bit mono
         var ss = new pa_sample_spec
         {

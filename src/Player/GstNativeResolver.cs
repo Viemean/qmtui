@@ -1,6 +1,7 @@
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using QmTui.Utils;
 
 namespace QmTui.Player;
 
@@ -8,10 +9,14 @@ namespace QmTui.Player;
 /// 负责跨平台原生动态库重定向解析与执行环境目录配置。
 /// 优先探测应用同级目录，次级匹配系统或开发环境。
 /// </summary>
-internal static class GstNativeResolver
+internal static partial class GstNativeResolver
 {
     private static readonly Lock s_lock = new();
     private static bool s_isRegistered;
+
+    [LibraryImport("kernel32.dll", EntryPoint = "SetDllDirectoryW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetDllDirectory(string lpPathName);
 
     private static readonly string[] s_macOsSearchDirs =
     [
@@ -49,6 +54,8 @@ internal static class GstNativeResolver
 
         if (OperatingSystem.IsWindows())
         {
+            SetDllDirectory(baseDir);
+
             List<string> dirs = [baseDir];
 
             var devRoot = Environment.GetEnvironmentVariable("GSTREAMER_1_0_ROOT_MSVC_X86_64")
@@ -116,9 +123,23 @@ internal static class GstNativeResolver
             if (targetDll is null) return IntPtr.Zero;
 
             var localPath = Path.Combine(AppContext.BaseDirectory, targetDll);
-            if (NativeLibrary.TryLoad(localPath, out var localHandle))
+            if (File.Exists(localPath))
             {
-                return localHandle;
+                if (NativeLibrary.TryLoad(localPath, out var localHandle))
+                {
+                    return localHandle;
+                }
+
+                var err = Marshal.GetLastPInvokeError();
+                if (err == 126)
+                {
+                    AppLogger.Warn("GstNativeResolver",
+                        $"加载原生库 '{targetDll}' 失败 (Win32 错误码 126: 找不到指定的模块)。可能缺少运行依赖，若系统未安装 Visual C++ 2015-2022 运行库，请前往微软官方下载安装：https://aka.ms/vc14/vc_redist.x64.exe");
+                }
+                else
+                {
+                    AppLogger.Warn("GstNativeResolver", $"从路径 '{localPath}' 加载原生库 '{targetDll}' 失败：Win32 错误码 {err}");
+                }
             }
 
             var devRoot = Environment.GetEnvironmentVariable("GSTREAMER_1_0_ROOT_MSVC_X86_64")

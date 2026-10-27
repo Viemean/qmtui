@@ -119,6 +119,11 @@ public sealed class AudioRecordingSession : IDisposable
             _pcmStream.Write(initialPreRollBytes, 0, initialPreRollBytes.Length);
         }
 
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
         var inputDevice = source == AudioRecordSource.SystemInternal
             ? AudioDeviceHelper.GetDefaultSinkMonitorDevice()
             : AudioDeviceHelper.GetDefaultMicrophoneDevice();
