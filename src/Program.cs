@@ -52,6 +52,7 @@ public static partial class Program
                        Environment.GetEnvironmentVariable("QQMUSIC_DEBUG") == "1";
         QmTui.Utils.AppLogger.Init(isDebug);
         QmTui.Utils.AppLogger.Info("Program", $"Starting qmtui. DebugMode: {isDebug}");
+        QmTui.Player.GstNativeResolver.EnsureRegistered();
 
         // 加载用户全局偏好配置，并处理命令行参数覆盖
         QmTui.Models.UserConfig.Load();
@@ -241,7 +242,7 @@ public static partial class Program
         }
     }
 
-    private const string LibC = "libc.so.6";
+    private const string LibC = "libc";
     private const int SIGPIPE = 13;
     private static readonly nint SIG_IGN = 1;
 

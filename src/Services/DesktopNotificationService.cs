@@ -14,6 +14,8 @@ public sealed unsafe partial class DesktopNotificationService : IDisposable
 {
     private const string LibGio = "libgio-2.0.so.0";
     private const string LibGlib = "libglib-2.0.so.0";
+    private const string LibGObject = "libgobject-2.0.so.0";
+    private const string LibC = "libc";
     private const int G_BUS_TYPE_SESSION = 2;
 
     private static readonly DesktopNotificationService s_instance = new();
@@ -411,10 +413,10 @@ public sealed unsafe partial class DesktopNotificationService : IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool g_variant_get_boolean(nint value);
 
-    [LibraryImport("libgobject-2.0.so.0")]
+    [LibraryImport(LibGObject)]
     private static partial void g_object_unref(nint obj);
 
-    [LibraryImport("libc")]
+    [LibraryImport(LibC)]
     private static partial uint geteuid();
 
     [LibraryImport(LibGlib)]

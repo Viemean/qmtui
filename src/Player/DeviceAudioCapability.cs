@@ -1,21 +1,13 @@
-using System.Runtime.InteropServices;
 using QmTui.Models;
 using QmTui.Utils;
 
 namespace QmTui.Player;
 
 /// <summary>
-/// 负责探测与管理本地 Linux 系统 GStreamer 音频解码器硬件/软件能力。
+/// 负责管理本地音频解码器硬件/软件能力。
 /// </summary>
-public static partial class DeviceAudioCapability
+public static class DeviceAudioCapability
 {
-    private const string LibGst = "libgstreamer-1.0.so.0";
-
-    private const ulong GST_ELEMENT_FACTORY_TYPE_DECODER = 1UL << 0;
-    private const ulong GST_ELEMENT_FACTORY_TYPE_MEDIA_AUDIO = 1UL << 50;
-    private const int GST_RANK_MARGINAL = 64;
-    private const int GST_PAD_SINK = 1;
-
     private static readonly Lock s_lock = new();
     private static bool s_isInitialized;
     private static bool s_supportsDolby;
@@ -83,7 +75,7 @@ public static partial class DeviceAudioCapability
     }
 
     /// <summary>
-    /// 初始化并探测本地系统 GStreamer 是否具备对应格式的解码器。
+    /// 初始化设备音频解码能力状态。
     /// </summary>
     public static void EnsureInitialized()
     {
@@ -92,67 +84,10 @@ public static partial class DeviceAudioCapability
         {
             if (s_isInitialized) return;
 
-            try
-            {
-                var type = GST_ELEMENT_FACTORY_TYPE_DECODER | GST_ELEMENT_FACTORY_TYPE_MEDIA_AUDIO;
-                var factories = gst_element_factory_list_get_elements(type, GST_RANK_MARGINAL);
-                if (factories != 0)
-                {
-                    try
-                    {
-                        s_supportsDolby = CanDecodeCaps(factories, "audio/x-ac4");
-                        s_supportsDtsX = CanDecodeCaps(factories, "audio/x-gst-fourcc-dtsx");
-                    }
-                    finally
-                    {
-                        gst_plugin_feature_list_free(factories);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("DeviceAudioCapability", $"Failed to detect GStreamer audio decoders: {ex.Message}");
-                s_supportsDolby = false;
-                s_supportsDtsX = false;
-            }
-
+            s_supportsDolby = false;
+            s_supportsDtsX = false;
             s_isInitialized = true;
-            AppLogger.Info("DeviceAudioCapability", $"Audio decoder capability probed: Dolby(AC-4)={s_supportsDolby}, DTS:X={s_supportsDtsX}");
+            AppLogger.Info("DeviceAudioCapability", $"Audio decoder capability initialized: Dolby(AC-4)={s_supportsDolby}, DTS:X={s_supportsDtsX}");
         }
     }
-
-    private static bool CanDecodeCaps(nint factories, string capsString)
-    {
-        var caps = gst_caps_from_string(capsString);
-        if (caps == 0) return false;
-        try
-        {
-            var filtered = gst_element_factory_list_filter(factories, caps, GST_PAD_SINK, false);
-            if (filtered != 0)
-            {
-                gst_plugin_feature_list_free(filtered);
-                return true;
-            }
-            return false;
-        }
-        finally
-        {
-            gst_caps_unref(caps);
-        }
-    }
-
-    [LibraryImport(LibGst, StringMarshalling = StringMarshalling.Utf8)]
-    private static partial nint gst_caps_from_string(string str);
-
-    [LibraryImport(LibGst)]
-    private static partial void gst_caps_unref(nint caps);
-
-    [LibraryImport(LibGst)]
-    private static partial nint gst_element_factory_list_get_elements(ulong type, int minrank);
-
-    [LibraryImport(LibGst)]
-    private static partial nint gst_element_factory_list_filter(nint list, nint caps, int direction, [MarshalAs(UnmanagedType.Bool)] bool subsetonly);
-
-    [LibraryImport(LibGst)]
-    private static partial void gst_plugin_feature_list_free(nint list);
 }

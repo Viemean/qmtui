@@ -60,8 +60,10 @@ public sealed partial class GstPlayer : IPlayer
     {
         try
         {
-            // 若用户未显式指定 GST_AUDIO_SINK，预设抗抖动环境变量以防底层 autoaudiosink 派生未捕获
-            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GST_AUDIO_SINK")))
+            GstNativeResolver.EnsureRegistered();
+
+            // 若用户未显式指定 GST_AUDIO_SINK，且处于 Linux 环境下，预设抗抖动环境变量以防底层 autoaudiosink 派生未捕获
+            if (OperatingSystem.IsLinux() && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GST_AUDIO_SINK")))
             {
                 Environment.SetEnvironmentVariable("GST_AUDIO_SINK", "pulsesink buffer-time=200000 latency-time=50000 client-name=\"qmtui\"");
             }
@@ -80,11 +82,16 @@ public sealed partial class GstPlayer : IPlayer
                     gst_util_set_object_arg(_pipeline, "flags", "18");
 
                     // 将 video-sink 与 text-sink 绑定至 fakesink，避免隐式视频呈现管道创建
-                    var fakesink = gst_element_factory_make("fakesink", "qmtui_fakesink");
-                    if (fakesink != 0)
+                    var videoFakesink = gst_element_factory_make("fakesink", "qmtui_video_fakesink");
+                    if (videoFakesink != 0)
                     {
-                        g_object_set(_pipeline, "video-sink", fakesink, 0);
-                        g_object_set(_pipeline, "text-sink", fakesink, 0);
+                        SetElementProperty(_pipeline, "video-sink", videoFakesink);
+                    }
+
+                    var textFakesink = gst_element_factory_make("fakesink", "qmtui_text_fakesink");
+                    if (textFakesink != 0)
+                    {
+                        SetElementProperty(_pipeline, "text-sink", textFakesink);
                     }
 
                     // 限制流媒体内部缓冲队列上限为 2MB，防止 WebDAV 大音频无节制全部解压进 RAM
@@ -573,14 +580,19 @@ public sealed partial class GstPlayer : IPlayer
                 return;
             }
 
-            // 优先配置 pulsesink 并注入抗抖动缓冲参数（200ms 缓冲与 50ms 周期，适应高负载游戏环境）
+            if (!OperatingSystem.IsLinux())
+            {
+                return;
+            }
+
+            // 优先配置 pulsesink 并注入抗抖动缓冲参数（200ms 缓冲与 50ms 周期，适应高负载环境）
             var sink = gst_element_factory_make("pulsesink", "qmtui_pulsesink");
             if (sink != 0)
             {
                 gst_util_set_object_arg(sink, "client-name", "qmtui");
                 gst_util_set_object_arg(sink, "buffer-time", "200000");
                 gst_util_set_object_arg(sink, "latency-time", "50000");
-                g_object_set(pipeline, "audio-sink", sink, 0);
+                SetElementProperty(pipeline, "audio-sink", sink);
                 AppLogger.Info("GstPlayer", "Custom pulsesink configured (buffer-time=200000, latency-time=50000, client-name=qmtui)");
                 return;
             }
@@ -590,7 +602,7 @@ public sealed partial class GstPlayer : IPlayer
             if (sink != 0)
             {
                 gst_util_set_object_arg(sink, "client-name", "qmtui");
-                g_object_set(pipeline, "audio-sink", sink, 0);
+                SetElementProperty(pipeline, "audio-sink", sink);
                 AppLogger.Info("GstPlayer", "Custom pipewiresink configured (client-name=qmtui)");
                 return;
             }
@@ -600,6 +612,37 @@ public sealed partial class GstPlayer : IPlayer
         catch (Exception ex)
         {
             AppLogger.Warn("GstPlayer", $"Failed to configure custom audio-sink, fallback to default: {ex.Message}");
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GValue
+    {
+        public nuint Type;
+        public nuint Data0;
+        public nuint Data1;
+    }
+
+    private static void SetElementProperty(nint obj, string propertyName, nint element)
+    {
+        gst_object_ref_sink(element);
+        try
+        {
+            var value = new GValue();
+            g_value_init(ref value, gst_element_get_type());
+            try
+            {
+                g_value_set_object(ref value, element);
+                g_object_set_property(obj, propertyName, in value);
+            }
+            finally
+            {
+                g_value_unset(ref value);
+            }
+        }
+        finally
+        {
+            gst_object_unref(element);
         }
     }
 
@@ -614,8 +657,23 @@ public sealed partial class GstPlayer : IPlayer
     [LibraryImport(LibGst, StringMarshalling = StringMarshalling.Utf8)]
     private static partial void gst_util_set_object_arg(nint obj, string name, string value);
 
+    [LibraryImport(LibGst)]
+    private static partial nuint gst_element_get_type();
+
+    [LibraryImport(LibGst)]
+    private static partial nint gst_object_ref_sink(nint obj);
+
+    [LibraryImport(LibGObject)]
+    private static partial nint g_value_init(ref GValue value, nuint type);
+
+    [LibraryImport(LibGObject)]
+    private static partial void g_value_set_object(ref GValue value, nint obj);
+
+    [LibraryImport(LibGObject)]
+    private static partial void g_value_unset(ref GValue value);
+
     [LibraryImport(LibGObject, StringMarshalling = StringMarshalling.Utf8)]
-    private static partial void g_object_set(nint obj, string property_name, nint value, nint sentinel);
+    private static partial void g_object_set_property(nint obj, string propertyName, in GValue value);
 
     [LibraryImport(LibGst)]
     private static partial int gst_element_set_state(nint element, int state);
