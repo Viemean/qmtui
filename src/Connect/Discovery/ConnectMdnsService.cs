@@ -43,22 +43,28 @@ public sealed class ConnectMdnsService : IDisposable
                 if (iface.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
 
                 var name = iface.Name.ToLowerInvariant();
+                var desc = iface.Description.ToLowerInvariant();
                 if (name.Contains("docker") || name.Contains("virbr") || name.Contains("vbox") ||
                     name.Contains("tun") || name.Contains("tap") || name.Contains("tailscale") ||
                     name.Contains("wireguard") || name.Contains("wg") || name.Contains("zt") ||
-                    name.Contains("clash") || name.Contains("mihomo"))
+                    name.Contains("clash") || name.Contains("mihomo") || name.Contains("vethernet") ||
+                    desc.Contains("virtual") || desc.Contains("vpn") || desc.Contains("hyper-v") ||
+                    desc.Contains("wsl"))
                 {
                     continue;
                 }
 
-                int ifaceScore = (name.StartsWith("wlan") || name.StartsWith("eth") || name.StartsWith("en") || name.StartsWith("wl")) ? 50 : 10;
+                bool isLikelyPhysical = name.StartsWith("wlan") || name.StartsWith("eth") || name.StartsWith("en") ||
+                                       name.StartsWith("wl") || name.Contains("wi-fi") || name.Contains("ethernet") ||
+                                       desc.Contains("wi-fi") || desc.Contains("wireless") || desc.Contains("ethernet");
+                int ifaceScore = isLikelyPhysical ? 50 : 10;
 
                 var ipProps = iface.GetIPProperties();
                 foreach (var addr in ipProps.UnicastAddresses)
                 {
                     if (addr.Address.AddressFamily != AddressFamily.InterNetwork) continue;
                     var ipStr = addr.Address.ToString();
-                    if (ipStr.StartsWith("127.") || ipStr.StartsWith("169.254.") || ipStr.StartsWith("198.18.")) continue;
+                    if (ipStr.StartsWith("127.") || ipStr.StartsWith("169.254.") || ipStr.StartsWith("198.18.") || ipStr.StartsWith("198.19.")) continue;
 
                     int score = ifaceScore;
                     if (ipStr.StartsWith("192.168.")) score += 40;

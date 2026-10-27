@@ -59,63 +59,7 @@ public sealed partial class WebPlaybackServer : IDisposable
 
     public static string? GetLocalLanIp()
     {
-        try
-        {
-            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0);
-            socket.Connect("223.5.5.5", 65530);
-            if (socket.LocalEndPoint is IPEndPoint endPoint && !IPAddress.IsLoopback(endPoint.Address))
-            {
-                return endPoint.Address.ToString();
-            }
-        }
-        catch { }
-
-        try
-        {
-            string? fallbackIp = null;
-            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                if (ni.OperationalStatus != OperationalStatus.Up ||
-                    ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
-                {
-                    continue;
-                }
-
-                var ipProps = ni.GetIPProperties();
-                foreach (var unicast in ipProps.UnicastAddresses)
-                {
-                    if (unicast.Address.AddressFamily != AddressFamily.InterNetwork ||
-                        IPAddress.IsLoopback(unicast.Address))
-                    {
-                        continue;
-                    }
-
-                    var ipStr = unicast.Address.ToString();
-                    if (ipStr.StartsWith("169.254.", StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
-                    if (ipStr.StartsWith("192.168.", StringComparison.Ordinal) ||
-                        ipStr.StartsWith("10.", StringComparison.Ordinal) ||
-                        (ipStr.StartsWith("172.", StringComparison.Ordinal) &&
-                         int.TryParse(ipStr.Split('.')[1], out var second) && second is >= 16 and <= 31))
-                    {
-                        return ipStr;
-                    }
-
-                    fallbackIp ??= ipStr;
-                }
-            }
-
-            if (!string.IsNullOrEmpty(fallbackIp))
-            {
-                return fallbackIp;
-            }
-        }
-        catch { }
-
-        return null;
+        return QmTui.Connect.Discovery.ConnectMdnsService.GetBestLocalIpAddress();
     }
 
     // 当前状态
