@@ -12,7 +12,7 @@ import sys
 import urllib.request
 
 DEFAULT_VERSION = "1.28.8"
-INSTALLER_URL_TEMPLATE = "https://gstreamer.freedesktop.org/data/pkg/windows/{version}/msvc/gstreamer-1.0-msvc-x86_64-{version}.exe"
+INSTALLER_URL_TEMPLATE = "https://gstreamer.freedesktop.org/data/pkg/windows/{version}/msvc/gstreamer-1.0-msvc-{arch}-{version}.exe"
 
 # 音频插件白名单（位于 lib/gstreamer-1.0/）
 AUDIO_PLUGIN_WHITELIST = {
@@ -275,16 +275,18 @@ def extract_minimal_gst(extract_dir: str, target_dir: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="GStreamer Windows x64 极简音频运行库提取与部署脚本")
+    parser = argparse.ArgumentParser(description="GStreamer Windows 极简音频运行库提取与部署脚本")
     parser.add_argument("--dest", required=True, help="目标放置目录（通常为可执行文件所在根目录）")
+    parser.add_argument("--arch", default="x64", choices=["x64", "arm64", "x86_64", "aarch64"], help="目标硬件架构（默认: x64）")
     parser.add_argument("--version", default=DEFAULT_VERSION, help=f"GStreamer 版本号（默认: {DEFAULT_VERSION}）")
     parser.add_argument("--cache-dir", default=os.path.expanduser("~/.cache/qmtui/gst_installer"), help="安装包缓存目录")
     args = parser.parse_args()
 
-    url = INSTALLER_URL_TEMPLATE.format(version=args.version)
-    installer_filename = f"gstreamer-1.0-msvc-x86_64-{args.version}.exe"
+    gst_arch = "arm64" if args.arch in ("arm64", "aarch64") else "x86_64"
+    url = INSTALLER_URL_TEMPLATE.format(version=args.version, arch=gst_arch)
+    installer_filename = f"gstreamer-1.0-msvc-{gst_arch}-{args.version}.exe"
     installer_path = os.path.join(args.cache_dir, installer_filename)
-    extract_temp_dir = os.path.join(args.cache_dir, f"extracted_{args.version}")
+    extract_temp_dir = os.path.join(args.cache_dir, f"extracted_{gst_arch}_{args.version}")
 
     # 1. 确保安装包存在
     download_file(url, installer_path)

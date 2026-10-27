@@ -95,9 +95,57 @@ jobs:
             qmtui_*.deb
             qmtui-*-linux-*.tar.gz
 
+  build-windows:
+    name: Build Windows ${{ matrix.arch }} package
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            rid: win-x64
+          - arch: arm64
+            rid: win-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup MSVC Toolchain
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+
+      - name: Build and Package Windows (${{ matrix.arch }})
+        shell: bash
+        run: |
+          chmod +x ./build-win.sh
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION="0.4.7"
+          fi
+          ./build-win.sh --aot "$VERSION" "${{ matrix.arch }}"
+
+      - name: Upload Windows Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qmtui-pkg-windows-${{ matrix.arch }}
+          path: qmtui-*-windows-${{ matrix.arch }}.zip
+          if-no-files-found: error
+
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [build, build-windows]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -114,5 +162,6 @@ jobs:
             dist/*.pkg.tar.zst
             dist/*.deb
             dist/*.tar.gz
+            dist/*.zip
           generate_release_notes: true
 

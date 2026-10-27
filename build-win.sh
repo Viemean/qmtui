@@ -52,14 +52,23 @@ else
     echo "==> Building Windows self-contained release package for ${ARCH} (${RID}) (Linux cross-compile fallback)..."
 fi
 
+PYTHON_BIN="python3"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1 && command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="python"
+fi
+
 # 1. 编译原生录音辅助工具 (qmtui-recorder.exe)
 if [ -f "src/Native/qmtui-recorder.cpp" ]; then
-    if command -v "$MINGW_CXX" >/dev/null 2>&1; then
-        echo "==> Compiling native recorder helper via ${MINGW_CXX}..."
-        "$MINGW_CXX" -O3 -static -s -o qmtui-recorder.exe src/Native/qmtui-recorder.cpp -lole32
+    if command -v cl >/dev/null 2>&1 || command -v cl.exe >/dev/null 2>&1; then
+        echo "==> Compiling native recorder helper via MSVC cl with maximum optimization (-O2 -Oi -Ot -GL -MT)..."
+        MSYS2_ARG_CONV_EXCL="*" MSYS_NO_PATHCONV=1 cl.exe -nologo -O2 -Oi -Ot -GL -EHsc -MT src/Native/qmtui-recorder.cpp -Fe:qmtui-recorder.exe -link -LTCG -OPT:REF -OPT:ICF ole32.lib
+        rm -f qmtui-recorder.obj
+    elif command -v "$MINGW_CXX" >/dev/null 2>&1; then
+        echo "==> Compiling native recorder helper via ${MINGW_CXX} with maximum optimization..."
+        "$MINGW_CXX" -O3 -flto -s -static -o qmtui-recorder.exe src/Native/qmtui-recorder.cpp -lole32
     elif command -v g++ >/dev/null 2>&1 && [[ "$(uname -s)" == MINGW* || "$(uname -s)" == MSYS* ]]; then
-        echo "==> Compiling native recorder helper via Windows g++..."
-        g++ -O3 -static -s -o qmtui-recorder.exe src/Native/qmtui-recorder.cpp -lole32
+        echo "==> Compiling native recorder helper via Windows g++ with maximum optimization..."
+        g++ -O3 -flto -s -static -o qmtui-recorder.exe src/Native/qmtui-recorder.cpp -lole32
     elif [ ! -f "qmtui-recorder.exe" ]; then
         echo "Error: C++ compiler not found and prebuilt qmtui-recorder.exe does not exist."
         exit 1
@@ -69,9 +78,6 @@ if [ -f "src/Native/qmtui-recorder.cpp" ]; then
 fi
 
 # 2. 发布 .NET 二进制
-PUBLISH_DIR="bin/Release/net10.0-windows10.0.26100.0/${RID}/publish"
-rm -rf "$PUBLISH_DIR" "bin/Release/net10.0/${RID}/publish"
-
 if [ "$USE_AOT" = true ]; then
     echo "==> Publishing .NET Native AOT binary (${RID})..."
     dotnet publish -c Release -r "${RID}" -p:PublishAot=true QmTui.csproj
@@ -80,12 +86,22 @@ else
     dotnet publish -c Release -r "${RID}" --self-contained true -p:PublishAot=false QmTui.csproj
 fi
 
-if [ ! -d "$PUBLISH_DIR" ]; then
-    PUBLISH_DIR="bin/Release/net10.0/${RID}/publish"
-fi
+PUBLISH_DIR=""
+POSSIBLE_DIRS=(
+    "bin/${ARCH}/Release/net10.0-windows10.0.26100.0/${RID}/publish"
+    "bin/Release/net10.0-windows10.0.26100.0/${RID}/publish"
+    "bin/${ARCH}/Release/net10.0/${RID}/publish"
+    "bin/Release/net10.0/${RID}/publish"
+)
+for dir in "${POSSIBLE_DIRS[@]}"; do
+    if [ -d "$dir" ] && [ -n "$(ls -A "$dir" 2>/dev/null)" ]; then
+        PUBLISH_DIR="$dir"
+        break
+    fi
+done
 
-if [ ! -d "$PUBLISH_DIR" ]; then
-    echo "Error: Publish directory not found at $PUBLISH_DIR"
+if [ -z "$PUBLISH_DIR" ]; then
+    echo "Error: Publish directory not found for ${RID}"
     exit 1
 fi
 
@@ -104,20 +120,21 @@ fi
 GST_SCRIPT="./setup_win_gst.py"
 [ ! -f "$GST_SCRIPT" ] && GST_SCRIPT=".bin/setup_win_gst.py"
 if [ -f "$GST_SCRIPT" ]; then
-    echo "==> Bundling minimal GStreamer Windows audio runtime..."
-    if [ "$ARCH" = "x64" ]; then
-        python3 "$GST_SCRIPT" --dest "$PUBLISH_DIR"
-    fi
+    echo "==> Bundling minimal GStreamer Windows audio runtime for ${ARCH}..."
+    "$PYTHON_BIN" "$GST_SCRIPT" --arch "$ARCH" --dest "$PUBLISH_DIR"
 fi
 
-# 6. 打包为最终 Zip 归档文件
+# 6. 清理调试符号文件（Release 包不包含 PDB 调试数据库）
+rm -f "$PUBLISH_DIR"/*.pdb
+
+# 7. 打包为最终 Zip 归档文件
 echo "==> Creating release archive: ${OUTPUT_FILE}..."
 rm -f "${OUTPUT_FILE}"
 
 if command -v zip >/dev/null 2>&1; then
     (cd "${PUBLISH_DIR}" && zip -r -q -9 "${OLDPWD}/${OUTPUT_FILE}" .)
 else
-    python3 -c "
+    "$PYTHON_BIN" -c "
 import shutil, os, sys
 publish_dir = sys.argv[1]
 output_zip = sys.argv[2]

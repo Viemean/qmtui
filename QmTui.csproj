@@ -14,10 +14,11 @@
     <PublishAot>true</PublishAot>
     <OptimizationPreference>Speed</OptimizationPreference>
     <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
-    <IlcInstructionSet Condition="'$(RuntimeIdentifier)' == 'linux-x64' or '$(RuntimeIdentifier)' == ''">x86-64-v3</IlcInstructionSet>
+    <IlcInstructionSet Condition="'$(RuntimeIdentifier)' == 'linux-x64' or '$(RuntimeIdentifier)' == 'win-x64' or '$(RuntimeIdentifier)' == ''">x86-64-v3</IlcInstructionSet>
     <TieredCompilation>true</TieredCompilation>
     <TieredPGO>true</TieredPGO>
     <StripSymbols>true</StripSymbols>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
