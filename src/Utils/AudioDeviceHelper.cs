@@ -156,6 +156,7 @@ public static class AudioDeviceHelper
 
     private static (bool hasInternal, bool hasMic) ProbeAudioSources()
     {
+        if (OperatingSystem.IsMacOS()) return (false, true);
         if (!OperatingSystem.IsLinux()) return (true, true);
 
         try

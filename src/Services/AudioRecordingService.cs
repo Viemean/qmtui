@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using QmTui.Utils;
 
@@ -88,8 +89,81 @@ internal static partial class PulseAudioSimpleNative
     }
 }
 
+internal static partial class AudioToolboxNative
+{
+    private const string LibAudioToolbox = "/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox";
+
+    public const uint kAudioFormatLinearPCM = 0x6C70636D; // 'lpcm'
+    public const uint kLinearPCMFormatFlagIsSignedInteger = 4;
+    public const uint kLinearPCMFormatFlagIsPacked = 8;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AudioStreamBasicDescription
+    {
+        public double mSampleRate;
+        public uint mFormatID;
+        public uint mFormatFlags;
+        public uint mBytesPerPacket;
+        public uint mFramesPerPacket;
+        public uint mBytesPerFrame;
+        public uint mChannelsPerFrame;
+        public uint mBitsPerChannel;
+        public uint mReserved;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AudioQueueBuffer
+    {
+        public uint mAudioDataBytesCapacity;
+        public IntPtr mAudioData;
+        public uint mAudioDataByteSize;
+        public IntPtr mUserData;
+        public uint mPacketDescriptionCapacity;
+        public IntPtr mPacketDescriptions;
+        public uint mPacketDescriptionCount;
+    }
+
+    [LibraryImport(LibAudioToolbox)]
+    public static unsafe partial int AudioQueueNewInput(
+        in AudioStreamBasicDescription inFormat,
+        delegate* unmanaged[Cdecl]<IntPtr, IntPtr, IntPtr, IntPtr, uint, IntPtr, void> inCallbackProc,
+        IntPtr inUserData,
+        IntPtr inCallbackRunLoop,
+        IntPtr inCallbackRunLoopMode,
+        uint inFlags,
+        out IntPtr outAQ);
+
+    [LibraryImport(LibAudioToolbox)]
+    public static partial int AudioQueueAllocateBuffer(
+        IntPtr inAQ,
+        uint inBufferByteSize,
+        out IntPtr outBuffer);
+
+    [LibraryImport(LibAudioToolbox)]
+    public static partial int AudioQueueEnqueueBuffer(
+        IntPtr inAQ,
+        IntPtr inBuffer,
+        uint inNumPacketDescs,
+        IntPtr inPacketDescs);
+
+    [LibraryImport(LibAudioToolbox)]
+    public static partial int AudioQueueStart(
+        IntPtr inAQ,
+        IntPtr inStartTime);
+
+    [LibraryImport(LibAudioToolbox)]
+    public static partial int AudioQueueStop(
+        IntPtr inAQ,
+        [MarshalAs(UnmanagedType.I1)] bool inImmediate);
+
+    [LibraryImport(LibAudioToolbox)]
+    public static partial int AudioQueueDispose(
+        IntPtr inAQ,
+        [MarshalAs(UnmanagedType.I1)] bool inImmediate);
+}
+
 /// <summary>
-/// 实时流式录音会话，基于 libpulse-simple (Linux) 与 qmtui-recorder.exe (Windows) 原生直连
+/// 实时流式录音会话，基于 libpulse-simple (Linux)、AudioToolbox (macOS) 与 qmtui-recorder.exe (Windows) 原生直连
 /// </summary>
 public sealed class AudioRecordingSession : IDisposable
 {
@@ -99,6 +173,7 @@ public sealed class AudioRecordingSession : IDisposable
     private static EventWaitHandle? s_evtMic;
     private static EventWaitHandle? s_evtStop;
     private static AudioRecordingSession? s_activeSession;
+    private static AudioRecordingSession? s_activeMacSession;
 
     static AudioRecordingSession()
     {
@@ -123,6 +198,8 @@ public sealed class AudioRecordingSession : IDisposable
 
     private readonly AudioRecordSource _source;
     private IntPtr _pulseHandle;
+    private IntPtr _macAudioQueue;
+    private readonly List<IntPtr> _macBuffers = [];
     private readonly MemoryStream _pcmStream = new(64 * 1024);
     private readonly Lock _lock = new();
     private readonly CancellationTokenSource _cts = new();
@@ -142,6 +219,10 @@ public sealed class AudioRecordingSession : IDisposable
                     {
                         return s_windowsProcess != null && !s_windowsProcess.HasExited;
                     }
+                }
+                if (OperatingSystem.IsMacOS())
+                {
+                    return _macAudioQueue != IntPtr.Zero;
                 }
                 if (OperatingSystem.IsLinux())
                 {
@@ -165,6 +246,15 @@ public sealed class AudioRecordingSession : IDisposable
             EnsureWindowsProcessStarted();
             s_activeSession = this;
             TriggerWindowsEvent(source == AudioRecordSource.Microphone ? s_evtMic : s_evtLoopback);
+            return;
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            if (source == AudioRecordSource.Microphone)
+            {
+                StartMacMicrophone();
+            }
             return;
         }
 
@@ -484,6 +574,91 @@ public sealed class AudioRecordingSession : IDisposable
         }
     }
 
+    private void StartMacMicrophone()
+    {
+        try
+        {
+            var format = new AudioToolboxNative.AudioStreamBasicDescription
+            {
+                mSampleRate = 16000.0,
+                mFormatID = AudioToolboxNative.kAudioFormatLinearPCM,
+                mFormatFlags = AudioToolboxNative.kLinearPCMFormatFlagIsSignedInteger | AudioToolboxNative.kLinearPCMFormatFlagIsPacked,
+                mBytesPerPacket = 2,
+                mFramesPerPacket = 1,
+                mBytesPerFrame = 2,
+                mChannelsPerFrame = 1,
+                mBitsPerChannel = 16,
+                mReserved = 0
+            };
+
+            s_activeMacSession = this;
+
+            int status;
+            unsafe
+            {
+                status = AudioToolboxNative.AudioQueueNewInput(
+                    in format,
+                    &MacAudioInputCallback,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    0,
+                    out _macAudioQueue
+                );
+            }
+
+            if (status != 0 || _macAudioQueue == IntPtr.Zero)
+            {
+                AppLogger.Warn("AudioRecording", $"AudioQueueNewInput failed with status {status}");
+                return;
+            }
+
+            const uint bufferSize = 2048;
+            for (int i = 0; i < 3; i++)
+            {
+                if (AudioToolboxNative.AudioQueueAllocateBuffer(_macAudioQueue, bufferSize, out IntPtr buf) == 0 && buf != IntPtr.Zero)
+                {
+                    _macBuffers.Add(buf);
+                    AudioToolboxNative.AudioQueueEnqueueBuffer(_macAudioQueue, buf, 0, IntPtr.Zero);
+                }
+            }
+
+            AudioToolboxNative.AudioQueueStart(_macAudioQueue, IntPtr.Zero);
+            AppLogger.Info("AudioRecording", "Started macOS AudioQueue microphone session (16000Hz mono S16LE).");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("AudioRecording", $"Failed to start macOS microphone: {ex.Message}");
+        }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void MacAudioInputCallback(IntPtr userData, IntPtr queue, IntPtr buffer, IntPtr startTime, uint packetCount, IntPtr packetDescs)
+    {
+        var session = s_activeMacSession;
+        if (session == null || session._isDisposed || queue == IntPtr.Zero || buffer == IntPtr.Zero) return;
+
+        try
+        {
+            var buf = Marshal.PtrToStructure<AudioToolboxNative.AudioQueueBuffer>(buffer);
+            if (buf.mAudioDataByteSize > 0 && buf.mAudioData != IntPtr.Zero)
+            {
+                byte[] data = new byte[buf.mAudioDataByteSize];
+                Marshal.Copy(buf.mAudioData, data, 0, (int)buf.mAudioDataByteSize);
+                session.OnPcm(data, data.Length);
+            }
+
+            if (!session._isDisposed)
+            {
+                AudioToolboxNative.AudioQueueEnqueueBuffer(queue, buffer, 0, IntPtr.Zero);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AudioRecording", $"MacAudioInputCallback exception: {ex.Message}");
+        }
+    }
+
     public void Dispose()
     {
         if (_isDisposed) return;
@@ -495,6 +670,28 @@ public sealed class AudioRecordingSession : IDisposable
             if (_source == AudioRecordSource.Microphone)
             {
                 TriggerWindowsEvent(s_evtStop);
+            }
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            if (s_activeMacSession == this) s_activeMacSession = null;
+            lock (_lock)
+            {
+                if (_macAudioQueue != IntPtr.Zero)
+                {
+                    try
+                    {
+                        AudioToolboxNative.AudioQueueStop(_macAudioQueue, true);
+                        AudioToolboxNative.AudioQueueDispose(_macAudioQueue, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("AudioRecording", $"Dispose AudioQueue error: {ex.Message}");
+                    }
+                    _macAudioQueue = IntPtr.Zero;
+                    _macBuffers.Clear();
+                }
             }
         }
 

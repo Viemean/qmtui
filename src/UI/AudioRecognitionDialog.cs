@@ -33,7 +33,7 @@ public sealed class AudioRecognitionDialog : Dialog
     private readonly Button _cancelBtn;
 
     // 记忆用户选择的录音源，避免每次打开弹窗时重置
-    private static AudioRecordSource s_currentSource = AudioRecordSource.SystemInternal;
+    private static AudioRecordSource s_currentSource = OperatingSystem.IsMacOS() ? AudioRecordSource.Microphone : AudioRecordSource.SystemInternal;
     private AudioRecordSource _currentSource = s_currentSource;
     private long _lastToggleTick;
     private long _lastPreRollToggleTick;
@@ -52,13 +52,17 @@ public sealed class AudioRecognitionDialog : Dialog
 
     private static string GetPreRollButtonText()
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            return "预录:不支持 (K)";
+        }
         return AudioPreRollManager.IsEnabled ? "预录:开 (K)" : "预录:关 (K)";
     }
 
     public AudioRecognitionDialog(Action<Song>? onSongSelected, bool inLyricArea = false)
     {
         _onSongSelected = onSongSelected;
-        _currentSource = s_currentSource;
+        _currentSource = OperatingSystem.IsMacOS() ? AudioRecordSource.Microphone : s_currentSource;
 
         AudioPreRollManager.WakeUp();
 
@@ -272,6 +276,16 @@ public sealed class AudioRecognitionDialog : Dialog
         }
         _lastToggleTick = now;
 
+        if (OperatingSystem.IsMacOS())
+        {
+            _statusLabel.Text = "[系统内录] macOS 暂不支持系统内录，仅支持麦克风识曲";
+            _currentSource = AudioRecordSource.Microphone;
+            s_currentSource = AudioRecordSource.Microphone;
+            _sourceBtn.Text = GetCurrentSourceButtonText();
+            SetNeedsDraw();
+            return;
+        }
+
         var oldSource = _currentSource;
         _currentSource = _currentSource == AudioRecordSource.SystemInternal
             ? AudioRecordSource.Microphone
@@ -292,6 +306,13 @@ public sealed class AudioRecognitionDialog : Dialog
             return;
         }
         _lastPreRollToggleTick = now;
+
+        if (OperatingSystem.IsMacOS())
+        {
+            _statusLabel.Text = "[预录功能] macOS 暂不支持后台内录预录功能";
+            SetNeedsDraw();
+            return;
+        }
 
         bool newState = !AudioPreRollManager.IsEnabled;
         AudioPreRollManager.IsEnabled = newState;
@@ -409,7 +430,12 @@ public sealed class AudioRecognitionDialog : Dialog
         _recordingSession = AudioRecordingService.StartRecordingSession(_currentSource, preRollBytes);
         if (!_recordingSession.IsRunning)
         {
-            ShowFailed("无法启动录音服务 (PulseAudio/PipeWire 连接失败)");
+            string errMsg = OperatingSystem.IsMacOS()
+                ? "无法启动 macOS 麦克风录音 (请检查系统设置中的麦克风权限)"
+                : OperatingSystem.IsWindows()
+                    ? "无法启动 Windows 录音辅助工具"
+                    : "无法启动录音服务 (PulseAudio/PipeWire 连接失败)";
+            ShowFailed(errMsg);
             return;
         }
 
