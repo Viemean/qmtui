@@ -99,10 +99,12 @@ if [ -d "www" ]; then
 fi
 
 # 5. 抽取并注入 GStreamer 极简音频运行库与插件
-if [ -f ".bin/setup_win_gst.py" ]; then
+GST_SCRIPT="./setup_win_gst.py"
+[ ! -f "$GST_SCRIPT" ] && GST_SCRIPT=".bin/setup_win_gst.py"
+if [ -f "$GST_SCRIPT" ]; then
     echo "==> Bundling minimal GStreamer Windows audio runtime..."
     if [ "$ARCH" = "x64" ]; then
-        python3 .bin/setup_win_gst.py --dest "$PUBLISH_DIR"
+        python3 "$GST_SCRIPT" --dest "$PUBLISH_DIR"
     fi
 fi
 
