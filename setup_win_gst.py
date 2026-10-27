@@ -271,7 +271,7 @@ def extract_minimal_gst(extract_dir: str, target_dir: str):
     print(f"  • 核心运行时 DLL: {copied_bin_count} 个 ({copied_bin_bytes / (1024 * 1024):.1f} MB)")
     print(f"  • 音频与解码插件: {len(copied_plugins)} 个 ({plugin_bytes / (1024 * 1024):.1f} MB)")
     print(f"  • GIO TLS 加密模块: {len(copied_gio)} 个 ({gio_bytes / (1024 * 1024):.1f} MB)")
-    print(f"  • 极简运行时总量: {copied_bin_count + len(copied_plugins) + len(copied_gio)} 个文件, 仅 {total_mb:.1f} MB")
+    print(f"  • 运行时总量: {copied_bin_count + len(copied_plugins) + len(copied_gio)} 个文件, 仅 {total_mb:.1f} MB")
 
 
 def main():

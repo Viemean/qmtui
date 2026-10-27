@@ -994,14 +994,24 @@ public sealed partial class MainWindow
                 nextSong = PlaybackQueueService.Instance.PeekNextSong();
             }
 
+            if (nextSong != null)
+            {
+                _ = TerminalImageHelper.EnsureSongCoverAsync(nextSong);
+            }
+            if (!IsRadioModeActive)
+            {
+                var prevSong = PlaybackQueueService.Instance.PeekPrevSong();
+                if (prevSong != null)
+                {
+                    _ = TerminalImageHelper.EnsureSongCoverAsync(prevSong);
+                }
+            }
+
             if (nextSong != null && !nextSong.IsLocal && !string.IsNullOrEmpty(nextSong.Mid))
             {
                 // 如果本地已有音频缓存，无需网络预热
                 var cached = AudioCacheService.GetCachedAudioPath(nextSong.Mid, _preferredQualityTier);
                 if (!string.IsNullOrEmpty(cached)) return;
-
-                // 预热本地封面
-                _ = TerminalImageHelper.EnsureSongCoverAsync(nextSong);
 
                 // 预解析下一首音源链接并缓存
                 var cacheKey = $"{nextSong.Mid}_{(int)_preferredQualityTier}";

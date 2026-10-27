@@ -5,6 +5,7 @@ using QmTui.Utils;
 #if WINDOWS
 using Windows.Media;
 using Windows.Media.Playback;
+using Windows.Storage;
 using Windows.Storage.Streams;
 #endif
 
@@ -135,17 +136,26 @@ public sealed class WindowsMediaSessionService : IDisposable
     {
         try
         {
-            if (!string.IsNullOrWhiteSpace(coverPath))
+            if (!string.IsNullOrWhiteSpace(coverPath) && File.Exists(coverPath))
             {
-                var uri = coverPath.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
-                    ? new Uri(coverPath)
-                    : new Uri(Path.GetFullPath(coverPath));
-                return RandomAccessStreamReference.CreateFromUri(uri);
+                try
+                {
+                    var file = StorageFile.GetFileFromPathAsync(Path.GetFullPath(coverPath)).GetAwaiter().GetResult();
+                    if (file != null)
+                    {
+                        return RandomAccessStreamReference.CreateFromFile(file);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("WindowsMediaSession", $"CreateFromFile failed for {coverPath}: {ex.Message}");
+                }
             }
+
             if (!string.IsNullOrEmpty(song.AlbumMid))
             {
                 return RandomAccessStreamReference.CreateFromUri(
-                    new Uri($"https://y.qq.com/music/photo_new/T002R1200x1200M000{song.AlbumMid}.jpg?max_age=2592000"));
+                    new Uri($"https://y.qq.com/music/photo_new/T002R800x800M000{song.AlbumMid}.jpg?max_age=2592000"));
             }
         }
         catch (Exception ex)
