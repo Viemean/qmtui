@@ -13,9 +13,11 @@ public class AppPathHelperTests
         Assert.EndsWith("qmtui", AppPathHelper.ConfigDir);
         Assert.EndsWith("qmtui", AppPathHelper.CacheDir);
         Assert.EndsWith("qmtui", AppPathHelper.DataDir);
+        Assert.EndsWith("logs", AppPathHelper.LogDir);
 
         Assert.True(Directory.Exists(AppPathHelper.ConfigDir));
         Assert.True(Directory.Exists(AppPathHelper.CacheDir));
         Assert.True(Directory.Exists(AppPathHelper.DataDir));
+        Assert.True(Directory.Exists(AppPathHelper.LogDir));
     }
 }

@@ -267,7 +267,8 @@ public sealed partial class LoginService
         try
         {
             var extension = mimeType == "image/jpeg" ? "jpg" : "png";
-            await File.WriteAllBytesAsync($"/tmp/qmtui_login_qr.{extension}", bytes, ct).ConfigureAwait(false);
+            var targetPath = Path.Combine(Path.GetTempPath(), $"qmtui_login_qr.{extension}");
+            await File.WriteAllBytesAsync(targetPath, bytes, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -24,6 +24,32 @@ public static class AppPathHelper
     /// </summary>
     public static string DataDir { get; } = ResolveAndMigrateDir(Path.Combine(".local", "share"), "qmtui", "qmtui");
 
+    /// <summary>
+    /// 日志目录
+    /// </summary>
+    public static string LogDir { get; } = ResolveLogDir();
+
+    private static string ResolveLogDir()
+    {
+        var logDir = OperatingSystem.IsWindows()
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "qmtui", "logs")
+            : Path.Combine(CacheDir, "logs");
+
+        try
+        {
+            if (!Directory.Exists(logDir))
+            {
+                Directory.CreateDirectory(logDir);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AppPathHelper", $"创建日志目录失败: {logDir}", ex);
+        }
+
+        return logDir;
+    }
+
     private static string ResolveAndMigrateDir(string parentRel, string newName, string legacyName)
     {
         var newDir = Path.Combine(s_userHome, parentRel, newName);

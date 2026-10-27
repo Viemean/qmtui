@@ -7,9 +7,14 @@ namespace QmTui.Utils;
 /// </summary>
 public static class AppLogger
 {
-    private static readonly string s_logFilePath = "/tmp/qqmusic_debug.log";
+    private static string? s_logFilePath;
     private static readonly object s_lock = new();
     private static bool s_debugEnabled;
+
+    /// <summary>
+    /// 当前日志输出文件的绝对路径
+    /// </summary>
+    public static string LogFilePath => s_logFilePath ??= ResolveLogFilePath();
 
     /// <summary>
     /// 初始化日志服务，设定调试模式并轮转超限历史日志文件
@@ -23,14 +28,21 @@ public static class AppLogger
         {
             lock (s_lock)
             {
-                // 若日志文件超过 5MB，安全轮转备份一次，防止无限膨胀
-                if (File.Exists(s_logFilePath) && new FileInfo(s_logFilePath).Length > 5 * 1024 * 1024)
+                var filePath = LogFilePath;
+                var logDir = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
                 {
-                    var backupPath = s_logFilePath + ".old";
-                    File.Move(s_logFilePath, backupPath, overwrite: true);
+                    Directory.CreateDirectory(logDir);
                 }
 
-                File.AppendAllText(s_logFilePath, $"=== qmtui Session Started at {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} (Debug: {s_debugEnabled}) ===\n", Encoding.UTF8);
+                // 若日志文件超过 5MB，安全轮转备份一次，防止无限膨胀
+                if (File.Exists(filePath) && new FileInfo(filePath).Length > 5 * 1024 * 1024)
+                {
+                    var backupPath = filePath + ".old";
+                    File.Move(filePath, backupPath, overwrite: true);
+                }
+
+                File.AppendAllText(filePath, $"=== qmtui Session Started at {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} (Debug: {s_debugEnabled}) ===\n", Encoding.UTF8);
             }
         }
         catch
@@ -109,11 +121,33 @@ public static class AppLogger
         {
             lock (s_lock)
             {
-                File.AppendAllText(s_logFilePath, line, Encoding.UTF8);
+                var filePath = LogFilePath;
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    File.AppendAllText(filePath, line, Encoding.UTF8);
+                }
             }
         }
         catch
         {
+        }
+    }
+
+    private static string ResolveLogFilePath()
+    {
+        var envPath = Environment.GetEnvironmentVariable("QMTUI_LOG_PATH");
+        if (!string.IsNullOrWhiteSpace(envPath))
+        {
+            return envPath;
+        }
+
+        try
+        {
+            return Path.Combine(AppPathHelper.LogDir, "qmtui.log");
+        }
+        catch
+        {
+            return Path.Combine(Path.GetTempPath(), "qmtui.log");
         }
     }
 }
