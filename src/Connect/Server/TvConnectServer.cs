@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Net;
+using System.Net.Sockets;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using QmTui.Connect.Models;
@@ -15,7 +17,7 @@ public sealed class TvConnectServer : IDisposable
     private readonly ConnectStorage _storage;
     private readonly int _port;
     private readonly System.Threading.Lock _gate = new();
-    private HttpListener? _listener;
+    private TcpListener? _listener;
     private CancellationTokenSource? _cts;
     private sealed class ClientSession : IDisposable
     {
@@ -70,7 +72,7 @@ public sealed class TvConnectServer : IDisposable
     public int Port => _port;
     public int ActualPort { get; private set; } = 8765;
     public bool IsLoopbackOnly { get; private set; }
-    public bool IsRunning => _listener?.IsListening ?? false;
+    public bool IsRunning => _listener != null && (_cts?.IsCancellationRequested == false);
     public int ConnectedCount => _activeClients.Count;
     internal Task AcceptLoopCompletion { get; private set; } = Task.CompletedTask;
 
@@ -120,13 +122,14 @@ public sealed class TvConnectServer : IDisposable
         {
             try
             {
-                var listener = new System.Net.Sockets.TcpListener(IPAddress.Any, candidate);
+                var listener = new TcpListener(IPAddress.Any, candidate);
                 listener.Start();
                 listener.Stop();
                 return candidate;
             }
-            catch
+            catch (SocketException ex)
             {
+                AppLogger.Debug("TvConnectServer", $"Port {candidate} unavailable: {ex.Message}");
             }
         }
         return startPort;
@@ -139,19 +142,19 @@ public sealed class TvConnectServer : IDisposable
     {
         lock (_gate)
         {
-            if (_listener != null && _listener.IsListening) return;
+            if (_listener != null && (_cts?.IsCancellationRequested == false)) return;
 
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
             int initialCandidate = FindAvailablePort(_port);
 
+            TcpListener? testListener = null;
             for (int candidate = initialCandidate; candidate <= _port + 10; candidate++)
             {
-                HttpListener? testListener = null;
                 try
                 {
-                    testListener = new HttpListener();
-                    testListener.Prefixes.Add($"http://*:{candidate}/");
+                    testListener = new TcpListener(IPAddress.Any, candidate);
+                    testListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                     testListener.Start();
                     _listener = testListener;
                     ActualPort = candidate;
@@ -160,48 +163,21 @@ public sealed class TvConnectServer : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    AppLogger.Warn("TvConnectServer", $"Could not bind to http://*:{candidate}/: {ex.Message}");
-                    try { testListener?.Close(); } catch { }
-
+                    AppLogger.Warn("TvConnectServer", $"Could not bind port {candidate}: {ex.Message}");
                     try
                     {
-                        testListener = new HttpListener();
-                        testListener.Prefixes.Add($"http://+:{candidate}/");
-                        testListener.Start();
-                        _listener = testListener;
-                        ActualPort = candidate;
-                        AppLogger.Info("TvConnectServer", $"Melodist Connect WebSocket Server listening on port {ActualPort} via prefix +");
-                        break;
+                        testListener?.Stop();
                     }
-                    catch (Exception ex2)
+                    catch (SocketException stopEx)
                     {
-                        AppLogger.Warn("TvConnectServer", $"Could not bind to http://+:{candidate}/: {ex2.Message}");
-                        try { testListener?.Close(); } catch { }
-
-                        try
-                        {
-                            testListener = new HttpListener();
-                            testListener.Prefixes.Add($"http://localhost:{candidate}/");
-                            testListener.Prefixes.Add($"http://127.0.0.1:{candidate}/");
-                            testListener.Start();
-                            _listener = testListener;
-                            ActualPort = candidate;
-                            IsLoopbackOnly = true;
-                            AppLogger.Warn("TvConnectServer", $"Melodist Connect bound to localhost:{ActualPort} only. LAN access is restricted by Windows http.sys permissions. Run as Administrator or execute: netsh http add urlacl url=http://+:{ActualPort}/ sddl=D:(A;;GX;;;WD)");
-                            break;
-                        }
-                        catch (Exception ex3)
-                        {
-                            AppLogger.Warn("TvConnectServer", $"Could not bind to loopback port {candidate}: {ex3.Message}");
-                            try { testListener?.Close(); } catch { }
-                        }
+                        AppLogger.Debug("TvConnectServer", $"Error stopping testListener: {stopEx.Message}");
                     }
                 }
             }
 
-            if (_listener == null || !_listener.IsListening)
+            if (_listener == null)
             {
-                AppLogger.Error("TvConnectServer", "Failed to start HttpListener on any port in range 8765-8775", null);
+                AppLogger.Error("TvConnectServer", "Failed to start TcpListener on any port in range 8765-8775", null);
                 return;
             }
 
@@ -209,63 +185,164 @@ public sealed class TvConnectServer : IDisposable
             var activeListener = _listener;
             AcceptLoopCompletion = Task.Run(async () =>
             {
-                while (activeCts.IsCancellationRequested == false && activeListener.IsListening)
+                while (!activeCts.IsCancellationRequested)
                 {
+                    TcpClient client;
                     try
                     {
-                        var ctx = await activeListener.GetContextAsync().ConfigureAwait(false);
-                        if (ctx.Request.IsWebSocketRequest)
-                        {
-                            _ = ProcessWebSocketRequestAsync(ctx);
-                        }
-                        else
-                        {
-                            _ = ProcessHttpRequestAsync(ctx);
-                        }
+                        client = await activeListener.AcceptTcpClientAsync(activeCts.Token).ConfigureAwait(false);
                     }
-                    catch (Exception ex) when (activeCts.IsCancellationRequested &&
-                        ex is HttpListenerException or ObjectDisposedException or OperationCanceledException)
+                    catch (OperationCanceledException) when (activeCts.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                    catch (Exception ex) when (activeCts.IsCancellationRequested || ex is ObjectDisposedException or SocketException)
                     {
                         break;
                     }
                     catch (Exception ex)
                     {
-                        AppLogger.Warn("TvConnectServer", $"Error accepting HTTP context: {ex.Message}");
+                        AppLogger.Warn("TvConnectServer", $"Error accepting TCP client: {ex.Message}");
+                        continue;
                     }
+
+                    _ = HandleIncomingConnectionAsync(client, activeCts.Token);
                 }
-            });
+            }, activeCts.Token);
         }
     }
 
-    private async Task ProcessWebSocketRequestAsync(HttpListenerContext ctx)
+    private async Task HandleIncomingConnectionAsync(TcpClient client, CancellationToken ct)
     {
-        WebSocketContext wsCtx;
         try
         {
-            wsCtx = await ctx.AcceptWebSocketAsync(subProtocol: null).ConfigureAwait(false);
+            client.NoDelay = true;
+            client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+            client.LingerState = new LingerOption(enable: false, seconds: 0);
         }
-        catch (Exception ex) when (_cts?.IsCancellationRequested == true &&
-            ex is HttpListenerException or WebSocketException or ObjectDisposedException or OperationCanceledException)
+        catch (SocketException ex)
         {
-            return;
+            AppLogger.Debug("TvConnectServer", $"Failed to set socket options: {ex.Message}");
+        }
+        catch (ObjectDisposedException ex)
+        {
+            AppLogger.Debug("TvConnectServer", $"Socket disposed while setting options: {ex.Message}");
+        }
+
+        var stream = client.GetStream();
+        try
+        {
+            byte[] buffer = new byte[8192];
+            using var readTimeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            readTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+
+            int bytesRead;
+            try
+            {
+                bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), readTimeoutCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                client.Dispose();
+                return;
+            }
+
+            if (bytesRead <= 0)
+            {
+                client.Dispose();
+                return;
+            }
+
+            string requestText = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            int headerEnd = requestText.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+            string headerPart = headerEnd >= 0 ? requestText[..headerEnd] : requestText;
+
+            string[] lines = headerPart.Split("\r\n");
+            if (lines.Length == 0)
+            {
+                client.Dispose();
+                return;
+            }
+
+            string firstLine = lines[0];
+            string[] parts = firstLine.Split(' ');
+            if (parts.Length < 2)
+            {
+                client.Dispose();
+                return;
+            }
+
+            string method = parts[0].ToUpperInvariant();
+            string rawUri = parts[1];
+
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 1; i < lines.Length; i++)
+            {
+                int colon = lines[i].IndexOf(':');
+                if (colon > 0)
+                {
+                    string name = lines[i][..colon].Trim();
+                    string val = lines[i][(colon + 1)..].Trim();
+                    headers[name] = val;
+                }
+            }
+
+            bool isWebSocket = headers.TryGetValue("Upgrade", out var upgradeVal) &&
+                               string.Equals(upgradeVal, "websocket", StringComparison.OrdinalIgnoreCase);
+
+            if (isWebSocket)
+            {
+                await AcceptWebSocketAsync(client, stream, headers, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                await ProcessHttpRequestAsync(client, stream, method, rawUri, headers, ct).ConfigureAwait(false);
+            }
+        }
+        catch (Exception) when (ct.IsCancellationRequested)
+        {
+            client.Dispose();
         }
         catch (Exception ex)
         {
-            AppLogger.Error("TvConnectServer", "Failed to accept WebSocket", ex);
-            try
-            {
-                ctx.Response.StatusCode = 500;
-                ctx.Response.Close();
-            }
-            catch { }
+            AppLogger.Debug("TvConnectServer", $"Incoming connection error: {ex.Message}");
+            client.Dispose();
+        }
+    }
+
+    private async Task AcceptWebSocketAsync(TcpClient client, NetworkStream stream, Dictionary<string, string> headers, CancellationToken ct)
+    {
+        if (!headers.TryGetValue("Sec-WebSocket-Key", out var secKey) || string.IsNullOrWhiteSpace(secKey))
+        {
+            await SendRawResponseAsync(stream, 400, "Bad Request", "text/plain", "Missing Sec-WebSocket-Key", ct).ConfigureAwait(false);
+            client.Dispose();
             return;
         }
 
-        var socket = wsCtx.WebSocket;
+        string acceptKey = Convert.ToBase64String(
+            SHA1.HashData(Encoding.UTF8.GetBytes(secKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))
+        );
+
+        string response =
+            "HTTP/1.1 101 Switching Protocols\r\n" +
+            "Upgrade: websocket\r\n" +
+            "Connection: Upgrade\r\n" +
+            $"Sec-WebSocket-Accept: {acceptKey}\r\n\r\n";
+
+        byte[] responseBytes = Encoding.ASCII.GetBytes(response);
+        await stream.WriteAsync(responseBytes, ct).ConfigureAwait(false);
+        await stream.FlushAsync(ct).ConfigureAwait(false);
+
+        var socket = WebSocket.CreateFromStream(stream, isServer: true, subProtocol: null, keepAliveInterval: TimeSpan.FromSeconds(30));
         var session = new ClientSession(socket);
         _activeClients[socket] = session;
-        AppLogger.Info("TvConnectServer", $"WebSocket client connected from {ctx.Request.RemoteEndPoint}");
+        AppLogger.Info("TvConnectServer", $"WebSocket client connected from {client.Client.RemoteEndPoint}");
 
+        _ = RunWebSocketSessionAsync(socket, client);
+    }
+
+    private async Task RunWebSocketSessionAsync(WebSocket socket, TcpClient client)
+    {
         var buffer = new byte[8192];
         var ms = new MemoryStream();
 
@@ -312,6 +389,7 @@ public sealed class TvConnectServer : IDisposable
                 disconnectedSession.Dispose();
             }
             socket.Dispose();
+            client.Dispose();
             AppLogger.Info("TvConnectServer", "WebSocket client disconnected");
         }
     }
@@ -420,7 +498,14 @@ public sealed class TvConnectServer : IDisposable
                     }
                     disconnectedSession.Dispose();
                 }
-                try { await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disconnect", CancellationToken.None).ConfigureAwait(false); } catch { }
+                try
+                {
+                    await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disconnect", CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"CloseAsync error on disconnect: {ex.Message}");
+                }
                 break;
 
             case ConnectActions.CmdPlaySong:
@@ -712,9 +797,11 @@ public sealed class TvConnectServer : IDisposable
             try
             {
                 _listener?.Stop();
-                _listener?.Close();
             }
-            catch { }
+            catch (SocketException ex)
+            {
+                AppLogger.Debug("TvConnectServer", $"Error stopping listener: {ex.Message}");
+            }
             _listener = null;
             foreach (var session in _activeClients.Values)
             {
@@ -724,21 +811,26 @@ public sealed class TvConnectServer : IDisposable
         }
     }
 
-    private async Task ProcessHttpRequestAsync(HttpListenerContext ctx)
+    private async Task ProcessHttpRequestAsync(
+        TcpClient client,
+        NetworkStream stream,
+        string method,
+        string rawUri,
+        Dictionary<string, string> headers,
+        CancellationToken ct)
     {
         try
         {
-            var path = ctx.Request.Url?.AbsolutePath?.ToLowerInvariant() ?? "";
-            var isHead = string.Equals(ctx.Request.HttpMethod, "HEAD", StringComparison.OrdinalIgnoreCase);
+            var (path, query) = ParseUri(rawUri);
+            var isHead = string.Equals(method, "HEAD", StringComparison.OrdinalIgnoreCase);
 
             if (path.StartsWith("/cover"))
             {
                 string? coverPath = null;
-                var mid = ctx.Request.QueryString["mid"];
-                var localCoverPath = ctx.Request.QueryString["path"];
-                var coverName = ctx.Request.QueryString["name"];
+                query.TryGetValue("mid", out var mid);
+                query.TryGetValue("path", out var localCoverPath);
+                query.TryGetValue("name", out var coverName);
 
-                // 支持 /cover?name=<cached_cover_filename>
                 if (!string.IsNullOrEmpty(coverName))
                 {
                     try
@@ -750,10 +842,12 @@ public sealed class TvConnectServer : IDisposable
                             coverPath = cachedPath;
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("TvConnectServer", $"Failed to resolve cover by name: {ex.Message}");
+                    }
                 }
 
-                // 优先支持 /cover/local?path=<url_encoded_path>
                 if (string.IsNullOrEmpty(coverPath) && !string.IsNullOrEmpty(localCoverPath))
                 {
                     try
@@ -764,7 +858,10 @@ public sealed class TvConnectServer : IDisposable
                             coverPath = unescaped;
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("TvConnectServer", $"Failed to unescape local cover path: {ex.Message}");
+                    }
                 }
 
                 if (string.IsNullOrEmpty(coverPath) && !string.IsNullOrEmpty(mid) && CoverPathByMidProvider != null)
@@ -779,7 +876,6 @@ public sealed class TvConnectServer : IDisposable
                     }
                 }
 
-                // 若指定了 mid 但未找到，或者未指定 mid 的 /cover/current，尝试回退当前正在播放的封面
                 if (string.IsNullOrEmpty(coverPath) && (path.Contains("current") || string.IsNullOrEmpty(mid)))
                 {
                     for (int i = 0; i < 20; i++)
@@ -789,50 +885,50 @@ public sealed class TvConnectServer : IDisposable
                         {
                             break;
                         }
-                        await Task.Delay(100).ConfigureAwait(false);
+                        await Task.Delay(100, ct).ConfigureAwait(false);
                     }
                 }
 
                 if (!string.IsNullOrEmpty(coverPath) && File.Exists(coverPath))
                 {
                     var ext = Path.GetExtension(coverPath).ToLowerInvariant();
-                    ctx.Response.ContentType = ext switch
+                    string contentType = ext switch
                     {
                         ".png" => "image/png",
                         ".webp" => "image/webp",
                         _ => "image/jpeg"
                     };
-                    ctx.Response.Headers.Add("Access-Control-Allow-Origin", "*");
-                    ctx.Response.Headers.Add("Accept-Ranges", "bytes");
-                    ctx.Response.Headers.Add("Cache-Control", "public, max-age=86400");
-                    ctx.Response.StatusCode = (int)HttpStatusCode.OK;
-
                     var fi = new FileInfo(coverPath);
-                    ctx.Response.ContentLength64 = fi.Length;
+                    var sb = new StringBuilder();
+                    sb.Append("HTTP/1.1 200 OK\r\n");
+                    sb.Append($"Content-Type: {contentType}\r\n");
+                    sb.Append($"Content-Length: {fi.Length}\r\n");
+                    sb.Append("Access-Control-Allow-Origin: *\r\n");
+                    sb.Append("Accept-Ranges: bytes\r\n");
+                    sb.Append("Cache-Control: public, max-age=86400\r\n");
+                    sb.Append("Connection: close\r\n\r\n");
 
+                    await stream.WriteAsync(Encoding.UTF8.GetBytes(sb.ToString()), ct).ConfigureAwait(false);
                     if (!isHead)
                     {
                         using var fs = File.OpenRead(coverPath);
-                        await fs.CopyToAsync(ctx.Response.OutputStream).ConfigureAwait(false);
+                        await fs.CopyToAsync(stream, ct).ConfigureAwait(false);
                     }
-                    ctx.Response.Close();
+                    await stream.FlushAsync(ct).ConfigureAwait(false);
                     AppLogger.Info("TvConnectServer", $"Served cover for {path}?mid={mid} ({fi.Length} bytes)");
                     return;
                 }
                 else
                 {
-                    ctx.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                    ctx.Response.Close();
+                    await SendRawResponseAsync(stream, 404, "Not Found", "text/plain", "Not Found", ct).ConfigureAwait(false);
                     return;
                 }
             }
             else if (path.StartsWith("/stream/local"))
             {
-                var localAudioPath = ctx.Request.QueryString["path"];
-                if (string.IsNullOrEmpty(localAudioPath))
+                if (!query.TryGetValue("path", out var localAudioPath) || string.IsNullOrEmpty(localAudioPath))
                 {
-                    ctx.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                    ctx.Response.Close();
+                    await SendRawResponseAsync(stream, 404, "Not Found", "text/plain", "Not Found", ct).ConfigureAwait(false);
                     return;
                 }
 
@@ -841,16 +937,19 @@ public sealed class TvConnectServer : IDisposable
                 {
                     decodedPath = Uri.UnescapeDataString(localAudioPath);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"Failed to unescape audio stream path: {ex.Message}");
+                }
 
                 if (string.IsNullOrEmpty(decodedPath) || !File.Exists(decodedPath))
                 {
-                    ctx.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                    ctx.Response.Close();
+                    await SendRawResponseAsync(stream, 404, "Not Found", "text/plain", "Not Found", ct).ConfigureAwait(false);
                     return;
                 }
 
-                await ServeLocalAudioStreamAsync(ctx, decodedPath, isHead).ConfigureAwait(false);
+                headers.TryGetValue("Range", out var rangeHeader);
+                await ServeLocalAudioStreamAsync(stream, decodedPath, isHead, rangeHeader, ct).ConfigureAwait(false);
                 return;
             }
             else if (path.StartsWith("/lyrics/"))
@@ -859,33 +958,111 @@ public sealed class TvConnectServer : IDisposable
                 if (!string.IsNullOrEmpty(lyricsText))
                 {
                     var bytes = Encoding.UTF8.GetBytes(lyricsText);
-                    ctx.Response.ContentType = "text/plain; charset=utf-8";
-                    ctx.Response.Headers.Add("Access-Control-Allow-Origin", "*");
-                    ctx.Response.Headers.Add("Cache-Control", "no-cache, no-store, must-revalidate");
-                    ctx.Response.StatusCode = (int)HttpStatusCode.OK;
-                    ctx.Response.ContentLength64 = bytes.Length;
-                    await ctx.Response.OutputStream.WriteAsync(bytes).ConfigureAwait(false);
-                    ctx.Response.Close();
+                    var sb = new StringBuilder();
+                    sb.Append("HTTP/1.1 200 OK\r\n");
+                    sb.Append("Content-Type: text/plain; charset=utf-8\r\n");
+                    sb.Append($"Content-Length: {bytes.Length}\r\n");
+                    sb.Append("Access-Control-Allow-Origin: *\r\n");
+                    sb.Append("Cache-Control: no-cache, no-store, must-revalidate\r\n");
+                    sb.Append("Connection: close\r\n\r\n");
+
+                    await stream.WriteAsync(Encoding.UTF8.GetBytes(sb.ToString()), ct).ConfigureAwait(false);
+                    await stream.WriteAsync(bytes, ct).ConfigureAwait(false);
+                    await stream.FlushAsync(ct).ConfigureAwait(false);
                     return;
                 }
+                await SendRawResponseAsync(stream, 404, "Not Found", "text/plain", "Not Found", ct).ConfigureAwait(false);
+                return;
             }
 
-            ctx.Response.StatusCode = (int)HttpStatusCode.NotFound;
-            ctx.Response.Close();
+            await SendRawResponseAsync(stream, 404, "Not Found", "text/plain", "Not Found", ct).ConfigureAwait(false);
+        }
+        catch (Exception) when (ct.IsCancellationRequested)
+        {
         }
         catch (Exception ex)
         {
             AppLogger.Debug("TvConnectServer", $"ProcessHttpRequest error: {ex.Message}");
             try
             {
-                ctx.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                ctx.Response.Close();
+                await SendRawResponseAsync(stream, 500, "Internal Server Error", "text/plain", "Internal Server Error", ct).ConfigureAwait(false);
             }
-            catch { }
+            catch (Exception sendEx)
+            {
+                AppLogger.Debug("TvConnectServer", $"Failed to write 500 response: {sendEx.Message}");
+            }
+        }
+        finally
+        {
+            client.Dispose();
         }
     }
 
-    private static async Task ServeLocalAudioStreamAsync(HttpListenerContext ctx, string filePath, bool isHead)
+    private static (string Path, Dictionary<string, string> Query) ParseUri(string rawUri)
+    {
+        string path = rawUri;
+        var query = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        int qIdx = rawUri.IndexOf('?');
+        if (qIdx >= 0)
+        {
+            path = rawUri[..qIdx];
+            string qStr = rawUri[(qIdx + 1)..];
+            foreach (var part in qStr.Split('&', StringSplitOptions.RemoveEmptyEntries))
+            {
+                int eq = part.IndexOf('=');
+                try
+                {
+                    if (eq > 0)
+                    {
+                        string k = Uri.UnescapeDataString(part[..eq]);
+                        string v = Uri.UnescapeDataString(part[(eq + 1)..]);
+                        query[k] = v;
+                    }
+                    else
+                    {
+                        query[Uri.UnescapeDataString(part)] = "";
+                    }
+                }
+                catch (UriFormatException ex)
+                {
+                    AppLogger.Debug("TvConnectServer", $"Malformed URI query parameter ignored: {ex.Message}");
+                }
+            }
+        }
+        return (path.ToLowerInvariant(), query);
+    }
+
+    private static async Task SendRawResponseAsync(
+        NetworkStream stream,
+        int statusCode,
+        string statusText,
+        string contentType,
+        string? content,
+        CancellationToken ct)
+    {
+        byte[] body = string.IsNullOrEmpty(content) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(content);
+        var sb = new StringBuilder();
+        sb.Append($"HTTP/1.1 {statusCode} {statusText}\r\n");
+        sb.Append($"Content-Type: {contentType}\r\n");
+        sb.Append($"Content-Length: {body.Length}\r\n");
+        sb.Append("Access-Control-Allow-Origin: *\r\n");
+        sb.Append("Connection: close\r\n\r\n");
+
+        byte[] headerBytes = Encoding.UTF8.GetBytes(sb.ToString());
+        await stream.WriteAsync(headerBytes, ct).ConfigureAwait(false);
+        if (body.Length > 0)
+        {
+            await stream.WriteAsync(body, ct).ConfigureAwait(false);
+        }
+        await stream.FlushAsync(ct).ConfigureAwait(false);
+    }
+
+    private static async Task ServeLocalAudioStreamAsync(
+        NetworkStream stream,
+        string filePath,
+        bool isHead,
+        string? rangeHeader,
+        CancellationToken ct)
     {
         var fi = new FileInfo(filePath);
         long totalLength = fi.Length;
@@ -900,7 +1077,6 @@ public sealed class TvConnectServer : IDisposable
             _ => "audio/mpeg"
         };
 
-        var rangeHeader = ctx.Request.Headers["Range"];
         long start = 0;
         long end = totalLength - 1;
         bool isRange = false;
@@ -935,26 +1111,37 @@ public sealed class TvConnectServer : IDisposable
 
         if (isRange && (start > end || start >= totalLength || start < 0))
         {
-            ctx.Response.StatusCode = 416;
-            ctx.Response.Headers.Add("Content-Range", $"bytes */{totalLength}");
-            ctx.Response.Close();
+            var sbErr = new StringBuilder();
+            sbErr.Append("HTTP/1.1 416 Range Not Satisfiable\r\n");
+            sbErr.Append($"Content-Range: bytes */{totalLength}\r\n");
+            sbErr.Append("Content-Length: 0\r\n");
+            sbErr.Append("Connection: close\r\n\r\n");
+            await stream.WriteAsync(Encoding.UTF8.GetBytes(sbErr.ToString()), ct).ConfigureAwait(false);
+            await stream.FlushAsync(ct).ConfigureAwait(false);
             return;
         }
 
         long contentLength = end - start + 1;
-        ctx.Response.StatusCode = isRange ? (int)HttpStatusCode.PartialContent : (int)HttpStatusCode.OK;
-        ctx.Response.ContentType = contentType;
-        ctx.Response.Headers.Add("Accept-Ranges", "bytes");
-        ctx.Response.Headers.Add("Access-Control-Allow-Origin", "*");
+        var sb = new StringBuilder();
         if (isRange)
         {
-            ctx.Response.Headers.Add("Content-Range", $"bytes {start}-{end}/{totalLength}");
+            sb.Append("HTTP/1.1 206 Partial Content\r\n");
+            sb.Append($"Content-Range: bytes {start}-{end}/{totalLength}\r\n");
         }
-        ctx.Response.ContentLength64 = contentLength;
+        else
+        {
+            sb.Append("HTTP/1.1 200 OK\r\n");
+        }
+        sb.Append($"Content-Type: {contentType}\r\n");
+        sb.Append($"Content-Length: {contentLength}\r\n");
+        sb.Append("Accept-Ranges: bytes\r\n");
+        sb.Append("Access-Control-Allow-Origin: *\r\n");
+        sb.Append("Connection: close\r\n\r\n");
 
+        await stream.WriteAsync(Encoding.UTF8.GetBytes(sb.ToString()), ct).ConfigureAwait(false);
         if (isHead)
         {
-            ctx.Response.Close();
+            await stream.FlushAsync(ct).ConfigureAwait(false);
             return;
         }
 
@@ -969,12 +1156,12 @@ public sealed class TvConnectServer : IDisposable
         while (remaining > 0)
         {
             int toRead = (int)Math.Min(buffer.Length, remaining);
-            int read = await fs.ReadAsync(buffer.AsMemory(0, toRead)).ConfigureAwait(false);
+            int read = await fs.ReadAsync(buffer.AsMemory(0, toRead), ct).ConfigureAwait(false);
             if (read <= 0) break;
-            await ctx.Response.OutputStream.WriteAsync(buffer.AsMemory(0, read)).ConfigureAwait(false);
+            await stream.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
             remaining -= read;
         }
-        ctx.Response.Close();
+        await stream.FlushAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>

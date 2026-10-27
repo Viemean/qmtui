@@ -721,4 +721,33 @@ public class ConnectTests
         Assert.Equal(3, connectSong.AvailableTiers.Count);
         Assert.Equal(filteredTiers, connectSong.AvailableTiers);
     }
+
+    [Fact]
+    public async Task TvConnectServer_TcpListener_WebSocket_Handshake_And_PingPong()
+    {
+        var storage = new ConnectStorage();
+        using var server = new TvConnectServer(storage, port: 18776);
+        server.Start();
+
+        using var ws = new System.Net.WebSockets.ClientWebSocket();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{server.ActualPort}/"), cts.Token);
+        Assert.Equal(System.Net.WebSockets.WebSocketState.Open, ws.State);
+
+        var pingMsg = new ConnectMessage(Action: ConnectActions.Ping, Payload: "", Id: "test-ping");
+        var pingBytes = JsonSerializer.SerializeToUtf8Bytes(pingMsg, ConnectJsonContext.Default.ConnectMessage);
+        await ws.SendAsync(new ArraySegment<byte>(pingBytes), System.Net.WebSockets.WebSocketMessageType.Text, true, cts.Token);
+
+        var buf = new byte[4096];
+        var res = await ws.ReceiveAsync(new ArraySegment<byte>(buf), cts.Token);
+        Assert.Equal(System.Net.WebSockets.WebSocketMessageType.Text, res.MessageType);
+        var replyText = System.Text.Encoding.UTF8.GetString(buf, 0, res.Count);
+        var replyMsg = JsonSerializer.Deserialize(replyText, ConnectJsonContext.Default.ConnectMessage);
+        Assert.NotNull(replyMsg);
+        Assert.Equal(ConnectActions.Pong, replyMsg.Action);
+
+        await ws.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, "done", cts.Token);
+        server.Stop();
+    }
 }
+
