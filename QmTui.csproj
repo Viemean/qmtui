@@ -24,6 +24,7 @@
     <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
     <DefaultItemExcludes>$(DefaultItemExcludes);tui/**;tests/**;experimental/**;old/**;**/*.raw.cs</DefaultItemExcludes>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>none</SatelliteResourceLanguages>
     <LinkerFlavor Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">lld</LinkerFlavor>
   </PropertyGroup>
 

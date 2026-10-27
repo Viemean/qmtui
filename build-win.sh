@@ -69,6 +69,9 @@ if [ -f "src/Native/qmtui-recorder.cpp" ]; then
 fi
 
 # 2. 发布 .NET 二进制
+PUBLISH_DIR="bin/Release/net10.0-windows10.0.26100.0/${RID}/publish"
+rm -rf "$PUBLISH_DIR" "bin/Release/net10.0/${RID}/publish"
+
 if [ "$USE_AOT" = true ]; then
     echo "==> Publishing .NET Native AOT binary (${RID})..."
     dotnet publish -c Release -r "${RID}" -p:PublishAot=true QmTui.csproj
@@ -77,7 +80,6 @@ else
     dotnet publish -c Release -r "${RID}" --self-contained true -p:PublishAot=false QmTui.csproj
 fi
 
-PUBLISH_DIR="bin/Release/net10.0-windows10.0.26100.0/${RID}/publish"
 if [ ! -d "$PUBLISH_DIR" ]; then
     PUBLISH_DIR="bin/Release/net10.0/${RID}/publish"
 fi
