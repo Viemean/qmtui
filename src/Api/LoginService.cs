@@ -509,28 +509,32 @@ public sealed partial class LoginService
                 return true;
             }
 
-            // 若存有 psrf_qqopenid 与 psrf_qqaccess_token，尝试通过官方 QQLogin 接口带 forceRefreshToken 续期
-            if (UserSession.Current.Cookies.TryGetValue("psrf_qqopenid", out var openid) && !string.IsNullOrEmpty(openid) &&
-                UserSession.Current.Cookies.TryGetValue("psrf_qqaccess_token", out var accessToken) && !string.IsNullOrEmpty(accessToken))
+            // 使用当前已有 musickey + uin 尝试续约90 天
+            var currentKey = UserSession.Current.MusicKey;
+            if (string.IsNullOrEmpty(currentKey) && UserSession.Current.Cookies.TryGetValue("qm_keyst", out var mk1)) currentKey = mk1;
+            if (string.IsNullOrEmpty(currentKey) && UserSession.Current.Cookies.TryGetValue("musickey", out var mk2)) currentKey = mk2;
+
+            var currentUin = UserSession.Current.Uin;
+            if (string.IsNullOrEmpty(currentUin) && UserSession.Current.Cookies.TryGetValue("musicid", out var mid1)) currentUin = mid1;
+            if (string.IsNullOrEmpty(currentUin) && UserSession.Current.Cookies.TryGetValue("uin", out var mid2)) currentUin = mid2;
+
+            if (!string.IsNullOrEmpty(currentKey) && !string.IsNullOrEmpty(currentUin))
             {
-                AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting token refresh via QQConnectLogin.LoginServer...");
-                if (await RefreshQQLoginTokenAsync(openid, accessToken, ct).ConfigureAwait(false))
+                AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting credential renewal via existing musickey (Scheme A)...");
+                if (await RefreshByExistingMusicKeyAsync(currentUin, currentKey, ct).ConfigureAwait(false))
                 {
                     return true;
                 }
             }
 
-            // 若存有 refresh_token 与 musicid/uin，尝试通过官方 App LoginServer 接口续期
+            // 若存有 refresh_token 与 musicid/uin，通过官方 App LoginServer 接口长效续期
             if (UserSession.Current.Cookies.TryGetValue("refresh_token", out var refreshToken) && !string.IsNullOrEmpty(refreshToken))
             {
-                var musicId = UserSession.Current.Uin;
-                if (string.IsNullOrEmpty(musicId) && UserSession.Current.Cookies.TryGetValue("musicid", out var mid)) musicId = mid;
-                if (string.IsNullOrEmpty(musicId) && UserSession.Current.Cookies.TryGetValue("uin", out var uin)) musicId = uin;
-
+                var musicId = currentUin;
                 if (!string.IsNullOrEmpty(musicId))
                 {
                     UserSession.Current.Cookies.TryGetValue("refresh_key", out var refreshKey);
-                    AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting token refresh via music.login.LoginServer...");
+                    AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting token refresh via music.login.LoginServer (Scheme B)...");
                     if (await RefreshOfficialAppTokenAsync(musicId, refreshToken, refreshKey ?? "", ct).ConfigureAwait(false))
                     {
                         return true;
@@ -538,10 +542,21 @@ public sealed partial class LoginService
                 }
             }
 
-            // 若存有 p_skey，自动走 OAuth2 重授权换票流程
+            // 若存有 psrf_qqopenid 与 psrf_qqaccess_token，尝试通过官方 QQLogin 接口带 forceRefreshToken 续期
+            if (UserSession.Current.Cookies.TryGetValue("psrf_qqopenid", out var openid) && !string.IsNullOrEmpty(openid) &&
+                UserSession.Current.Cookies.TryGetValue("psrf_qqaccess_token", out var accessToken) && !string.IsNullOrEmpty(accessToken))
+            {
+                AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting token refresh via QQConnectLogin.LoginServer access_token...");
+                if (await RefreshQQLoginTokenAsync(openid, accessToken, ct).ConfigureAwait(false))
+                {
+                    return true;
+                }
+            }
+
+            // 若存有 p_skey，回退尝试走 OAuth2 网页重授权换票流程
             if (UserSession.Current.Cookies.TryGetValue("p_skey", out var pskey) && !string.IsNullOrEmpty(pskey))
             {
-                AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting automatic OAuth2 exchange via p_skey...");
+                AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting fallback OAuth2 exchange via p_skey...");
                 return await ExchangeMusicKeyByOAuthAsync(UserSession.Current.Cookies, ct).ConfigureAwait(false);
             }
 
@@ -551,6 +566,48 @@ public sealed partial class LoginService
         {
             s_refreshMutex.Release();
         }
+    }
+
+    /// <summary>
+    /// 使用当前已有的 musickey 与 uin 申请90 天的凭据续期
+    /// </summary>
+    public static async Task<bool> RefreshByExistingMusicKeyAsync(string uin, string musickey, CancellationToken ct = default)
+    {
+        try
+        {
+            var cleanUin = uin.TrimStart('o');
+            var payload = $"{{\"comm\":{{\"ct\":11,\"cv\":14090008,\"v\":14090008,\"platform\":\"android\"}},\"login\":{{\"module\":\"QQConnectLogin.LoginServer\",\"method\":\"QQLogin\",\"param\":{{\"musicid\":\"{cleanUin}\",\"musickey\":\"{musickey}\",\"expired_in\":7776000}}}}}}";
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, "https://u.y.qq.com/cgi-bin/musicu.fcg");
+            req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+            req.Headers.TryAddWithoutValidation("User-Agent", "QQMusic 14090008(android 14)");
+
+            var cookieHeader = UserSession.Current.GetCookieHeader();
+            if (!string.IsNullOrEmpty(cookieHeader))
+            {
+                req.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
+            }
+
+            using var resp = await s_http.SendAsync(req, ct).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) return false;
+
+            var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            AppLogger.Info("LoginService", $"RefreshByExistingMusicKey response: {json}");
+
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("login", out var loginObj) &&
+                loginObj.TryGetProperty("code", out var codeProp) && codeProp.GetInt32() == 0 &&
+                loginObj.TryGetProperty("data", out var loginData))
+            {
+                return await ApplyLoginDataAsync(loginData, UserSession.Current.Cookies, ct).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("LoginService", $"RefreshByExistingMusicKey exception: {ex.Message}");
+        }
+        return false;
     }
 
     /// <summary>
@@ -819,7 +876,7 @@ public sealed partial class LoginService
 
             if (string.IsNullOrEmpty(code))
             {
-                AppLogger.Error("LoginService", "Failed to obtain OAuth code from authorize endpoint");
+                AppLogger.Warn("LoginService", "Failed to obtain OAuth code from authorize endpoint (p_skey session expired)");
                 return false;
             }
 
