@@ -54,19 +54,6 @@ public static class AcousticRecognizeClient
         Timeout = TimeSpan.FromSeconds(8)
     };
 
-    public static async Task PreWarmAsync()
-    {
-        try
-        {
-            using var req = new HttpRequestMessage(HttpMethod.Head, _ep);
-            using var resp = await HttpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("AcousticRecognizeClient", $"识曲服务连接预热异常: {ex.Message}");
-        }
-    }
-
     private static (string Source, string Salt, byte[] AesKey)? _cc;
     private static readonly Lock _lk = new();
 

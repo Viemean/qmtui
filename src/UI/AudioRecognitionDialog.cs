@@ -60,8 +60,6 @@ public sealed class AudioRecognitionDialog : Dialog
         _onSongSelected = onSongSelected;
         _currentSource = s_currentSource;
 
-        // 预热网络连接池与唤醒预录
-        AudioRecognitionService.PreWarm();
         AudioPreRollManager.WakeUp();
 
         Title = "听歌识曲";
@@ -401,9 +399,6 @@ public sealed class AudioRecognitionDialog : Dialog
             ShowDeviceUnavailable("未检测到可用的系统内录通道 (无声卡输出)", "请连接耳机/扬声器，或按 T 切换为麦克风外录");
             return;
         }
-
-        // 纯 C# 原生算法，无需拉起外部 Worker 进程，预热网络连接
-        AudioRecognitionService.PreWarm();
 
         byte[]? preRollBytes = null;
         if (_currentSource == AudioRecordSource.SystemInternal)

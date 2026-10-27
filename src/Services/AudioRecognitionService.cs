@@ -76,15 +76,6 @@ public static class AudioRecognitionService
     }
 
     /// <summary>
-    /// 预热听歌识曲网络连接
-    /// </summary>
-    public static void PreWarm()
-    {
-        _ = AcousticRecognitionService.IsAvailable;
-        _ = AcousticRecognizeClient.PreWarmAsync();
-    }
-
-    /// <summary>
     /// 识别 16000Hz PCM 采样切片并联动曲库
     /// </summary>
     /// <param name="pcmSamples">16000Hz 采样率单声道 16-bit PCM 采样数组。</param>
