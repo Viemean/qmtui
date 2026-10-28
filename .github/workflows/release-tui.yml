@@ -139,19 +139,8 @@ jobs:
           if-no-files-found: error
 
   build-macos:
-    name: Build macOS ${{ matrix.arch }} package
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: arm64
-            os: macos-14
-            rid: osx-arm64
-          - arch: x64
-            os: macos-13
-            rid: osx-x64
-
+    name: Build macOS (Apple Silicon ARM64) package
+    runs-on: macos-14
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -165,20 +154,20 @@ jobs:
         run: |
           brew install gstreamer gst-plugins-base gst-plugins-good || true
 
-      - name: Build and Package macOS (${{ matrix.arch }})
+      - name: Build and Package macOS (arm64)
         run: |
           chmod +x ./build-mac.sh
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
             VERSION="0.4.8"
           fi
-          ./build-mac.sh --aot "$VERSION" "${{ matrix.arch }}"
+          ./build-mac.sh "$VERSION"
 
       - name: Upload macOS Package Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: qmtui-pkg-macos-${{ matrix.arch }}
-          path: qmtui-*-darwin-${{ matrix.arch }}.tar.gz
+          name: qmtui-pkg-macos-arm64
+          path: qmtui-*-darwin-arm64.tar.gz
           if-no-files-found: error
 
   release:

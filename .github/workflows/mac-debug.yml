@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - 'tui'
-      - 'test/win-aot'
   workflow_dispatch:
 
 jobs:
@@ -25,9 +24,9 @@ jobs:
         run: |
           brew install gstreamer gst-plugins-base gst-plugins-good || true
 
-      - name: Build qmtui (Native AOT osx-arm64)
+      - name: Build qmtui (Self-Contained osx-arm64)
         run: |
-          dotnet publish -c Release -r osx-arm64 -p:PublishAot=true QmTui.csproj
+          dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishAot=false -p:PublishSingleFile=true QmTui.csproj
           chmod +x bin/Release/net10.0/osx-arm64/publish/qmtui
 
       - name: Run Automated Smoke Tests
@@ -50,46 +49,3 @@ jobs:
         with:
           name: qmtui-osx-arm64
           path: bin/Release/net10.0/osx-arm64/publish/
-
-  test-x64:
-    name: macOS 13 (Intel x64) Build & Smoke Test
-    runs-on: macos-13
-    timeout-minutes: 20
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 10 SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Install macOS Dependencies (GStreamer)
-        run: |
-          brew install gstreamer gst-plugins-base gst-plugins-good || true
-
-      - name: Build qmtui (Native AOT osx-x64)
-        run: |
-          dotnet publish -c Release -r osx-x64 -p:PublishAot=true QmTui.csproj
-          chmod +x bin/Release/net10.0/osx-x64/publish/qmtui
-
-      - name: Run Automated Smoke Tests
-        run: |
-          TARGET="bin/Release/net10.0/osx-x64/publish/qmtui"
-          echo "=== 1. CLI Version Test ==="
-          $TARGET --version
-
-          echo "=== 2. CLI Help Test ==="
-          $TARGET --help
-
-          echo "=== 3. Platform & Audio Diagnostics ==="
-          $TARGET --diagnostics
-
-          echo "=== 4. Web Server Launch Test (3s) ==="
-          python3 -c "import subprocess, time; p = subprocess.Popen(['$TARGET', '--web', '--no-audio']); time.sleep(3); p.terminate(); print('Web mode test completed successfully')"
-
-      - name: Upload Binary Artifact (osx-x64)
-        uses: actions/upload-artifact@v4
-        with:
-          name: qmtui-osx-x64
-          path: bin/Release/net10.0/osx-x64/publish/
