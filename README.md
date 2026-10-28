@@ -1,6 +1,6 @@
 # qmtui
 
-`qmtui` 是一款运行于 Linux 终端的 QQ 音乐 TUI 客户端。
+`qmtui` 是一款运行于终端的 QQ 音乐 TUI 客户端。
 
 ## 界面预览
 
@@ -23,6 +23,25 @@
   - **图像协议环境变量**：
     - 强制开启：若您确定终端支持 Kitty 图像协议且实现规范可在使用以下环境变量强制开启 `QQMUSIC_FORCE_IMAGE=1`
     - 显式禁用：通过设置 `QQMUSIC_DISABLE_IMAGE=1`（或 `QQMUSIC_NO_IMAGE=1`）停用图像渲染
+
+## 安装与发布包说明
+
+在 GitHub Releases 页面提供以下类型的发布文件：
+
+### 1. 便携包
+
+| 类型 | 文件格式 | 说明 |
+| :--- | :--- | :--- |
+| **Windows** | `.zip` | 解压后直接运行 `qmtui.exe` |
+| **macOS** | `.tar.gz` | 解压后在终端运行 `./qmtui`。<br>**依赖**：需通过 Homebrew 安装 GStreamer 运行库：<br>`brew install gstreamer gst-plugins-base gst-plugins-good`<br>*(可选，提供 AAC/M4A 解码支持)*：`brew install gst-libav` |
+| **Linux** | `.tar.gz` | 解压后直接在终端运行 `./qmtui`。<br>**依赖**：需系统安装 GStreamer 1.0 基础组件：<br>- Debian/Ubuntu: `sudo apt install libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good libpulse0`<br>- Arch Linux: `sudo pacman -S gstreamer gst-plugins-base gst-plugins-good libpulse`<br>- Fedora: `sudo dnf install gstreamer1 gstreamer1-plugins-base gstreamer1-plugins-good pulseaudio-libs`<br>可选剪贴板工具：`wl-clipboard` (Wayland) 或 `xclip` (X11) |
+
+### 2. 系统包
+
+| 类型 | 说明与安装方式 |
+| :--- | :--- |
+| **Deb 包 (`.deb`)** | 适用于 Debian、Ubuntu、Deepin、UOS 等。安装时系统包管理器会自动处理依赖。<br>安装命令：<br>`sudo apt install ./qmtui_*.deb` |
+| **Arch Linux 包 (`.pkg.tar.zst` / AUR)** | `.pkg.tar.zst` 为 Arch Linux / Manjaro 的 Pacman 本地包格式。<br>- **AUR 安装**：包名为 `qmtui-bin`，推荐使用 AUR 助手自动安装与更新：<br>  `yay -S qmtui-bin` 或 `paru -S qmtui-bin`<br>- **本地包安装**：可下载 Release 中的 `.pkg.tar.zst` 文件直接安装：<br>  `sudo pacman -U qmtui-bin-*.pkg.tar.zst` |
 
 ## 免责声明
 
