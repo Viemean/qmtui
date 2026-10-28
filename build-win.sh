@@ -57,7 +57,7 @@ if ! command -v "$PYTHON_BIN" >/dev/null 2>&1 && command -v python >/dev/null 2>
     PYTHON_BIN="python"
 fi
 
-# 1. 编译原生录音辅助工具 (qmtui-recorder.exe)
+# 编译原生录音辅助工具 (qmtui-recorder.exe)
 if [ -f "src/Native/qmtui-recorder.cpp" ]; then
     if command -v cl >/dev/null 2>&1 || command -v cl.exe >/dev/null 2>&1; then
         echo "==> Compiling native recorder helper via MSVC cl with maximum optimization (-O2 -Oi -Ot -GL -MT)..."
@@ -77,7 +77,7 @@ if [ -f "src/Native/qmtui-recorder.cpp" ]; then
     fi
 fi
 
-# 2. 发布 .NET 二进制
+# 发布 .NET 二进制
 if [ "$USE_AOT" = true ]; then
     echo "==> Publishing .NET Native AOT binary (${RID})..."
     dotnet publish -c Release -r "${RID}" -p:PublishAot=true QmTui.csproj
@@ -105,18 +105,18 @@ if [ -z "$PUBLISH_DIR" ]; then
     exit 1
 fi
 
-# 3. 复制原生录音二进制
+# 复制原生录音二进制
 if [ -f "qmtui-recorder.exe" ]; then
     cp -f qmtui-recorder.exe "$PUBLISH_DIR/"
 fi
 
-# 4. 复制静态 Web 资源（若存在）
+# 复制静态 Web 资源（若存在）
 if [ -d "www" ]; then
     mkdir -p "$PUBLISH_DIR/www"
     cp -rf www/* "$PUBLISH_DIR/www/"
 fi
 
-# 5. 抽取并注入 GStreamer 极简音频运行库与插件
+# 抽取并注入 GStreamer 极简音频运行库与插件
 GST_SCRIPT="./setup_win_gst.py"
 [ ! -f "$GST_SCRIPT" ] && GST_SCRIPT=".bin/setup_win_gst.py"
 if [ -f "$GST_SCRIPT" ]; then
@@ -124,10 +124,10 @@ if [ -f "$GST_SCRIPT" ]; then
     "$PYTHON_BIN" "$GST_SCRIPT" --arch "$ARCH" --dest "$PUBLISH_DIR"
 fi
 
-# 6. 清理调试符号文件（Release 包不包含 PDB 调试数据库）
+# 清理调试符号文件（Release 包不包含 PDB 调试数据库）
 rm -f "$PUBLISH_DIR"/*.pdb
 
-# 7. 打包为最终 Zip 归档文件
+# 打包为最终 Zip 归档文件
 echo "==> Creating release archive: ${OUTPUT_FILE}..."
 rm -f "${OUTPUT_FILE}"
 

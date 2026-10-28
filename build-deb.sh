@@ -26,7 +26,7 @@ OUTPUT_FILE="${PKGNAME}_${VERSION}-${PKGREL}_${ARCH}.deb"
 
 BIN_PATH="bin/Release/net10.0/${RID}/publish/qmtui"
 if [ ! -f "$BIN_PATH" ]; then
-    BIN_PATH="bin/Release/net10.0/${RID}/publish/qmtui"
+    BIN_PATH="bin/Release/net10.0/${RID}/publish/QQMusic.Tui"
 fi
 
 if [ ! -f "$BIN_PATH" ]; then

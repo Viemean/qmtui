@@ -569,8 +569,12 @@ public sealed partial class LoginService
     }
 
     /// <summary>
-    /// 使用当前已有的 musickey 与 uin 申请90 天的凭据续期
+    /// 使用当前已有的 musickey 与 uin 申请 90 天的凭据续期
     /// </summary>
+    /// <param name="uin">用户账号标识。</param>
+    /// <param name="musickey">音乐会话凭据密钥。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>若凭据续期成功返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
     public static async Task<bool> RefreshByExistingMusicKeyAsync(string uin, string musickey, CancellationToken ct = default)
     {
         try

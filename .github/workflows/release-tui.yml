@@ -45,7 +45,7 @@ jobs:
           chmod +x ./build-pkg.sh
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION="0.1.4"
+            VERSION="0.4.7"
           fi
           ./build-pkg.sh "$VERSION" 1 "${{ matrix.arch }}" "${{ matrix.rid }}"
 
@@ -54,7 +54,7 @@ jobs:
           chmod +x ./build-deb.sh
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION="0.1.4"
+            VERSION="0.4.7"
           fi
           ./build-deb.sh "$VERSION" 1 "${{ matrix.deb_arch }}" "${{ matrix.rid }}"
 
@@ -62,23 +62,18 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION="0.1.4"
+            VERSION="0.4.7"
           fi
           BIN_PATH="bin/Release/net10.0/${{ matrix.rid }}/publish/qmtui"
           if [ ! -f "$BIN_PATH" ]; then
             BIN_PATH="bin/Release/net10.0/${{ matrix.rid }}/publish/QQMusic.Tui"
           fi
 
-          # 独立通用 tar.gz 压缩包 (包含可执行文件 qmtui 与 qafp 识曲运行时)
+          # 独立通用 tar.gz 压缩包 (包含可执行文件 qmtui 与 www 静态资源)
           STAGE_DIR=$(mktemp -d /tmp/qmtui_standalone.XXXXXX)
           cp "$BIN_PATH" "$STAGE_DIR/qmtui"
           chmod 755 "$STAGE_DIR/qmtui"
           ln -sf qmtui "$STAGE_DIR/qqmusic-tui"
-          if [ -d "Services/AudioRecognition/Runtime/qafp" ]; then
-            cp -r "Services/AudioRecognition/Runtime/qafp" "$STAGE_DIR/qafp"
-            chmod 755 "$STAGE_DIR/qafp/qafp_runner" || true
-            chmod 755 "$STAGE_DIR/qafp/sysroot/system/bin/linker64" || true
-          fi
           if [ -d "www" ]; then
             mkdir -p "$STAGE_DIR/www"
             cp -r www/* "$STAGE_DIR/www/"
@@ -143,9 +138,52 @@ jobs:
           path: qmtui-*-windows-${{ matrix.arch }}.zip
           if-no-files-found: error
 
+  build-macos:
+    name: Build macOS ${{ matrix.arch }} package
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            os: macos-14
+            rid: osx-arm64
+          - arch: x64
+            os: macos-13
+            rid: osx-x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Native Build Dependencies (GStreamer)
+        run: |
+          brew install gstreamer gst-plugins-base gst-plugins-good || true
+
+      - name: Build and Package macOS (${{ matrix.arch }})
+        run: |
+          chmod +x ./build-mac.sh
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION="0.4.7"
+          fi
+          ./build-mac.sh --aot "$VERSION" "${{ matrix.arch }}"
+
+      - name: Upload macOS Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qmtui-pkg-macos-${{ matrix.arch }}
+          path: qmtui-*-darwin-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+
   release:
     name: Publish GitHub Release
-    needs: [build, build-windows]
+    needs: [build, build-windows, build-macos]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:

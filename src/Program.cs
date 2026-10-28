@@ -31,6 +31,54 @@ public static partial class Program
             Console.WriteLine("  -p, --web-port <p>   Specify Web player port (default: 9999)");
             Console.WriteLine("  --no-audio           Disable local GStreamer playback");
             Console.WriteLine("  --no-notify          Disable desktop song switch notifications");
+            Console.WriteLine("  --diagnostics        Run platform diagnostics and exit");
+            return;
+        }
+
+        if (args.Contains("--diagnostics"))
+        {
+            Console.WriteLine($"[Diagnostics] OS: {Environment.OSVersion}, Arch: {RuntimeInformation.OSArchitecture}");
+            Console.WriteLine($"[Diagnostics] IsMacOS: {OperatingSystem.IsMacOS()}, IsLinux: {OperatingSystem.IsLinux()}, IsWindows: {OperatingSystem.IsWindows()}");
+
+            try
+            {
+                bool hasOut = QmTui.Utils.AudioDeviceHelper.HasAudioOutputDevice();
+                bool hasInternal = QmTui.Utils.AudioDeviceHelper.HasInternalRecordDevice();
+                bool hasMic = QmTui.Utils.AudioDeviceHelper.HasMicrophoneDevice();
+                Console.WriteLine($"[Diagnostics] AudioDeviceHelper: Output={hasOut}, InternalRecord={hasInternal}, Microphone={hasMic}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Diagnostics] AudioDeviceHelper exception: {ex.Message}");
+            }
+
+            if (OperatingSystem.IsMacOS())
+            {
+                Console.WriteLine("[Diagnostics] Testing AudioRecordingSession (Microphone) on macOS...");
+                try
+                {
+                    using var session = QmTui.Services.AudioRecordingService.StartRecordingSession(QmTui.Services.AudioRecordSource.Microphone);
+                    Console.WriteLine($"[Diagnostics] AudioRecordingSession started: IsRunning={session.IsRunning}");
+                    Thread.Sleep(500);
+                    var samples = session.GetSnapshotSamples();
+                    Console.WriteLine($"[Diagnostics] Snapshot samples: {samples.Length}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Diagnostics] AudioRecordingSession exception: {ex}");
+                }
+            }
+
+            try
+            {
+                QmTui.Player.GstNativeResolver.EnsureRegistered();
+                Console.WriteLine("[Diagnostics] GstNativeResolver.EnsureRegistered() executed successfully.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Diagnostics] GstNativeResolver exception: {ex.Message}");
+            }
+
             return;
         }
 

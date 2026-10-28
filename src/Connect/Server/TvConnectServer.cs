@@ -1040,7 +1040,7 @@ public sealed class TvConnectServer : IDisposable
         string? content,
         CancellationToken ct)
     {
-        byte[] body = string.IsNullOrEmpty(content) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(content);
+        byte[] body = string.IsNullOrEmpty(content) ? [] : Encoding.UTF8.GetBytes(content);
         var sb = new StringBuilder();
         sb.Append($"HTTP/1.1 {statusCode} {statusText}\r\n");
         sb.Append($"Content-Type: {contentType}\r\n");
