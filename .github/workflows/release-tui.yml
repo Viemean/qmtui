@@ -45,7 +45,7 @@ jobs:
           chmod +x ./build-pkg.sh
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION="0.4.8"
+            VERSION="0.4.9"
           fi
           ./build-pkg.sh "$VERSION" 1 "${{ matrix.arch }}" "${{ matrix.rid }}"
 
@@ -54,7 +54,7 @@ jobs:
           chmod +x ./build-deb.sh
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION="0.4.8"
+            VERSION="0.4.9"
           fi
           ./build-deb.sh "$VERSION" 1 "${{ matrix.deb_arch }}" "${{ matrix.rid }}"
 
@@ -62,7 +62,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION="0.4.8"
+            VERSION="0.4.9"
           fi
           BIN_PATH="bin/Release/net10.0/${{ matrix.rid }}/publish/qmtui"
           if [ ! -f "$BIN_PATH" ]; then
@@ -127,7 +127,7 @@ jobs:
           chmod +x ./build-win.sh
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION="0.4.8"
+            VERSION="0.4.9"
           fi
           ./build-win.sh --aot "$VERSION" "${{ matrix.arch }}"
 
@@ -159,7 +159,7 @@ jobs:
           chmod +x ./build-mac.sh
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION="0.4.8"
+            VERSION="0.4.9"
           fi
           ./build-mac.sh "$VERSION"
 

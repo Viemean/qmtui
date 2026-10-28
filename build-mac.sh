@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # 默认版本号与目标架构 (仅支持 Apple Silicon ARM64)
-VERSION="0.4.8"
+VERSION="0.4.9"
 ARCH="arm64"
 RID="osx-arm64"
 
