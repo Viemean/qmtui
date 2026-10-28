@@ -979,11 +979,26 @@ public sealed partial class MainWindow
                     }
                 }
                 catch { }
+                if (_macEventPumpTimeoutToken != null)
+                {
+                    Application.RemoveTimeout(_macEventPumpTimeoutToken);
+                    _macEventPumpTimeoutToken = null;
+                }
                 _player.Dispose();
                 _mprisService.Dispose();
                 Application.RequestStop();
             });
         };
+
+        if (OperatingSystem.IsMacOS())
+        {
+            QmTui.Player.MacMediaSessionService.EnsureInitialized();
+            _macEventPumpTimeoutToken = Application.AddTimeout(TimeSpan.FromMilliseconds(50), () =>
+            {
+                QmTui.Player.MacMediaSessionService.PumpCocoaEvents();
+                return true;
+            });
+        }
 
         Task.Run(async () =>
         {

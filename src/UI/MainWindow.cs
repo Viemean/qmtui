@@ -24,6 +24,7 @@ public sealed partial class MainWindow : Window
     private readonly bool _isWebMode;
     private long _lastUserActivityTick = Environment.TickCount64;
     private object? _aodInactivityTimerToken;
+    private object? _macEventPumpTimeoutToken;
     private readonly SystemMediaSessionService _mprisService;
     private PlaybackMode _currentPlaybackMode;
     private readonly TextField _searchField;
@@ -1762,6 +1763,12 @@ public sealed partial class MainWindow : Window
                 }
             }
             catch { }
+
+            if (_macEventPumpTimeoutToken != null)
+            {
+                Application.RemoveTimeout(_macEventPumpTimeoutToken);
+                _macEventPumpTimeoutToken = null;
+            }
 
             try { _mprisService.Dispose(); } catch { }
             try { _player.Dispose(); } catch { }

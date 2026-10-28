@@ -12,11 +12,18 @@ namespace QmTui.Player;
 public sealed unsafe partial class MacMediaSessionService : IDisposable
 {
     private const string LibObjC = "/usr/lib/libobjc.A.dylib";
+    private const string LibSystem = "/usr/lib/libSystem.B.dylib";
     private const string MediaPlayerFramework = "/System/Library/Frameworks/MediaPlayer.framework/MediaPlayer";
     private const string AppKitFramework = "/System/Library/Frameworks/AppKit.framework/AppKit";
+    private const string CoreFoundationFramework = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation";
     private const long CommandSuccess = 0;
 
+    private static readonly Lock s_initLock = new();
+    private static bool s_initialized;
+    private static nint s_defaultRunLoopMode;
     private static MacMediaSessionService? s_instance;
+    private static nint s_artworkBlock;
+    private static nint s_currentArtworkImage;
 
     private nint _mediaPlayerHandle;
     private nint _commandCenter;
@@ -41,14 +48,90 @@ public sealed unsafe partial class MacMediaSessionService : IDisposable
     public Func<Task>? PreviousHandler { get; set; }
     public Func<double, Task>? SetPositionHandler { get; set; }
 
+    public static void EnsureInitialized()
+    {
+        if (!OperatingSystem.IsMacOS() || s_initialized) return;
+        if (pthread_main_np() == 0)
+        {
+            AppLogger.Warn("MacMediaSession", "Cocoa must be initialized on the native macOS main thread");
+            return;
+        }
+        lock (s_initLock)
+        {
+            if (s_initialized) return;
+            try
+            {
+                NativeLibrary.Load(AppKitFramework);
+                var cfHandle = NativeLibrary.Load(CoreFoundationFramework);
+                if (NativeLibrary.TryGetExport(cfHandle, "kCFRunLoopDefaultMode", out var modeAddr))
+                {
+                    s_defaultRunLoopMode = Marshal.ReadIntPtr(modeAddr);
+                }
+
+                var pool = CreateObject("NSAutoreleasePool");
+                try
+                {
+                    var app = Send(Class("NSApplication"), Sel("sharedApplication"));
+                    if (app != 0)
+                    {
+                        SendLong(app, Sel("setActivationPolicy:"), 1);
+                        Send(app, Sel("finishLaunching"));
+                    }
+                }
+                finally
+                {
+                    Release(pool);
+                }
+                s_initialized = true;
+                AppLogger.Info("MacMediaSession", "Cocoa accessory application initialized on main thread");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("MacMediaSession", "Failed to initialize Cocoa application on main thread", ex);
+            }
+        }
+    }
+
+    public static void PumpCocoaEvents()
+    {
+        if (!OperatingSystem.IsMacOS() || !s_initialized) return;
+        if (pthread_main_np() == 0) return;
+
+        nint mode = s_defaultRunLoopMode;
+        if (mode == 0)
+        {
+            mode = NativeString("kCFRunLoopDefaultMode");
+            if (mode != 0) s_defaultRunLoopMode = mode;
+        }
+        if (mode == 0) return;
+
+        var pool = CreateObject("NSAutoreleasePool");
+        try
+        {
+            for (var i = 0; i < 8; i++)
+            {
+                if (CFRunLoopRunInMode(mode, 0, true) != 4) break;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MacMediaSession", $"Error pumping Cocoa events: {ex.Message}");
+        }
+        finally
+        {
+            Release(pool);
+        }
+    }
+
     public Task StartAsync()
     {
         if (!OperatingSystem.IsMacOS()) return Task.CompletedTask;
 
+        EnsureInitialized();
+
         try
         {
             _mediaPlayerHandle = NativeLibrary.Load(MediaPlayerFramework);
-            NativeLibrary.Load(AppKitFramework);
             var pool = CreateObject("NSAutoreleasePool");
             try
             {
@@ -164,6 +247,11 @@ public sealed unsafe partial class MacMediaSessionService : IDisposable
             Release(_currentArtwork);
             _currentArtwork = 0;
         }
+        if (s_currentArtworkImage != 0)
+        {
+            Release(s_currentArtworkImage);
+            s_currentArtworkImage = 0;
+        }
         if (!_isReady || string.IsNullOrWhiteSpace(coverPath) || !File.Exists(coverPath)) return;
 
         var pool = CreateObject("NSAutoreleasePool");
@@ -172,13 +260,23 @@ public sealed unsafe partial class MacMediaSessionService : IDisposable
             var path = NativeString(Path.GetFullPath(coverPath));
             var image = SendPtr(Send(Class("NSImage"), Sel("alloc")), Sel("initWithContentsOfFile:"), path);
             if (image == 0) return;
-            try
+
+            s_currentArtworkImage = image;
+
+            var size = SendSizeReturn(image, Sel("size"));
+            if (size.Width <= 0 || size.Height <= 0)
             {
-                _currentArtwork = SendPtr(Send(Class("MPMediaItemArtwork"), Sel("alloc")), Sel("initWithImage:"), image);
+                size = new NativeSize { Width = 512, Height = 512 };
             }
-            finally
+
+            var block = EnsureArtworkBlock();
+            if (block != 0)
             {
-                Release(image);
+                var artwork = Send(Class("MPMediaItemArtwork"), Sel("alloc"));
+                if (artwork != 0)
+                {
+                    _currentArtwork = SendSizeBlock(artwork, Sel("initWithBoundsSize:requestHandler:"), size, block);
+                }
             }
         }
         catch (Exception ex)
@@ -190,6 +288,31 @@ public sealed unsafe partial class MacMediaSessionService : IDisposable
             Release(pool);
         }
     }
+
+    private static nint EnsureArtworkBlock()
+    {
+        if (s_artworkBlock != 0) return s_artworkBlock;
+        var libSystemHandle = NativeLibrary.Load(LibSystem);
+        if (!NativeLibrary.TryGetExport(libSystemHandle, "_NSConcreteGlobalBlock", out var globalBlockIsa))
+        {
+            return 0;
+        }
+
+        var desc = (BlockDescriptor*)NativeMemory.AllocZeroed((nuint)sizeof(BlockDescriptor));
+        desc->Size = (nuint)sizeof(BlockLiteral);
+
+        var literal = (BlockLiteral*)NativeMemory.AllocZeroed((nuint)sizeof(BlockLiteral));
+        literal->Isa = globalBlockIsa;
+        literal->Flags = 1 << 28;
+        literal->Invoke = (nint)(delegate* unmanaged[Cdecl]<nint, NativeSize, nint>)&ProvideArtworkImage;
+        literal->Descriptor = (nint)desc;
+
+        s_artworkBlock = (nint)literal;
+        return s_artworkBlock;
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static nint ProvideArtworkImage(nint block, NativeSize size) => s_currentArtworkImage;
 
     private static nint CreateCommandTarget()
     {
@@ -361,6 +484,11 @@ public sealed unsafe partial class MacMediaSessionService : IDisposable
                 Release(_currentArtwork);
                 _currentArtwork = 0;
             }
+            if (s_currentArtworkImage != 0)
+            {
+                Release(s_currentArtworkImage);
+                s_currentArtworkImage = 0;
+            }
             Release(_commandTarget);
             _commandTarget = 0;
             _commandCenter = 0;
@@ -408,4 +536,40 @@ public sealed unsafe partial class MacMediaSessionService : IDisposable
 
     [LibraryImport(LibObjC, EntryPoint = "objc_msgSend")]
     private static partial void SendLong(nint receiver, nint selector, long value);
+
+    [LibraryImport(CoreFoundationFramework)]
+    private static partial int CFRunLoopRunInMode(nint mode, double seconds, [MarshalAs(UnmanagedType.I1)] bool returnAfterSourceHandled);
+
+    [LibraryImport(LibSystem)]
+    private static partial int pthread_main_np();
+
+    [LibraryImport(LibObjC, EntryPoint = "objc_msgSend")]
+    private static partial NativeSize SendSizeReturn(nint receiver, nint selector);
+
+    [LibraryImport(LibObjC, EntryPoint = "objc_msgSend")]
+    private static partial nint SendSizeBlock(nint receiver, nint selector, NativeSize size, nint block);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeSize
+    {
+        public double Width;
+        public double Height;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BlockDescriptor
+    {
+        public nuint Reserved;
+        public nuint Size;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BlockLiteral
+    {
+        public nint Isa;
+        public int Flags;
+        public int Reserved;
+        public nint Invoke;
+        public nint Descriptor;
+    }
 }
