@@ -467,7 +467,7 @@ public sealed partial class GstPlayer : IPlayer
                     if (errMsg != 0)
                     {
                         AppLogger.Warn("GstPlayer", "Bus reported GST_MESSAGE_ERROR, triggering watchdog");
-                        gst_object_unref(errMsg);
+                        gst_mini_object_unref(errMsg);
                         TriggerWatchdogRecovery();
                     }
 
@@ -475,7 +475,7 @@ public sealed partial class GstPlayer : IPlayer
                     if (bufMsg != 0)
                     {
                         _watchdogStallCount = 0;
-                        gst_object_unref(bufMsg);
+                        gst_mini_object_unref(bufMsg);
                     }
                 }
                 finally
@@ -708,4 +708,7 @@ public sealed partial class GstPlayer : IPlayer
 
     [LibraryImport(LibGst)]
     private static partial void gst_object_unref(nint obj);
+
+    [LibraryImport(LibGst)]
+    private static partial void gst_mini_object_unref(nint obj);
 }

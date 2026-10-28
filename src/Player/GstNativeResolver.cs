@@ -81,6 +81,25 @@ internal static partial class GstNativeResolver
             List<string> dirs = [baseDir];
             dirs.AddRange(s_macOsBinDirs);
             AppendPathsToEnvironment(dirs);
+
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GST_PLUGIN_PATH_1_0")))
+            {
+                string[] candidatePluginDirs =
+                [
+                    Path.Combine(baseDir, "lib", "gstreamer-1.0"),
+                    "/opt/homebrew/lib/gstreamer-1.0",
+                    "/Library/Frameworks/GStreamer.framework/Versions/1.0/lib/gstreamer-1.0",
+                    "/usr/local/lib/gstreamer-1.0"
+                ];
+                foreach (var pDir in candidatePluginDirs)
+                {
+                    if (Directory.Exists(pDir))
+                    {
+                        Environment.SetEnvironmentVariable("GST_PLUGIN_PATH_1_0", pDir);
+                        break;
+                    }
+                }
+            }
         }
     }
 
