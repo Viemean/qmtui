@@ -8,8 +8,8 @@ on:
 
 jobs:
   test-arm64:
-    name: macOS 14 (Apple Silicon ARM64) Build & Smoke Test
-    runs-on: macos-14
+    name: macOS (Apple Silicon ARM64) Build & Smoke Test
+    runs-on: macos-latest
     timeout-minutes: 20
     steps:
       - name: Checkout code
