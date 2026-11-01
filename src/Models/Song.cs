@@ -34,4 +34,6 @@ public record Song(
     public List<ArtistInfo> Singers { get; set; } = [];
 }
 
-public record LyricLine(TimeSpan Timestamp, string Text, string Trans = "");
+public record WordSpan(string Word, long OffsetMs, long DurationMs);
+
+public record LyricLine(TimeSpan Timestamp, string Text, string Trans = "", IReadOnlyList<WordSpan>? Words = null);

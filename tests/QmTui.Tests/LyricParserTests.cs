@@ -96,4 +96,169 @@ public class LyricParserTests
         var normalLrc = LyricParser.ParseSingleLrc("[00:01.00]Hello world\n[00:05.00]Second line of song");
         Assert.False(LyricParser.IsPlaceholderLyrics(normalLrc));
     }
+
+    [Fact]
+    public void ExtractQrcLyricContent_HandlesUnescapedQuotesAndEntities()
+    {
+        var xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <QrcInfos>
+            <LyricInfo LyricCount="1">
+            <Lyric_1 LyricType="1" LyricContent="[ti:ぶれないアイで (坚定的eye) (&quot;初音未来xROHTO Digital Eye&quot;合作曲)]
+            [ar:Mitchie M]
+            [931,4869]ぶ(931,497)れ(1428,34)な(1462,33)い(1495,32)
+            "/>
+            </LyricInfo>
+            </QrcInfos>
+            """;
+
+        var extracted = LyricParser.ExtractQrcLyricContent(xml);
+        Assert.Contains("[931,4869]ぶ(931,497)れ", extracted);
+
+        var lines = LyricParser.ParseQrcLyrics(xml);
+        Assert.Single(lines);
+        Assert.Equal("ぶれない", lines[0].Text);
+        Assert.NotNull(lines[0].Words);
+        Assert.Equal(4, lines[0].Words!.Count);
+        Assert.Equal("ぶ", lines[0].Words![0].Word);
+        Assert.Equal(0, lines[0].Words![0].OffsetMs);
+        Assert.Equal(497, lines[0].Words![0].DurationMs);
+    }
+
+    [Fact]
+    public void ParseQrcLine_LeadingTagStyle_ParsesWordsCorrectly()
+    {
+        var line = "[00:10.00](0,300)旋(300,200)律(500,400)家";
+        var parsed = LyricParser.ParseQrcLine(line);
+
+        Assert.NotNull(parsed);
+        Assert.Equal("旋律家", parsed.Text);
+        Assert.Equal(new TimeSpan(0, 0, 10), parsed.Timestamp);
+        Assert.NotNull(parsed.Words);
+        Assert.Equal(3, parsed.Words!.Count);
+        Assert.Equal("旋", parsed.Words![0].Word);
+        Assert.Equal(0, parsed.Words![0].OffsetMs);
+        Assert.Equal(300, parsed.Words![0].DurationMs);
+    }
+
+    [Fact]
+    public void MergeLyrics_QrcWithTranslation_MergesCorrectly()
+    {
+        var qrc = """
+            [0,2000]你(0,500)好(500,500)
+            [2000,3000]世(2000,1000)界(3000,1000)
+            """;
+        var trans = """
+            [00:00.00]Hello
+            [00:02.00]World
+            """;
+
+        var merged = LyricParser.MergeLyrics(qrc, trans);
+        Assert.Equal(2, merged.Count);
+        Assert.Equal("你好", merged[0].Text);
+        Assert.Equal("Hello", merged[0].Trans);
+        Assert.NotNull(merged[0].Words);
+        Assert.Equal(2, merged[0].Words!.Count);
+
+        Assert.Equal("世界", merged[1].Text);
+        Assert.Equal("World", merged[1].Trans);
+        Assert.NotNull(merged[1].Words);
+        Assert.Equal(2, merged[1].Words!.Count);
+    }
+
+    [Fact]
+    public void QrcDecoder_InvalidHex_ReturnsEmptyString()
+    {
+        Assert.Equal("", QrcDecoder.DecodeQrc(null));
+        Assert.Equal("", QrcDecoder.DecodeQrc(""));
+        Assert.Equal("", QrcDecoder.DecodeQrc("123")); // 奇数长度
+        Assert.Equal("", QrcDecoder.DecodeQrc("ZZZZ")); // 非十六进制
+    }
+
+    [Fact]
+    public void HasWordLevelSync_DetectsPresenceCorrectly()
+    {
+        var lineLevel = new List<QmTui.Models.LyricLine>
+        {
+            new(TimeSpan.FromSeconds(1), "Hello World")
+        };
+        Assert.False(LyricParser.HasWordLevelSync(lineLevel));
+
+        var wordSynced = new List<QmTui.Models.LyricLine>
+        {
+            new(TimeSpan.FromSeconds(1), "Hello World", "", [new QmTui.Models.WordSpan("Hello", 0, 500)])
+        };
+        Assert.True(LyricParser.HasWordLevelSync(wordSynced));
+    }
+
+    [Fact]
+    public void LyricListDataSource_ConstructsWithWordSyncedTimesCorrectly()
+    {
+        var lyrics = new List<QmTui.Models.LyricLine>
+        {
+            new(TimeSpan.FromSeconds(1), "你好世界", "Hello World", [
+                new QmTui.Models.WordSpan("你好", 0, 400),
+                new QmTui.Models.WordSpan("世界", 400, 500)
+            ])
+        };
+
+        Dictionary<int, int> lineMap = [];
+        List<int> itemMap = [];
+
+        var ds = new QmTui.UI.LyricListDataSource(lyrics, showTranslation: true, usableWidth: 30, padLines: 2, lineMap, itemMap);
+        Assert.True(ds.Count > 0);
+        Assert.True(lineMap.ContainsKey(0));
+        Assert.Equal(ds.Count, itemMap.Count);
+    }
+
+    [Fact]
+    public void ParseLrc_EnhancedLrc_StripsAngleBracketsForPlainText()
+    {
+        var enhancedLrc = "[00:10.50]<00:10.50>Hello <00:11.00>world<00:11.80>";
+        var parsed = LyricParser.ParseLrc(enhancedLrc);
+
+        Assert.Single(parsed);
+        Assert.Equal("Hello world", parsed[0].Text);
+    }
+
+    [Fact]
+    public void ParseSingleLrc_EnhancedLrc_ParsesWordSpansCorrectly()
+    {
+        var enhancedLrc = "[00:10.50]<00:10.50>Hello <00:11.00>world<00:11.80>";
+        var lines = LyricParser.ParseSingleLrc(enhancedLrc);
+
+        Assert.Single(lines);
+        Assert.Equal("Hello world", lines[0].Text);
+        Assert.NotNull(lines[0].Words);
+        Assert.Equal(2, lines[0].Words!.Count);
+
+        Assert.Equal("Hello ", lines[0].Words![0].Word);
+        Assert.Equal(0, lines[0].Words![0].OffsetMs);
+        Assert.Equal(500, lines[0].Words![0].DurationMs);
+
+        Assert.Equal("world", lines[0].Words![1].Word);
+        Assert.Equal(500, lines[0].Words![1].OffsetMs);
+        Assert.Equal(800, lines[0].Words![1].DurationMs);
+
+        Assert.True(LyricParser.HasWordLevelSync(lines));
+    }
+
+    [Fact]
+    public void ParseSingleLrc_EnhancedLrcWithTranslation_MergesCorrectly()
+    {
+        var enhancedLrc = """
+            [00:10.50]<00:10.50>你好 <00:11.00>世界<00:11.80>
+            [00:10.50]Hello world
+            """;
+        var lines = LyricParser.ParseSingleLrc(enhancedLrc);
+
+        Assert.Single(lines);
+        Assert.Equal("你好 世界", lines[0].Text);
+        Assert.Equal("Hello world", lines[0].Trans);
+        Assert.NotNull(lines[0].Words);
+        Assert.Equal(2, lines[0].Words!.Count);
+        Assert.True(LyricParser.HasWordLevelSync(lines));
+    }
 }
+
+

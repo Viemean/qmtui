@@ -27,13 +27,32 @@ public static partial class LyricParser
     }
 
     /// <summary>
+    /// <summary>
     /// 解析标准及多时间戳 LRC 文本
     /// </summary>
     public static List<(TimeSpan Timestamp, string Text)> ParseLrc(string? lrcText)
     {
+        var rawItems = ParseRawLrcItems(lrcText);
+        if (rawItems.Count == 0) return [];
+
+        var result = new List<(TimeSpan Timestamp, string Text)>(rawItems.Count);
+        foreach (var item in rawItems)
+        {
+            var text = item.RawContent.Contains('<')
+                ? EnhancedTimestampRegex().Replace(item.RawContent, "").Trim()
+                : item.RawContent;
+            result.Add((item.Timestamp, text));
+        }
+        return result;
+    }
+
+    private readonly record struct RawLrcItem(TimeSpan Timestamp, string RawContent, int Order);
+
+    private static List<RawLrcItem> ParseRawLrcItems(string? lrcText)
+    {
         if (string.IsNullOrWhiteSpace(lrcText)) return [];
 
-        List<(TimeSpan Timestamp, string Text, int Order)> list = [];
+        List<RawLrcItem> list = [];
         int lineOrder = 0;
         Span<TimeSpan> tsBuf = stackalloc TimeSpan[8];
 
@@ -97,30 +116,24 @@ public static partial class LyricParser
             int directCount = Math.Min(matchCount, tsBuf.Length);
             for (int i = 0; i < directCount; i++)
             {
-                list.Add((tsBuf[i], content, lineOrder++));
+                list.Add(new RawLrcItem(tsBuf[i], content, lineOrder++));
             }
             if (tsOverflow != null)
             {
                 for (int i = 0; i < tsOverflow.Count; i++)
                 {
-                    list.Add((tsOverflow[i], content, lineOrder++));
+                    list.Add(new RawLrcItem(tsOverflow[i], content, lineOrder++));
                 }
             }
         }
 
-        // 稳定排序：时间戳相同时保留 LRC 文件中的原始相对先后排版顺序
         list.Sort((a, b) =>
         {
             int cmp = a.Timestamp.CompareTo(b.Timestamp);
             return cmp != 0 ? cmp : a.Order.CompareTo(b.Order);
         });
 
-        var result = new List<(TimeSpan Timestamp, string Text)>(list.Count);
-        foreach (var item in list)
-        {
-            result.Add((item.Timestamp, item.Text));
-        }
-        return result;
+        return list;
     }
 
     private static bool TryParseTimestampSpan(ReadOnlySpan<char> span, out TimeSpan ts)
@@ -164,14 +177,31 @@ public static partial class LyricParser
     }
 
     /// <summary>
-    /// 解析本地 LRC 文本为 LyricLine 列表（识别同时间戳双语原歌词与翻译）。
+    /// 解析本地 LRC 文本为 LyricLine 列表（识别增强型 LRC 逐字时间戳与同时间戳双语原歌词与翻译）。
     /// </summary>
     /// <param name="lrcText">原始 LRC 文本内容。</param>
     /// <returns>结构化歌词行列表；若内容为空返回空列表。</returns>
     public static List<LyricLine> ParseSingleLrc(string? lrcText)
     {
-        var items = ParseLrc(lrcText);
-        if (items.Count == 0) return [];
+        var rawItems = ParseRawLrcItems(lrcText);
+        if (rawItems.Count == 0) return [];
+
+        List<(TimeSpan Timestamp, string Text, List<WordSpan>? Words)> items = [];
+        foreach (var raw in rawItems)
+        {
+            long lineMs = (long)raw.Timestamp.TotalMilliseconds;
+            if (TryParseEnhancedWords(lineMs, raw.RawContent, out var cleanText, out var words))
+            {
+                items.Add((raw.Timestamp, cleanText, words));
+            }
+            else
+            {
+                var clean = raw.RawContent.Contains('<')
+                    ? EnhancedTimestampRegex().Replace(raw.RawContent, "").Trim()
+                    : raw.RawContent;
+                items.Add((raw.Timestamp, clean, null));
+            }
+        }
 
         var result = new List<LyricLine>(items.Count);
         for (int i = 0; i < items.Count; i++)
@@ -200,7 +230,6 @@ public static partial class LyricParser
 
                 if (!anyMeta)
                 {
-                    // 若只有 2 行，第二行直接作为译文；若有多行，优先找含汉字中文的行作为译文
                     int transIdx = i + 1;
                     if (j - i > 2)
                     {
@@ -215,16 +244,106 @@ public static partial class LyricParser
                     }
 
                     var transText = items[transIdx].Text;
-                    result.Add(new LyricLine(curr.Timestamp, curr.Text, transText));
-                    i = j - 1; // 跳过同时间戳的所有附加行
+                    result.Add(new LyricLine(curr.Timestamp, curr.Text, transText, curr.Words));
+                    i = j - 1;
                     continue;
                 }
             }
 
-            result.Add(new LyricLine(curr.Timestamp, curr.Text));
+            result.Add(new LyricLine(curr.Timestamp, curr.Text, "", curr.Words));
         }
 
         return result;
+    }
+
+    public static bool TryParseEnhancedWords(
+        long lineTimestampMs,
+        string rawContent,
+        out string cleanText,
+        out List<WordSpan>? words)
+    {
+        words = null;
+        cleanText = rawContent;
+        if (string.IsNullOrWhiteSpace(rawContent) || !rawContent.Contains('<'))
+        {
+            return false;
+        }
+
+        var matches = EnhancedTimestampRegex().Matches(rawContent);
+        if (matches.Count == 0)
+        {
+            return false;
+        }
+
+        List<WordSpan> wordList = [];
+        var sbText = new StringBuilder();
+
+        int firstIndex = matches[0].Index;
+        if (firstIndex > 0)
+        {
+            string prefix = rawContent[..firstIndex].TrimStart();
+            if (!string.IsNullOrEmpty(prefix))
+            {
+                sbText.Append(prefix);
+                long firstTs = ParseEnhancedTimestampToMs(matches[0]);
+                long dur = Math.Max(0, firstTs - lineTimestampMs);
+                wordList.Add(new WordSpan(prefix, 0, dur));
+            }
+        }
+
+        for (int i = 0; i < matches.Count; i++)
+        {
+            var match = matches[i];
+            long currentTs = ParseEnhancedTimestampToMs(match);
+            long relOffset = Math.Max(0, currentTs - lineTimestampMs);
+
+            int wordStart = match.Index + match.Length;
+            int wordEnd = (i + 1 < matches.Count) ? matches[i + 1].Index : rawContent.Length;
+
+            string word = (wordEnd > wordStart) ? rawContent[wordStart..wordEnd] : "";
+            if (string.IsNullOrEmpty(word))
+            {
+                continue;
+            }
+
+            long durMs;
+            if (i + 1 < matches.Count)
+            {
+                long nextTs = ParseEnhancedTimestampToMs(matches[i + 1]);
+                durMs = Math.Max(50, nextTs - currentTs);
+            }
+            else
+            {
+                durMs = 500;
+            }
+
+            wordList.Add(new WordSpan(word, relOffset, durMs));
+            sbText.Append(word);
+        }
+
+        if (wordList.Count > 0)
+        {
+            words = wordList;
+            cleanText = sbText.ToString();
+            return true;
+        }
+
+        return false;
+    }
+
+    private static long ParseEnhancedTimestampToMs(Match match)
+    {
+        int min = int.TryParse(match.Groups[1].Value, out var m) ? m : 0;
+        int sec = int.TryParse(match.Groups[2].Value, out var s) ? s : 0;
+        int ms = 0;
+        if (match.Groups[3].Success)
+        {
+            var msStr = match.Groups[3].Value;
+            if (msStr.Length == 1) ms = (msStr[0] - '0') * 100;
+            else if (msStr.Length == 2) ms = int.Parse(msStr) * 10;
+            else if (msStr.Length >= 3) ms = int.Parse(msStr[..3]);
+        }
+        return min * 60_000L + sec * 1_000L + ms;
     }
 
     private static bool HasChinese(string s)
@@ -245,6 +364,74 @@ public static partial class LyricParser
     /// <returns>合并对齐后的歌词行列表。</returns>
     public static List<LyricLine> MergeLyrics(string rawLyric, string rawTrans)
     {
+        if (IsQrcContent(rawLyric))
+        {
+            var qrcLines = ParseQrcLyrics(rawLyric);
+            if (qrcLines.Count == 0)
+            {
+                qrcLines = [new LyricLine(TimeSpan.Zero, "暂无歌词")];
+            }
+
+            var transList = ParseLrc(rawTrans);
+            var cleanTList = transList.FindAll(t =>
+                !string.IsNullOrWhiteSpace(t.Text) &&
+                t.Text != "//" &&
+                !t.Text.Contains("享有") &&
+                !t.Text.Contains("大模型") &&
+                !t.Text.Contains("翻译贡献")
+            );
+
+            var qrcUsedSet = new HashSet<(TimeSpan, string)>(cleanTList.Count);
+            var qrcResult = new List<LyricLine>(qrcLines.Count);
+
+            for (int i = 0; i < qrcLines.Count; i++)
+            {
+                var qrcLine = qrcLines[i];
+                string transText = "";
+                bool isMeta = IsMetaInfoLine(qrcLine.Timestamp, qrcLine.Text);
+
+                if (!isMeta && transList.Count > 0)
+                {
+                    var exact = transList.Find(t => Math.Abs((t.Timestamp - qrcLine.Timestamp).TotalMilliseconds) < 80);
+                    if (exact.Text != null && !qrcUsedSet.Contains(exact) &&
+                        exact.Text != "//" && !exact.Text.Contains("享有") && !exact.Text.Contains("大模型") && !exact.Text.Contains("翻译贡献"))
+                    {
+                        transText = exact.Text;
+                        qrcUsedSet.Add(exact);
+                    }
+                    else if (cleanTList.Count > 0)
+                    {
+                        var candidates = cleanTList.FindAll(t => !qrcUsedSet.Contains(t) && Math.Abs((t.Timestamp - qrcLine.Timestamp).TotalMilliseconds) <= 300);
+                        if (candidates.Count > 0)
+                        {
+                            var best = candidates[0];
+                            var minDiff = Math.Abs((best.Timestamp - qrcLine.Timestamp).TotalMilliseconds);
+                            for (int c = 1; c < candidates.Count; c++)
+                            {
+                                var diff = Math.Abs((candidates[c].Timestamp - qrcLine.Timestamp).TotalMilliseconds);
+                                if (diff < minDiff)
+                                {
+                                    minDiff = diff;
+                                    best = candidates[c];
+                                }
+                            }
+                            transText = best.Text;
+                            qrcUsedSet.Add(best);
+                        }
+                        else if (cleanTList.Count == qrcLines.Count && i < cleanTList.Count && !qrcUsedSet.Contains(cleanTList[i]))
+                        {
+                            transText = cleanTList[i].Text;
+                            qrcUsedSet.Add(cleanTList[i]);
+                        }
+                    }
+                }
+
+                qrcResult.Add(new LyricLine(qrcLine.Timestamp, qrcLine.Text, transText, qrcLine.Words));
+            }
+
+            return qrcResult;
+        }
+
         var origItems = ParseLrc(rawLyric);
         if (origItems.Count == 0)
         {
@@ -446,6 +633,162 @@ public static partial class LyricParser
         return foreignCharCount > 20 && foreignCharCount > hanziCount * 2;
     }
 
+    /// <summary>
+    /// 判断当前歌词列表中是否包含词级逐字时间戳同步数据。
+    /// </summary>
+    /// <param name="lyrics">待检查的歌词行序列。</param>
+    /// <returns>若存在至少一行有效 Words 逐字信息返回 <see langword="true"/>；否则返回 <see langword="false"/>。</returns>
+    public static bool HasWordLevelSync(IEnumerable<LyricLine>? lyrics)
+    {
+        if (lyrics == null) return false;
+        foreach (var l in lyrics)
+        {
+            if (l.Words != null && l.Words.Count > 0) return true;
+        }
+        return false;
+    }
+
+    public static bool IsQrcContent(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        var trimmed = text.Trim();
+        return trimmed.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) ||
+               trimmed.Contains("<QrcInfos", StringComparison.OrdinalIgnoreCase) ||
+               QrcMsRegex().IsMatch(trimmed);
+    }
+
+    public static string ExtractQrcLyricContent(string? rawText)
+    {
+        if (string.IsNullOrWhiteSpace(rawText)) return "";
+        var trimmed = rawText.Trim();
+        if (trimmed.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) || trimmed.Contains("<QrcInfos", StringComparison.OrdinalIgnoreCase))
+        {
+            var match = QrcLyricContentRegex().Match(trimmed);
+            if (match.Success)
+            {
+                return match.Groups[1].Value
+                    .Replace("&apos;", "'")
+                    .Replace("&quot;", "\"")
+                    .Replace("&gt;", ">")
+                    .Replace("&lt;", "<")
+                    .Replace("&amp;", "&");
+            }
+        }
+        return rawText;
+    }
+
+    public static List<LyricLine> ParseQrcLyrics(string? qrcText)
+    {
+        var content = ExtractQrcLyricContent(qrcText);
+        if (string.IsNullOrWhiteSpace(content)) return [];
+
+        List<LyricLine> result = [];
+        foreach (var line in content.AsSpan().EnumerateLines())
+        {
+            var trimmed = line.Trim();
+            if (trimmed.IsEmpty) continue;
+            var parsed = ParseQrcLine(trimmed.ToString());
+            if (parsed != null)
+            {
+                result.Add(parsed);
+            }
+        }
+        return result;
+    }
+
+    public static LyricLine? ParseQrcLine(string rawLine)
+    {
+        var msMatch = QrcMsRegex().Match(rawLine);
+        long lineTimestampMs;
+        string afterTimestamp;
+
+        if (msMatch.Success && msMatch.Index == 0)
+        {
+            lineTimestampMs = long.TryParse(msMatch.Groups[1].Value, out var msVal) ? msVal : 0L;
+            afterTimestamp = rawLine[(msMatch.Index + msMatch.Length)..];
+        }
+        else
+        {
+            var match = TimestampRegex().Match(rawLine);
+            if (!match.Success) return null;
+            int min = int.TryParse(match.Groups[1].Value, out var mVal) ? mVal : 0;
+            int sec = int.TryParse(match.Groups[2].Value, out var sVal) ? sVal : 0;
+            var msStr = match.Groups[3].Success ? match.Groups[3].Value.PadRight(3, '0')[..3] : "000";
+            int ms = int.TryParse(msStr, out var msV) ? msV : 0;
+            lineTimestampMs = min * 60_000L + sec * 1_000L + ms;
+            afterTimestamp = rawLine[(match.Index + match.Length)..];
+        }
+
+        bool isLeadingStyle = afterTimestamp.StartsWith('(');
+        if (isLeadingStyle)
+        {
+            var matches = QrcLeadingRegex().Matches(afterTimestamp);
+            if (matches.Count == 0)
+            {
+                var text = afterTimestamp.Trim();
+                return string.IsNullOrEmpty(text) ? null : new LyricLine(TimeSpan.FromMilliseconds(lineTimestampMs), text);
+            }
+
+            var words = new List<WordSpan>(matches.Count);
+            var sb = new StringBuilder();
+            foreach (Match wm in matches)
+            {
+                long offsetOrAbs = long.TryParse(wm.Groups[1].Value, out var oVal) ? oVal : 0L;
+                long dur = long.TryParse(wm.Groups[2].Value, out var dVal) ? dVal : 0L;
+                string word = wm.Groups[3].Value;
+                long relOffset = offsetOrAbs >= lineTimestampMs ? offsetOrAbs - lineTimestampMs : offsetOrAbs;
+                words.Add(new WordSpan(word, relOffset, dur));
+                sb.Append(word);
+            }
+
+            return new LyricLine(TimeSpan.FromMilliseconds(lineTimestampMs), sb.ToString(), "", words);
+        }
+        else
+        {
+            var tagMatches = QrcTagRegex().Matches(afterTimestamp);
+            if (tagMatches.Count == 0)
+            {
+                var text = afterTimestamp.Trim();
+                return string.IsNullOrEmpty(text) ? null : new LyricLine(TimeSpan.FromMilliseconds(lineTimestampMs), text);
+            }
+
+            var words = new List<WordSpan>(tagMatches.Count);
+            var sb = new StringBuilder();
+            int lastEnd = 0;
+            foreach (Match tm in tagMatches)
+            {
+                string word = afterTimestamp[lastEnd..tm.Index];
+                long offsetOrAbs = long.TryParse(tm.Groups[1].Value, out var oVal) ? oVal : 0L;
+                long dur = long.TryParse(tm.Groups[2].Value, out var dVal) ? dVal : 0L;
+                long relOffset = offsetOrAbs >= lineTimestampMs ? offsetOrAbs - lineTimestampMs : offsetOrAbs;
+                if (!string.IsNullOrEmpty(word))
+                {
+                    words.Add(new WordSpan(word, relOffset, dur));
+                    sb.Append(word);
+                }
+                lastEnd = tm.Index + tm.Length;
+            }
+
+            return new LyricLine(TimeSpan.FromMilliseconds(lineTimestampMs), sb.ToString(), "", words);
+        }
+    }
+
     [GeneratedRegex(@"\[(\d{1,2}):(\d{1,2})(?:[\.:](\d{1,3}))?\]")]
     private static partial Regex TimestampRegex();
+
+    [GeneratedRegex(@"\[(\d+),(\d+)\]")]
+    private static partial Regex QrcMsRegex();
+
+    [GeneratedRegex(@"\((\d+),(\d+)\)([^(]*)")]
+    private static partial Regex QrcLeadingRegex();
+
+    [GeneratedRegex(@"\((\d+),(\d+)\)")]
+    private static partial Regex QrcTagRegex();
+
+    [GeneratedRegex(@"LyricContent=""(.*)""(?:\s*/>|\s*>)", RegexOptions.Singleline)]
+    private static partial Regex QrcLyricContentRegex();
+
+    [GeneratedRegex(@"<(\d{1,2}):(\d{1,2})(?:[\.:](\d{1,3}))?>")]
+    private static partial Regex EnhancedTimestampRegex();
 }
+

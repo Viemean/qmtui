@@ -15,6 +15,8 @@ namespace QmTui.Utils;
 [JsonSerializable(typeof(DailyRecommendCache))]
 [JsonSerializable(typeof(FavoriteCache))]
 [JsonSerializable(typeof(List<LyricLine>))]
+[JsonSerializable(typeof(WordSpan))]
+[JsonSerializable(typeof(List<WordSpan>))]
 [JsonSerializable(typeof(Dictionary<string, int>))]
 [JsonSerializable(typeof(ListeningReportData))]
 internal sealed partial class AppJsonContext : JsonSerializerContext
