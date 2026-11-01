@@ -26,6 +26,7 @@ public sealed partial class MainWindow
 
     private CancellationTokenSource? _playbackCts;
     private long _playbackSessionId;
+    private long _lastLyricAutoMatchedSessionId = -1;
 
     // 物理真实累计收听满 30 秒门限流式持久化缓存状态机
     private bool _hasTriggeredCacheForCurrentSong;
@@ -310,6 +311,14 @@ public sealed partial class MainWindow
             else if (song.IsLocal && !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath))
             {
                 lyrics = await QmTui.Services.LocalMusicService.GetLyricsAsync(song).ConfigureAwait(false);
+                if (!LyricParser.HasWordLevelSync(lyrics))
+                {
+                    var cached = LocalLyricAutoMatcher.TryGetCachedLyrics(song, playUrl);
+                    if (cached != null && cached.Lines.Count > 0 && cached.Lines.Exists(l => l.Words != null && l.Words.Count > 0))
+                    {
+                        lyrics = cached.Lines.ConvertAll(l => l.ToDomain());
+                    }
+                }
             }
             else if (song.IsWebDav)
             {
@@ -319,10 +328,18 @@ public sealed partial class MainWindow
                 lyrics = server != null && !string.IsNullOrEmpty(song.WebDavHref)
                     ? await WebDavService.EnsureLyricsAsync(server, song).ConfigureAwait(false)
                     : [];
+
+                if (!LyricParser.HasWordLevelSync(lyrics))
+                {
+                    var cached = LocalLyricAutoMatcher.TryGetCachedLyrics(song, playUrl);
+                    if (cached != null && cached.Lines.Count > 0 && cached.Lines.Exists(l => l.Words != null && l.Words.Count > 0))
+                    {
+                        lyrics = cached.Lines.ConvertAll(l => l.ToDomain());
+                    }
+                }
             }
             else
             {
-                // 手机反向接力本地曲目 / 代理串流：优先检索本地多级歌词母本与快表缓存
                 var cached = LocalLyricAutoMatcher.TryGetCachedLyrics(song, playUrl);
                 lyrics = (cached != null && cached.Lines.Count > 0)
                     ? cached.Lines.ConvertAll(l => l.ToDomain())
@@ -587,10 +604,11 @@ public sealed partial class MainWindow
                 }
             }, ct);
 
-            // 若为本地歌曲或 WebDAV 歌曲，且满足匹配规则，后台自动尝试匹配在线歌词与翻译
+            // 若为本地歌曲或 WebDAV 歌曲，且满足匹配规则，单次播放过程中仅触发一次后台自动匹配
             bool isLocalOrWebDav = song.IsLocal || song.IsWebDav;
-            if (isLocalOrWebDav && !IsCurrentSongLyricMatched(song) && LocalLyricAutoMatcher.NeedsMatching(song, _currentLyrics))
+            if (isLocalOrWebDav && _lastLyricAutoMatchedSessionId != currentSession && !IsCurrentSongLyricMatched(song) && LocalLyricAutoMatcher.NeedsMatching(song, _currentLyrics))
             {
+                _lastLyricAutoMatchedSessionId = currentSession;
                 bool isNoLyrics = LyricParser.IsPlaceholderLyrics(_currentLyrics);
                 _ = Task.Run(async () =>
                 {

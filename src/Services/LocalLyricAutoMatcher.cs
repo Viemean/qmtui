@@ -17,12 +17,13 @@ namespace QmTui.Services;
 public sealed record CachedLyricLineItem(
     [property: JsonPropertyName("ms")] long TimestampMs,
     [property: JsonPropertyName("text")] string Text,
-    [property: JsonPropertyName("trans")] string Trans = ""
+    [property: JsonPropertyName("trans")] string Trans = "",
+    [property: JsonPropertyName("words")] List<WordSpan>? Words = null
 )
 {
-    public LyricLine ToDomain() => new(TimeSpan.FromMilliseconds(TimestampMs), Text, Trans);
+    public LyricLine ToDomain() => new(TimeSpan.FromMilliseconds(TimestampMs), Text, Trans, Words);
     public static CachedLyricLineItem FromDomain(LyricLine line) =>
-        new((long)line.Timestamp.TotalMilliseconds, line.Text, line.Trans ?? "");
+        new((long)line.Timestamp.TotalMilliseconds, line.Text, line.Trans ?? "", line.Words as List<WordSpan> ?? line.Words?.ToList());
 }
 
 public sealed record CachedMatchedLyricData(
@@ -36,6 +37,8 @@ public sealed record CachedMatchedLyricData(
 [JsonSerializable(typeof(CachedMatchedLyricData))]
 [JsonSerializable(typeof(List<CachedLyricLineItem>))]
 [JsonSerializable(typeof(CachedLyricLineItem))]
+[JsonSerializable(typeof(WordSpan))]
+[JsonSerializable(typeof(List<WordSpan>))]
 internal sealed partial class MatchedLyricJsonContext : JsonSerializerContext
 {
 }
@@ -71,10 +74,10 @@ public static class LocalLyricAutoMatcher
     {
         if (LyricParser.IsPlaceholderLyrics(currentLyrics)) return true;
 
-        // 若已有内嵌歌词且已有翻译，跳过
+        if (!LyricParser.HasWordLevelSync(currentLyrics)) return true;
+
         if (currentLyrics.Exists(l => !string.IsNullOrWhiteSpace(l.Trans))) return false;
 
-        // 若为外文歌曲但缺少翻译，允许匹配官方双语歌词
         return LyricParser.NeedsTranslation(currentLyrics);
     }
 
@@ -98,15 +101,36 @@ public static class LocalLyricAutoMatcher
         if (cached != null && cached.Lines.Count > 0)
         {
             var domainLyrics = cached.Lines.ConvertAll(l => l.ToDomain());
-            var dummySong = song with
+            if (LyricParser.HasWordLevelSync(domainLyrics))
             {
-                Mid = cached.SongMid,
-                AlbumMid = cached.AlbumMid,
-                Title = string.IsNullOrWhiteSpace(cached.Title) ? song.Title : cached.Title,
-                Artist = string.IsNullOrWhiteSpace(cached.Artist) ? song.Artist : cached.Artist
-            };
-            AppLogger.Info("LocalLyricAutoMatcher", $"[缓存命中] 成功加载统一歌词母本: {cached.Title} - {cached.Artist} (Mid: {cached.SongMid})");
-            return (dummySong, domainLyrics);
+                var dummySong = song with
+                {
+                    Mid = cached.SongMid,
+                    AlbumMid = cached.AlbumMid,
+                    Title = string.IsNullOrWhiteSpace(cached.Title) ? song.Title : cached.Title,
+                    Artist = string.IsNullOrWhiteSpace(cached.Artist) ? song.Artist : cached.Artist
+                };
+                AppLogger.Info("LocalLyricAutoMatcher", $"[缓存命中] 成功加载统一逐字歌词母本: {cached.Title} - {cached.Artist} (Mid: {cached.SongMid})");
+                return (dummySong, domainLyrics);
+            }
+
+            if (!string.IsNullOrEmpty(cached.SongMid))
+            {
+                AppLogger.Info("LocalLyricAutoMatcher", $"[母本升级] 缓存仅含行级歌词，穿透拉取官方逐字歌词: {cached.SongMid}");
+                var freshLyrics = await MusicApi.GetLyricsAsync(cached.SongMid, cancellationToken).ConfigureAwait(false);
+                if (freshLyrics != null && freshLyrics.Count > 0 && !LyricParser.IsPlaceholderLyrics(freshLyrics))
+                {
+                    SaveUnifiedCache(cached.SongMid, cached.AlbumMid, cached.Title, cached.Artist, freshLyrics, song, playUrl);
+                    var dummySong = song with
+                    {
+                        Mid = cached.SongMid,
+                        AlbumMid = cached.AlbumMid,
+                        Title = string.IsNullOrWhiteSpace(cached.Title) ? song.Title : cached.Title,
+                        Artist = string.IsNullOrWhiteSpace(cached.Artist) ? song.Artist : cached.Artist
+                    };
+                    return (dummySong, freshLyrics);
+                }
+            }
         }
 
         // 定位有效的本地/已缓存音频文件或 WebDAV/本地流式 URL
@@ -178,17 +202,20 @@ public static class LocalLyricAutoMatcher
             var matchedSong = acrResult.MatchedSong;
             AppLogger.Info("LocalLyricAutoMatcher", $"[ACR 识别成功] 命中官方曲目: {matchedSong.Title} - {matchedSong.Artist} (Mid: {matchedSong.Mid})");
 
-            // 优先检查识别到的 SongMid 是否已存在于本地母本缓存（例如在线播放时已缓存），若命中则无需重复网络请求
             var midCached = ReadMasterCacheByMid(matchedSong.Mid);
             List<LyricLine>? officialLyrics = null;
             if (midCached != null && midCached.Lines.Count > 0)
             {
-                officialLyrics = midCached.Lines.ConvertAll(l => l.ToDomain());
-                AppLogger.Info("LocalLyricAutoMatcher", $"[母本复用] 直接命中已缓存的官方双语歌词: {matchedSong.Mid}");
+                var cachedDomain = midCached.Lines.ConvertAll(l => l.ToDomain());
+                if (LyricParser.HasWordLevelSync(cachedDomain))
+                {
+                    officialLyrics = cachedDomain;
+                    AppLogger.Info("LocalLyricAutoMatcher", $"[母本复用] 直接命中已缓存的官方逐字双语歌词: {matchedSong.Mid}");
+                }
             }
-            else
+
+            if (officialLyrics == null)
             {
-                // 若本地尚无母本，拉取官方双语歌词
                 officialLyrics = await MusicApi.GetLyricsAsync(matchedSong.Mid, cancellationToken).ConfigureAwait(false);
             }
 
@@ -198,13 +225,21 @@ public static class LocalLyricAutoMatcher
                 return null;
             }
 
-            // 原歌词保护检查：若原歌词已有有效非占位内容，而官方歌词没有提供双语翻译，则保留原歌词（用户强制匹配时不拦截）
             bool currentIsPlaceholder = LyricParser.IsPlaceholderLyrics(currentLyrics);
+            bool currentHasWordSync = LyricParser.HasWordLevelSync(currentLyrics);
+            bool newHasWordSync = LyricParser.HasWordLevelSync(officialLyrics);
+            bool currentHasTrans = currentLyrics.Exists(l => !string.IsNullOrWhiteSpace(l.Trans));
             bool newHasTrans = officialLyrics.Exists(l => !string.IsNullOrWhiteSpace(l.Trans));
-            if (!forceMatch && currentLyrics.Count > 0 && !currentIsPlaceholder && !newHasTrans)
+
+            if (!forceMatch && currentLyrics.Count > 0 && !currentIsPlaceholder)
             {
-                AppLogger.Info("LocalLyricAutoMatcher", "官方歌词未包含翻译，保留现有有效歌词");
-                return null;
+                bool bringsWordSync = newHasWordSync && !currentHasWordSync;
+                bool bringsTranslation = newHasTrans && !currentHasTrans && LyricParser.NeedsTranslation(currentLyrics);
+                if (!bringsWordSync && !bringsTranslation)
+                {
+                    AppLogger.Info("LocalLyricAutoMatcher", "官方歌词未包含逐字或有效翻译，保留现有本地内嵌/LRC歌词");
+                    return null;
+                }
             }
 
             // 将结果持久化至统一歌词母本库，并建立路径与元数据关联索引

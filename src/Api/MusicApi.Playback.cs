@@ -737,24 +737,35 @@ public sealed partial class MusicApi
             return [new LyricLine(TimeSpan.Zero, "暂无歌词")];
         }
 
+        List<LyricLine>? fallbackCached = null;
+
         // 优先读取统一母本缓存 (mid_<songMid>.json)
         var masterCached = LocalLyricAutoMatcher.ReadMasterCacheByMid(songMid);
         if (masterCached != null && masterCached.Lines.Count > 0)
         {
-            return masterCached.Lines.ConvertAll(l => l.ToDomain());
+            var domainLines = masterCached.Lines.ConvertAll(l => l.ToDomain());
+            if (LyricParser.HasWordLevelSync(domainLines))
+            {
+                return domainLines;
+            }
+            fallbackCached ??= domainLines;
         }
 
         // 兼容读取旧版 MetadataCacheService 缓存
         var cached = MetadataCacheService.GetLyrics(songMid);
         if (cached != null && cached.Count > 0)
         {
-            return cached;
+            if (LyricParser.HasWordLevelSync(cached))
+            {
+                return cached;
+            }
+            fallbackCached ??= cached;
         }
 
         try
         {
-            // 调用 PlayLyricInfo 接口以获取原生原文与翻译歌词
-            var jsonPayload = $"{{\"comm\":{{\"ct\":24,\"cv\":0}},\"playLyricInfo\":{{\"module\":\"music.musichallSong.PlayLyricInfo\",\"method\":\"GetPlayLyricInfo\",\"param\":{{\"songMID\":\"{songMid}\",\"songID\":0,\"qrc\":0,\"trans\":1,\"roma\":1,\"isHQ\":1}}}}}}";
+            // 调用 PlayLyricInfo 接口以获取原生原文与翻译歌词（启用 qrc 与 crypt 逐字歌词）
+            var jsonPayload = $"{{\"comm\":{{\"ct\":24,\"cv\":0}},\"playLyricInfo\":{{\"module\":\"music.musichallSong.PlayLyricInfo\",\"method\":\"GetPlayLyricInfo\",\"param\":{{\"songMID\":\"{songMid}\",\"songID\":0,\"qrc\":1,\"trans\":1,\"roma\":1,\"isHQ\":1,\"crypt\":1}}}}}}";
 
             using var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
             using var resp = await s_httpClient.PostAsync("https://u.y.qq.com/cgi-bin/musicu.fcg", content, ct).ConfigureAwait(false);
@@ -765,11 +776,35 @@ public sealed partial class MusicApi
             if (root.TryGetProperty("playLyricInfo", out var info) &&
                 info.TryGetProperty("data", out var data))
             {
-                var b64Lyric = data.TryGetProperty("lyric", out var l) ? l.GetString() : null;
-                var b64Trans = data.TryGetProperty("trans", out var t) ? t.GetString() : null;
+                var lyricField = data.TryGetProperty("lyric", out var l) ? l.GetString() : null;
+                var transField = data.TryGetProperty("trans", out var t) ? t.GetString() : null;
 
-                var rawLyric = LyricParser.DecodeBase64(b64Lyric);
-                var rawTrans = LyricParser.DecodeBase64(b64Trans);
+                string rawLyric = "";
+                string rawTrans = "";
+
+                if (!string.IsNullOrWhiteSpace(lyricField))
+                {
+                    if (lyricField.Length > 100 && IsAllHex(lyricField))
+                    {
+                        rawLyric = QrcDecoder.DecodeQrc(lyricField);
+                    }
+                    if (string.IsNullOrWhiteSpace(rawLyric))
+                    {
+                        rawLyric = LyricParser.DecodeBase64(lyricField);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(transField))
+                {
+                    if (transField.Length > 100 && IsAllHex(transField))
+                    {
+                        rawTrans = QrcDecoder.DecodeQrc(transField);
+                    }
+                    if (string.IsNullOrWhiteSpace(rawTrans))
+                    {
+                        rawTrans = LyricParser.DecodeBase64(transField);
+                    }
+                }
 
                 if (!string.IsNullOrWhiteSpace(rawLyric))
                 {
@@ -810,6 +845,15 @@ public sealed partial class MusicApi
             AppLogger.Warn("MusicApi.Playback", $"GetLyricsAsync failed for mid={songMid}: {ex.Message}");
         }
 
-        return [new LyricLine(TimeSpan.Zero, "暂无歌词")];
+        return fallbackCached ?? [new LyricLine(TimeSpan.Zero, "暂无歌词")];
+    }
+
+    private static bool IsAllHex(ReadOnlySpan<char> span)
+    {
+        foreach (var c in span)
+        {
+            if (!char.IsAsciiHexDigit(c)) return false;
+        }
+        return true;
     }
 }

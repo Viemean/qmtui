@@ -228,10 +228,16 @@ public class AcousticRecognitionTests
         // 占位歌词需匹配
         Assert.True(LocalLyricAutoMatcher.NeedsMatching(song, [new LyricLine(TimeSpan.Zero, "暂无歌词")]));
 
-        // 多行且有翻译，不需要匹配
-        Assert.False(LocalLyricAutoMatcher.NeedsMatching(song, [
+        // 仅有多行和翻译但无逐字歌词，仍需触发一次以尝试获取逐字歌词
+        Assert.True(LocalLyricAutoMatcher.NeedsMatching(song, [
             new LyricLine(TimeSpan.Zero, "Hello", "你好"),
             new LyricLine(TimeSpan.FromSeconds(2), "World", "世界")
+        ]));
+
+        // 多行且既有翻译又有逐字歌词，不需要匹配
+        Assert.False(LocalLyricAutoMatcher.NeedsMatching(song, [
+            new LyricLine(TimeSpan.Zero, "Hello", "你好", [new WordSpan("Hello", 0, 500)]),
+            new LyricLine(TimeSpan.FromSeconds(2), "World", "世界", [new WordSpan("World", 0, 500)])
         ]));
     }
 
