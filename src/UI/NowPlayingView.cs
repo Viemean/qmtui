@@ -39,6 +39,7 @@ public sealed partial class NowPlayingView : View
 
     private readonly View _lyricContainer;
     private readonly ListView _lyricListView;
+    private LyricListDataSource? _lyricDataSource;
     private readonly ThinScrollBarView _lyricScrollBar;
     private readonly Label _transBtn;
     private readonly Label _immersiveBtn;

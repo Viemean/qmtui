@@ -35,6 +35,7 @@ public sealed partial class MainWindow : Window
     private readonly ListeningFootprintView _footprintView;
     private readonly FrameView _lyricFrame;
     private readonly ListView _lyricListView;
+    private LyricListDataSource? _lyricDataSource;
     private readonly ThinScrollBarView _lyricScrollBar;
     private readonly ArtistAlbumDetailView _artistAlbumDetailView;
     private readonly SongCommentView _songCommentView;

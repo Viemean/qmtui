@@ -290,8 +290,14 @@ public sealed partial class NowPlayingView
         if (activeIndex != _currentActiveLyricIndex)
         {
             _currentActiveLyricIndex = activeIndex;
-            _lyricListView.SetNeedsDraw();
         }
+
+        if (_lyricDataSource != null)
+        {
+            _lyricDataSource.CurrentPlaybackMs = (long)(currentSec * 1000);
+            _lyricDataSource.ActiveLineIndex = activeIndex;
+        }
+        _lyricListView.SetNeedsDraw();
 
         if (activeIndex >= 0 && _lyricLineToFirstItemIndex.TryGetValue(activeIndex, out int targetListItemIdx))
         {
@@ -335,63 +341,20 @@ public sealed partial class NowPlayingView
     {
         int viewW = _lyricListView.Viewport.Width > 0 ? _lyricListView.Viewport.Width : 40;
         int usableWidth = Math.Max(10, viewW - 2);
-
-        if (_currentLyrics.Count == 0)
-        {
-            var emptyMsg = MainWindow.CenterLyricText("暂无歌词", usableWidth);
-            _lyricListView.SetSource(new ObservableCollection<string> { emptyMsg });
-            _lyricItemToLineIndex.Clear();
-            _lyricLineToFirstItemIndex.Clear();
-            return;
-        }
-
-        List<string> displayLines = [];
-        _lyricItemToLineIndex.Clear();
-        _lyricLineToFirstItemIndex.Clear();
-
         int viewH = _lyricListView.Viewport.Height > 0 ? _lyricListView.Viewport.Height : 15;
         int padLines = Math.Max(2, (viewH / 2) - 1);
 
-        for (int p = 0; p < padLines; p++)
-        {
-            displayLines.Add("");
-            _lyricItemToLineIndex.Add(-1);
-        }
-
-        for (int i = 0; i < _currentLyrics.Count; i++)
-        {
-            var l = _currentLyrics[i];
-            _lyricLineToFirstItemIndex[i] = displayLines.Count;
-
-            var origWrapped = MainWindow.WrapLyricText(l.Text, usableWidth);
-            foreach (var oLine in origWrapped)
-            {
-                displayLines.Add(MainWindow.CenterLyricText(oLine, usableWidth));
-                _lyricItemToLineIndex.Add(i);
-            }
-
-            if (_showTranslation && !string.IsNullOrWhiteSpace(l.Trans))
-            {
-                var transWrapped = MainWindow.WrapLyricText(l.Trans, usableWidth);
-                foreach (var tLine in transWrapped)
-                {
-                    displayLines.Add(MainWindow.CenterLyricText(tLine, usableWidth));
-                    _lyricItemToLineIndex.Add(i);
-                }
-            }
-
-            displayLines.Add("");
-            _lyricItemToLineIndex.Add(-1);
-        }
-
-        for (int p = 0; p < padLines; p++)
-        {
-            displayLines.Add("");
-            _lyricItemToLineIndex.Add(-1);
-        }
-
-        _lyricListView.SetSource(new ObservableCollection<string>(displayLines));
-        _lyricScrollBar?.UpdateMetrics(displayLines.Count, _lyricListView.Viewport.Height, _lyricListView.Viewport.Y);
+        _lyricDataSource = new LyricListDataSource(
+            _currentLyrics,
+            _showTranslation,
+            usableWidth,
+            padLines,
+            _lyricLineToFirstItemIndex,
+            _lyricItemToLineIndex
+        );
+        _lyricDataSource.ActiveLineIndex = _currentActiveLyricIndex;
+        _lyricListView.Source = _lyricDataSource;
+        _lyricScrollBar?.UpdateMetrics(_lyricDataSource.Count, _lyricListView.Viewport.Height, _lyricListView.Viewport.Y);
     }
 
     public void OnActivated()

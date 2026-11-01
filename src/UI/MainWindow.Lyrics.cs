@@ -51,70 +51,22 @@ public sealed partial class MainWindow
     {
         int viewW = _lyricListView.Viewport.Width > 0 ? _lyricListView.Viewport.Width : 40;
         int usableWidth = Math.Max(10, viewW - 2);
-
-        if (_currentLyrics.Count == 0)
-        {
-            var emptyMsg = CenterLyricText("暂无歌词", usableWidth);
-            _lyricListView.SetSource(new ObservableCollection<string> { emptyMsg });
-            _lyricItemToLineIndex.Clear();
-            _lyricLineToFirstItemIndex.Clear();
-            return;
-        }
-
-        var showTrans = _showTranslation;
-        List<string> displayLines = [];
-        _lyricItemToLineIndex.Clear();
-        _lyricLineToFirstItemIndex.Clear();
-
         int viewH = _lyricListView.Viewport.Height > 0 ? _lyricListView.Viewport.Height : 15;
         int padLines = Math.Max(2, (viewH / 2) - 1);
 
-        // 顶部预留视口半高空行留白，使第一句歌词可滚动至屏幕正中央
-        for (int p = 0; p < padLines; p++)
-        {
-            displayLines.Add("");
-            _lyricItemToLineIndex.Add(-1);
-        }
-
-        for (int i = 0; i < _currentLyrics.Count; i++)
-        {
-            var l = _currentLyrics[i];
-            _lyricLineToFirstItemIndex[i] = displayLines.Count;
-
-            // 原文行（水平居中，按宽度自动断行）
-            var origWrapped = WrapLyricText(l.Text, usableWidth);
-            foreach (var oLine in origWrapped)
-            {
-                displayLines.Add(CenterLyricText(oLine, usableWidth));
-                _lyricItemToLineIndex.Add(i);
-            }
-
-            // 翻译行（若启用且非空，紧贴原文下方，水平居中与自动断行）
-            if (showTrans && !string.IsNullOrWhiteSpace(l.Trans))
-            {
-                var transWrapped = WrapLyricText(l.Trans, usableWidth);
-                foreach (var tLine in transWrapped)
-                {
-                    displayLines.Add(CenterLyricText(tLine, usableWidth));
-                    _lyricItemToLineIndex.Add(i);
-                }
-            }
-
-            // 句落之间插入单个空行作为间隔
-            displayLines.Add("");
-            _lyricItemToLineIndex.Add(-1);
-        }
-
-        // 底部预留视口半高空行留白，使最后一句歌词可滚动至屏幕正中央
-        for (int p = 0; p < padLines; p++)
-        {
-            displayLines.Add("");
-            _lyricItemToLineIndex.Add(-1);
-        }
-
         var prevIdx = _lyricListView.SelectedItem ?? 0;
-        _lyricListView.SetSource(new ObservableCollection<string>(displayLines));
-        if (prevIdx >= 0 && prevIdx < displayLines.Count)
+        _lyricDataSource = new LyricListDataSource(
+            _currentLyrics,
+            _showTranslation,
+            usableWidth,
+            padLines,
+            _lyricLineToFirstItemIndex,
+            _lyricItemToLineIndex
+        );
+        _lyricDataSource.ActiveLineIndex = _currentActiveLyricIndex;
+        _lyricListView.Source = _lyricDataSource;
+
+        if (prevIdx >= 0 && prevIdx < _lyricDataSource.Count)
         {
             try
             {
@@ -129,7 +81,7 @@ public sealed partial class MainWindow
             }
             catch { }
         }
-        _lyricScrollBar?.UpdateMetrics(displayLines.Count, _lyricListView.Viewport.Height, _lyricListView.Viewport.Y);
+        _lyricScrollBar?.UpdateMetrics(_lyricDataSource.Count, _lyricListView.Viewport.Height, _lyricListView.Viewport.Y);
     }
 
     public static int GetDisplayWidth(string text)
@@ -289,8 +241,14 @@ public sealed partial class MainWindow
         if (activeIndex != _currentActiveLyricIndex)
         {
             _currentActiveLyricIndex = activeIndex;
-            _lyricListView.SetNeedsDraw();
         }
+
+        if (_lyricDataSource != null)
+        {
+            _lyricDataSource.CurrentPlaybackMs = (long)(currentSec * 1000);
+            _lyricDataSource.ActiveLineIndex = activeIndex;
+        }
+        _lyricListView.SetNeedsDraw();
 
         if (activeIndex >= 0 && _lyricLineToFirstItemIndex.TryGetValue(activeIndex, out int targetListItemIdx))
         {
@@ -473,8 +431,12 @@ public sealed partial class MainWindow
                 return;
             }
 
-            // 若原先已有歌词（只是缺少翻译），则必须要求在线歌词包含有效翻译才进行升级替换
-            if (!needLyrics && !LyricParser.HasTranslation(onlineLyrics))
+            bool currentHasWords = LyricParser.HasWordLevelSync(_currentLyrics);
+            bool onlineHasWords = LyricParser.HasWordLevelSync(onlineLyrics);
+            bool bringsWords = onlineHasWords && !currentHasWords;
+            bool bringsTrans = LyricParser.HasTranslation(onlineLyrics) && !LyricParser.HasTranslation(_currentLyrics) && LyricParser.NeedsTranslation(_currentLyrics);
+
+            if (!needLyrics && !bringsWords && !bringsTrans)
             {
                 return;
             }
@@ -516,7 +478,7 @@ public sealed partial class MainWindow
                 UpdateLyricMatchButtonHighlight();
                 RefreshLyricListView();
                 _controlBar?.UpdateTranslationAvailability(hasTrans);
-                string reason = needLyrics ? "歌词" : "双语翻译";
+                string reason = bringsWords ? "逐字歌词" : (needLyrics ? "歌词" : "双语翻译");
                 _controlBar?.UpdateStatus($"[歌词] 已自动匹配在线{reason}: {bestMatch.Title} - {bestMatch.Artist}");
             });
 

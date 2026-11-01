@@ -437,7 +437,7 @@ public sealed partial class GstPlayer : IPlayer
     {
         while (!_disposed && !_disposeCts.IsCancellationRequested)
         {
-            int delayMs = IsPlaying ? 250 : 1000;
+            int delayMs = IsPlaying ? 50 : 1000;
             try
             {
                 await _loopSignal.WaitAsync(delayMs, _disposeCts.Token).ConfigureAwait(false);
