@@ -140,7 +140,7 @@ jobs:
 
   build-macos:
     name: Build macOS (Apple Silicon ARM64) package
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -149,10 +149,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-
-      - name: Install Native Build Dependencies (GStreamer)
-        run: |
-          brew install gstreamer gst-plugins-base gst-plugins-good || true
 
       - name: Build and Package macOS (arm64)
         run: |
