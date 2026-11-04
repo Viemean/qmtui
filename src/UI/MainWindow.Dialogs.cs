@@ -705,6 +705,12 @@ public sealed partial class MainWindow
         }
     }
 
+    private void ShowHelpDialog()
+    {
+        using var dlg = new HelpDialog();
+        RunModalDialog(dlg);
+    }
+
     private void ShowLocalOrWebDavAudioInfoDialog(Song song)
     {
         var prefix = song.IsWebDav ? "WebDAV" : "本地音乐";

@@ -434,6 +434,16 @@ public sealed partial class MainWindow
             return;
         }
 
+        // 帮助总览不设 _isNowPlayingViewActive 守卫：底部提示栏在大播放界面/沉浸/AOD 下是隐藏的，
+        // 那几个界面反而是唯一需要键位说明的地方
+        if (k == Key.F1 || k.AsRune.Value == '?')
+        {
+            if (_isSearchActive || _searchField.HasFocus) return;
+            k.Handled = true;
+            ShowHelpDialog();
+            return;
+        }
+
         if (await HandleLetterActionKeyAsync(c, k))
         {
             return;
