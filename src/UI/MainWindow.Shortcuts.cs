@@ -576,6 +576,17 @@ public sealed partial class MainWindow
             return true;
         }
 
+        // 不设 _isNowPlayingViewActive 守卫：大播放界面才是逐字过渡的主战场
+        if (c == 'Z')
+        {
+            k.Handled = true;
+            bool on = LyricListDataSource.SmoothHighlightEnabled = !LyricListDataSource.SmoothHighlightEnabled;
+            _controlBar?.UpdateStatus($"歌词逐字过渡: {(on ? "开" : "关")}");
+            _lyricListView.SetNeedsDraw();
+            _nowPlayingView.RedrawLyrics();
+            return true;
+        }
+
         bool isD = c == 'D' || k == Key.DeleteChar;
         if (isD)
         {

@@ -22,7 +22,8 @@ public sealed record LyricDisplayItem(
     string Text,
     int LeadingPad,
     long LineStartMs,
-    (long StartMs, long EndMs)[]? CharTimes
+    (long StartMs, long EndMs)[]? CharTimes,
+    bool Synthesized = false
 );
 
 /// <summary>
@@ -37,6 +38,9 @@ public sealed class LyricListDataSource : IListDataSource
 
     public int ActiveLineIndex { get; set; } = -1;
     public long CurrentPlaybackMs { get; set; }
+
+    /// <summary>歌词逐字过渡高亮开关（Z 键切换，两个歌词视图共享）</summary>
+    public static bool SmoothHighlightEnabled { get; set; } = true;
 
     public int Count => _items.Count;
     public int MaxItemLength => _maxItemLength;
@@ -81,7 +85,8 @@ public sealed class LyricListDataSource : IListDataSource
             lineToFirstItemMap[i] = _items.Count;
 
             long lineStartMs = (long)line.Timestamp.TotalMilliseconds;
-            var (origCharTimes, wordsAvailable) = BuildLineCharTimes(line);
+            long nextLineStartMs = i + 1 < lyrics.Count ? (long)lyrics[i + 1].Timestamp.TotalMilliseconds : 0;
+            var (origCharTimes, wordsAvailable, synthesized) = BuildLineCharTimes(line, nextLineStartMs);
 
             // 原文行居中与自动断行
             var origWrapped = MainWindow.WrapLyricText(line.Text, usableWidth);
@@ -103,7 +108,7 @@ public sealed class LyricListDataSource : IListDataSource
                     charCursor += takeLen;
                 }
 
-                _items.Add(new LyricDisplayItem(i, false, centeredText, leadingPad, lineStartMs, subCharTimes));
+                _items.Add(new LyricDisplayItem(i, false, centeredText, leadingPad, lineStartMs, subCharTimes, synthesized));
                 _displayStrings.Add(centeredText);
                 itemToLineMap.Add(i);
                 _maxItemLength = Math.Max(_maxItemLength, centeredText.Length);
@@ -137,14 +142,53 @@ public sealed class LyricListDataSource : IListDataSource
         }
     }
 
-    private static ((long StartMs, long EndMs)[]? Times, bool Available) BuildLineCharTimes(LyricLine line)
+    /// <summary>
+    /// 字符从"未唱"过渡到"已唱"的进度（0..1），t=1 表示过渡完成
+    /// </summary>
+    internal static double FadeProgress(long elapsedMs, long startMs, int fadeMs)
     {
-        if (line.Words == null || line.Words.Count == 0 || string.IsNullOrEmpty(line.Text))
+        if (fadeMs <= 0) return 1;
+        long delta = elapsedMs - startMs;
+        if (delta <= 0) return 0;
+        if (delta >= fadeMs) return 1;
+        return (double)delta / fadeMs;
+    }
+
+    /// <summary>
+    /// 逐通道 RGB 线性插值；终端一个单元格只能一种颜色，靠相邻字色差形成柔和前沿
+    /// </summary>
+    internal static Color LerpColor(Color from, Color to, double t)
+    {
+        t = Math.Clamp(t, 0d, 1d);
+        byte r = (byte)Math.Round(from.R + (to.R - from.R) * t);
+        byte g = (byte)Math.Round(from.G + (to.G - from.G) * t);
+        byte b = (byte)Math.Round(from.B + (to.B - from.B) * t);
+        return new Color(r, g, b);
+    }
+
+    internal static ((long StartMs, long EndMs)[]? Times, bool Available, bool Synthesized) BuildLineCharTimes(LyricLine line, long nextLineStartMs)
+    {
+        if (string.IsNullOrEmpty(line.Text))
         {
-            return (null, false);
+            return (null, false, false);
         }
 
         int textLen = line.Text.Length;
+
+        // 无词级时间轴（普通 LRC）：按本行→下一行的时长均分到每个字符，做行级兜底扫过
+        if (line.Words == null || line.Words.Count == 0)
+        {
+            long lineStartMs = (long)line.Timestamp.TotalMilliseconds;
+            long dur = nextLineStartMs > lineStartMs ? nextLineStartMs - lineStartMs : 0;
+            dur = Math.Clamp(dur, 800, 15000);
+
+            var fallbackTimes = new (long StartMs, long EndMs)[textLen];
+            for (int c = 0; c < textLen; c++)
+            {
+                fallbackTimes[c] = (c * dur / textLen, (c + 1) * dur / textLen);
+            }
+            return (fallbackTimes, true, true);
+        }
         var charTimes = new (long StartMs, long EndMs)[textLen];
         int currIdx = 0;
         long lastEndMs = 0;
@@ -187,7 +231,7 @@ public sealed class LyricListDataSource : IListDataSource
             charTimes[rest] = (lastEndMs, lastEndMs + 500);
         }
 
-        return (charTimes, true);
+        return (charTimes, true, false);
     }
 
     private static (string CenteredText, int LeadingPad) CenterLyricTextWithPad(string text, int targetWidth)
@@ -217,8 +261,9 @@ public sealed class LyricListDataSource : IListDataSource
 
         bool isActive = (rItem.LineIndex >= 0 && rItem.LineIndex == ActiveLineIndex);
 
-        // 非活跃行、翻译行或无逐字时间戳行：走普通整行输出
-        if (!isActive || rItem.IsTranslation || rItem.CharTimes == null || rItem.CharTimes.Length == 0)
+        // 非活跃行、翻译行、无逐字时间戳行，或关闭过渡时的行级兜底行：走普通整行输出
+        if (!isActive || rItem.IsTranslation || rItem.CharTimes == null || rItem.CharTimes.Length == 0 ||
+            (!SmoothHighlightEnabled && rItem.Synthesized))
         {
             var attr = isActive
                 ? new Attribute(MikuTheme.QqGreenPrimary, Color.None)
@@ -244,6 +289,7 @@ public sealed class LyricListDataSource : IListDataSource
         int colsDrawn = 0;
         string text = row.Text;
         var charTimes = row.CharTimes;
+        Attribute? lastAttr = null;
 
         for (int i = 0; i < text.Length && colsDrawn < width; i++)
         {
@@ -261,8 +307,24 @@ public sealed class LyricListDataSource : IListDataSource
                 int charIdx = i - row.LeadingPad;
                 if (charTimes != null && charIdx >= 0 && charIdx < charTimes.Length)
                 {
-                    var (startMs, _) = charTimes[charIdx];
-                    currentAttr = elapsedInLine >= startMs ? activeAttr : dimAttr;
+                    var (startMs, endMs) = charTimes[charIdx];
+                    if (!SmoothHighlightEnabled)
+                    {
+                        currentAttr = elapsedInLine >= startMs ? activeAttr : dimAttr;
+                    }
+                    else
+                    {
+                        // 过渡时长跟随字时长，柔光带恒定约两个字宽，不受歌曲快慢影响
+                        int fadeMs = (int)Math.Clamp((endMs - startMs) * 2, 150, 600);
+
+                        // 三段色带：未唱 → 亮绿前沿 → 已唱主色；中间段才做插值，两端走快路径
+                        double t = FadeProgress(elapsedInLine, startMs, fadeMs);
+                        currentAttr = t <= 0 ? dimAttr
+                                      : t >= 1 ? activeAttr
+                                      : t < 0.5
+                                          ? new Attribute(LerpColor(MikuTheme.QqTextLyricDim, MikuTheme.QqGreenLight, t * 2), Color.None)
+                                          : new Attribute(LerpColor(MikuTheme.QqGreenLight, MikuTheme.QqGreenPrimary, (t - 0.5) * 2), Color.None);
+                    }
                 }
                 else
                 {
@@ -270,7 +332,12 @@ public sealed class LyricListDataSource : IListDataSource
                 }
             }
 
-            listView.SetAttribute(currentAttr);
+            // 相同颜色合并成一段，避免逐字切换属性
+            if (lastAttr is null || !currentAttr.Equals(lastAttr.Value))
+            {
+                listView.SetAttribute(currentAttr);
+                lastAttr = currentAttr;
+            }
             listView.AddRune((Rune)ch);
             colsDrawn += chCols;
         }
