@@ -268,6 +268,9 @@ public sealed partial class NowPlayingView
         RefreshLyrics();
     }
 
+    /// <summary>暂停态下切换渲染选项时立刻重绘（播放中位置 tick 本来就会重绘）</summary>
+    public void RedrawLyrics() => _lyricListView.SetNeedsDraw();
+
     public void UpdatePlaybackTime(double currentSec)
     {
         if (_currentLyrics.Count == 0) return;

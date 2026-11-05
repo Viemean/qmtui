@@ -434,6 +434,16 @@ public sealed partial class MainWindow
             return;
         }
 
+        // 帮助总览不设 _isNowPlayingViewActive 守卫：底部提示栏在大播放界面/沉浸/AOD 下是隐藏的，
+        // 那几个界面反而是唯一需要键位说明的地方
+        if (k == Key.F1 || k.AsRune.Value == '?')
+        {
+            if (_isSearchActive || _searchField.HasFocus) return;
+            k.Handled = true;
+            ShowHelpDialog();
+            return;
+        }
+
         if (await HandleLetterActionKeyAsync(c, k))
         {
             return;
@@ -573,6 +583,17 @@ public sealed partial class MainWindow
             if (_isNowPlayingViewActive) return true;
             k.Handled = true;
             ShowQueueDrawerDialog();
+            return true;
+        }
+
+        // 不设 _isNowPlayingViewActive 守卫：大播放界面才是逐字过渡的主战场
+        if (c == 'Z')
+        {
+            k.Handled = true;
+            bool on = LyricListDataSource.SmoothHighlightEnabled = !LyricListDataSource.SmoothHighlightEnabled;
+            _controlBar?.UpdateStatus($"歌词逐字过渡: {(on ? "开" : "关")}");
+            _lyricListView.SetNeedsDraw();
+            _nowPlayingView.RedrawLyrics();
             return true;
         }
 

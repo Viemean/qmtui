@@ -57,6 +57,7 @@ public sealed partial class MainWindow : Window
     private readonly Button _recognizeBtn;
     private readonly Button _webBtn;
     private readonly Button _themeBtn;
+    private readonly Button _helpBtn;
     private WebPlaybackServer? _standaloneWebServer;
     private string? _currentPlayUrl;
     private bool _isTuiAudioDisabled;
@@ -326,6 +327,19 @@ public sealed partial class MainWindow : Window
         _themeBtn.KeyBindings.Remove(Key.Space);
         _themeBtn.Accepting += (s, e) => HandleThemeButtonClicked();
         Add(_themeBtn);
+
+        // 顶部帮助按钮：键位与鼠标操作总览（按 ? 或 F1 同样唤起）
+        _helpBtn = new Button
+        {
+            NoDecorations = true,
+            Y = 0,
+            ShadowStyle = ShadowStyles.None,
+            CanFocus = false
+        };
+        _helpBtn.TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop;
+        _helpBtn.KeyBindings.Remove(Key.Space);
+        _helpBtn.Accepting += (s, e) => ShowHelpDialog();
+        Add(_helpBtn);
 
         _searchField = new TextField
         {
@@ -1802,12 +1816,12 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 动态刷新顶部右上角按钮（主题、Web 协同、账号状态与识曲按钮）的防重叠独立布局
-    /// 自右向左依次排列：[主题] -> [W] Web -> [U] 账号 -> [R] 识曲
+    /// 动态刷新顶部右上角按钮（主题、Web 协同、账号状态、识曲与帮助按钮）的防重叠独立布局
+    /// 自右向左依次排列：[主题] -> [?] 帮助 -> [W] Web -> [U] 账号 -> [R] 识曲
     /// </summary>
     internal void UpdateTopRightButtonsLayout()
     {
-        if (_userStatusBtn == null || _recognizeBtn == null || _webBtn == null || _themeBtn == null || _searchField == null ||
+        if (_userStatusBtn == null || _recognizeBtn == null || _webBtn == null || _themeBtn == null || _helpBtn == null || _searchField == null ||
             _searchSongsBtn == null || _searchPlaylistsBtn == null || _searchAlbumsBtn == null) return;
 
         // 最右侧：主题切换按钮 [主题:自动] / [主题:亮色] / [主题:暗色] (右侧保留 1 列安全留白)
@@ -1817,12 +1831,21 @@ public sealed partial class MainWindow : Window
         int themeAnchorOffset = themeBtnWidth + 1;
         _themeBtn.X = Pos.AnchorEnd(themeAnchorOffset);
 
-        // Web 协同按钮 [W] Web (排在主题按钮左侧，间隔 2 列)
+        // 帮助按钮 [?] 帮助 (排在主题按钮左侧，间隔 2 列)
+        // 刻意不跟 识曲/账号/Web 一起隐藏：那三个按钮在大播放界面/沉浸/AOD 下不可见，
+        // 而主题按钮常驻，挂在它左边可让帮助入口在所有界面都紧贴右上角按钮簇
+        const string helpText = "[?] 帮助";
+        _helpBtn.Text = helpText;
+        int helpBtnWidth = helpText.GetVisualWidth();
+        int helpAnchorOffset = themeAnchorOffset + 2 + helpBtnWidth;
+        _helpBtn.X = Pos.AnchorEnd(helpAnchorOffset);
+
+        // Web 协同按钮 [W] Web (排在帮助按钮左侧，间隔 2 列)
         var isWebRunning = (_standaloneWebServer?.IsRunning == true) || (_player is WebPlayer);
         var webText = isWebRunning ? "[W] Web:开" : "[W] Web";
         _webBtn.Text = webText;
         int webBtnWidth = webText.GetVisualWidth();
-        int webAnchorOffset = themeAnchorOffset + 2 + webBtnWidth;
+        int webAnchorOffset = helpAnchorOffset + 2 + webBtnWidth;
         _webBtn.X = Pos.AnchorEnd(webAnchorOffset);
 
         // 账号按钮 [U] 登录 / [U] 账号: ... (排在 Web 按钮左侧，间隔 2 列)
