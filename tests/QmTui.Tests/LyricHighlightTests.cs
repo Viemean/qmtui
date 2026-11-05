@@ -95,4 +95,32 @@ public class LyricHighlightTests
         Assert.False(synthesized);
         Assert.Equal((400L, 650L), times![2]);
     }
+
+    [Fact]
+    public void ActiveLineIndex_TransitionTracking_RecordsPreviousLineAndTimestamp()
+    {
+        var lyrics = new[]
+        {
+            new LyricLine(TimeSpan.FromSeconds(1), "第一行"),
+            new LyricLine(TimeSpan.FromSeconds(3), "第二行")
+        };
+        var lineMap = new System.Collections.Generic.Dictionary<int, int>();
+        var itemMap = new System.Collections.Generic.List<int>();
+        var ds = new LyricListDataSource(lyrics, false, 40, 2, lineMap, itemMap)
+        {
+            CurrentPlaybackMs = 1500,
+            ActiveLineIndex = 0
+        };
+
+        Assert.Equal(0, ds.ActiveLineIndex);
+        Assert.Equal(-1, ds.PreviousActiveLineIndex);
+
+        // 切换到第 1 行
+        ds.CurrentPlaybackMs = 3000;
+        ds.ActiveLineIndex = 1;
+
+        Assert.Equal(1, ds.ActiveLineIndex);
+        Assert.Equal(0, ds.PreviousActiveLineIndex);
+        Assert.Equal(3000, ds.LineTransitionMs);
+    }
 }

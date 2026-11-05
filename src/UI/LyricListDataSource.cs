@@ -37,7 +37,30 @@ public sealed class LyricListDataSource : IListDataSource
     private readonly List<string> _displayStrings = [];
     private int _maxItemLength;
 
-    public int ActiveLineIndex { get; set; } = -1;
+    private int _activeLineIndex = -1;
+    public int ActiveLineIndex
+    {
+        get => _activeLineIndex;
+        set
+        {
+            if (_activeLineIndex != value)
+            {
+                if (_activeLineIndex >= 0 && value >= 0)
+                {
+                    PreviousActiveLineIndex = _activeLineIndex;
+                    LineTransitionMs = CurrentPlaybackMs;
+                }
+                else
+                {
+                    PreviousActiveLineIndex = -1;
+                }
+                _activeLineIndex = value;
+            }
+        }
+    }
+
+    public int PreviousActiveLineIndex { get; private set; } = -1;
+    public long LineTransitionMs { get; private set; }
     public long CurrentPlaybackMs { get; set; }
 
     /// <summary>歌词逐字过渡高亮开关（Z 键切换，两个歌词视图共享）</summary>
@@ -156,7 +179,7 @@ public sealed class LyricListDataSource : IListDataSource
     }
 
     /// <summary>
-    /// 逐通道 RGB 线性插值；终端一个单元格只能一种颜色，靠相邻字色差形成柔和前沿
+    /// 逐通道 RGB 线性插值；终端单元格使用单一颜色，由相邻字符色差构成渐变前沿
     /// </summary>
     internal static Color LerpColor(Color from, Color to, double t)
     {
@@ -261,14 +284,55 @@ public sealed class LyricListDataSource : IListDataSource
         }
 
         bool isActive = (rItem.LineIndex >= 0 && rItem.LineIndex == ActiveLineIndex);
+        bool isFadingOut = false;
+        double fadeOutProgress = 0.0;
+
+        if (!isActive && rItem.LineIndex >= 0 && rItem.LineIndex == PreviousActiveLineIndex && SmoothHighlightEnabled)
+        {
+            long elapsedSinceTransition = CurrentPlaybackMs - LineTransitionMs;
+            if (elapsedSinceTransition >= 0 && elapsedSinceTransition < 250)
+            {
+                isFadingOut = true;
+                fadeOutProgress = 1.0 - ((double)elapsedSinceTransition / 250.0);
+            }
+        }
 
         // 非活跃行、翻译行、无逐字时间戳行，或关闭过渡时的行级兜底行：走普通整行输出
         if (!isActive || rItem.IsTranslation || rItem.CharTimes == null || rItem.CharTimes.Length == 0 ||
             (!SmoothHighlightEnabled && rItem.Synthesized))
         {
-            var attr = isActive
-                ? new Attribute(MikuTheme.QqGreenPrimary, Color.None)
-                : new Attribute(MikuTheme.QqTextLyricDim, Color.None);
+            Attribute attr;
+            if (isActive)
+            {
+                if (SmoothHighlightEnabled)
+                {
+                    long elapsedActive = CurrentPlaybackMs - LineTransitionMs;
+                    if (elapsedActive >= 0 && elapsedActive < 200)
+                    {
+                        double fadeInProgress = Math.Clamp(elapsedActive / 200.0, 0.0, 1.0);
+                        var fadeInColor = LerpColor(MikuTheme.QqTextLyricDim, MikuTheme.QqGreenPrimary, fadeInProgress);
+                        attr = new Attribute(fadeInColor, Color.None);
+                    }
+                    else
+                    {
+                        attr = new Attribute(MikuTheme.QqGreenPrimary, Color.None);
+                    }
+                }
+                else
+                {
+                    attr = new Attribute(MikuTheme.QqGreenPrimary, Color.None);
+                }
+            }
+            else if (isFadingOut)
+            {
+                var fadedColor = LerpColor(MikuTheme.QqTextLyricDim, MikuTheme.QqGreenPrimary, fadeOutProgress);
+                attr = new Attribute(fadedColor, Color.None);
+            }
+            else
+            {
+                attr = new Attribute(MikuTheme.QqTextLyricDim, Color.None);
+            }
+
             listView.SetAttribute(attr);
             RenderPlainText(listView, str, width, viewportX);
             return;

@@ -302,7 +302,30 @@ public sealed partial class NowPlayingView
         }
         _lyricListView.SetNeedsDraw();
 
-        if (activeIndex >= 0 && _lyricLineToFirstItemIndex.TryGetValue(activeIndex, out int targetListItemIdx))
+        int scrollLineIdx = activeIndex;
+        if (LyricListDataSource.SmoothHighlightEnabled && activeIndex > 0)
+        {
+            var curTs = _currentLyrics[activeIndex].Timestamp;
+            var elapsedMs = (currentTs - curTs).TotalMilliseconds;
+            int delayMs = 450;
+            if (activeIndex + 1 < _currentLyrics.Count)
+            {
+                var nextTs = _currentLyrics[activeIndex + 1].Timestamp;
+                var lineDurMs = (nextTs - curTs).TotalMilliseconds;
+                if (lineDurMs > 0 && lineDurMs < 900)
+                {
+                    delayMs = (int)(lineDurMs / 2);
+                }
+            }
+
+            // 延迟换行：在新句唱响的前 450ms 内，视口保持停留在上一句；等待视线定焦在新句前两个字后再居中对齐
+            if (elapsedMs >= 0 && elapsedMs < delayMs)
+            {
+                scrollLineIdx = activeIndex - 1;
+            }
+        }
+
+        if (scrollLineIdx >= 0 && _lyricLineToFirstItemIndex.TryGetValue(scrollLineIdx, out int targetListItemIdx))
         {
             var sourceCount = _lyricListView.Source?.Count ?? 0;
             if (targetListItemIdx >= 0 && targetListItemIdx < sourceCount)
