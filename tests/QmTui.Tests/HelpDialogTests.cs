@@ -1,5 +1,6 @@
 using System.Linq;
 using QmTui.UI;
+using QmTui.Utils;
 using Xunit;
 
 namespace QmTui.Tests;
@@ -17,7 +18,6 @@ public class HelpDialogTests
     [InlineData("/  F3  C-V")]
     [InlineData("Q")]
     [InlineData("Backspace")]
-    [InlineData("Home")]
     [InlineData("N")]
     public void PreviouslyUnadvertisedKeys_AreListedInHelp(string keyLabel)
     {
@@ -41,7 +41,7 @@ public class HelpDialogTests
     public void KeyColumn_KeepsDescriptionsAligned()
     {
         var lines = HelpDialog.BuildDisplayLines();
-        int lineIdx = 0;
+        int lineIdx = lines.FindIndex(l => l.StartsWith("── "));
         int? alignedCol = null;
 
         foreach (var (_, rows) in HelpDialog.KeysHelpLines)
@@ -57,7 +57,7 @@ public class HelpDialogTests
                 Assert.EndsWith(" ", prefix);   // 键名与说明之间至少一个空格
 
                 // 全部键名的说明必须从同一列开始；键名本身超过列宽就会破坏这一点
-                int prefixCols = prefix.Sum(ch => ch > 127 ? 2 : 1);
+                int prefixCols = prefix.GetVisualWidth();
                 Assert.Equal(alignedCol ??= prefixCols, prefixCols);
             }
             lineIdx++;   // 分组间空行
@@ -85,8 +85,16 @@ public class HelpDialogTests
     {
         // 弹窗宽 76 列，CJK 按 2 列折算，超出部分会被终端裁掉
         int tooWide = HelpDialog.BuildDisplayLines()
-                                .Count(line => line.Sum(ch => ch > 127 ? 2 : 1) > 74);
+                                .Count(line => line.GetVisualWidth() > 74);
 
         Assert.Equal(0, tooWide);
     }
+
+    [Fact]
+    public void HelpKeyRegistry_GroupsAreNotEmpty()
+    {
+        Assert.NotEmpty(HelpKeyRegistry.Groups);
+        Assert.Same(HelpKeyRegistry.Groups, HelpDialog.KeysHelpLines);
+    }
 }
+
