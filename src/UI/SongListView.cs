@@ -404,6 +404,12 @@ public sealed partial class SongListView : FrameView
             {
                 ScrollToTop();
             }
+
+            var rune = k.AsRune;
+            if (rune.Value != 0 && !char.IsControl((char)rune.Value))
+            {
+                k.Handled = true;
+            }
         };
 
         _listView.MouseEvent += (s, m) =>

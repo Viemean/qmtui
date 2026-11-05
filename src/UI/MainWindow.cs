@@ -1283,6 +1283,8 @@ public sealed partial class MainWindow : Window
         _nowPlayingView.MatchLyricRequested += async () => await MatchOrRestoreLyricAsync();
         _nowPlayingView.LoginRequested += ShowLoginDialog;
         _nowPlayingView.AddToPlaylistRequested += () => _ = HandleAddToPlaylistAsync();
+        _nowPlayingView.FavoriteRequested += () => _ = HandleSmartFavoriteAsync();
+        _nowPlayingView.ListenTogetherRequested += ShowListenTogetherDialog;
         _nowPlayingView.CommentViewToggled += active =>
         {
             if (_isCommentViewActive != active)

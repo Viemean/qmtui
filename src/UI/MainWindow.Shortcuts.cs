@@ -473,7 +473,7 @@ public sealed partial class MainWindow
             return true;
         }
 
-        if (c == 'S')
+        if (c == 'F')
         {
             k.Handled = true;
             await HandleSmartFavoriteAsync();
@@ -544,7 +544,6 @@ public sealed partial class MainWindow
 
         if (c == 'K')
         {
-            if (_isNowPlayingViewActive) return true;
             k.Handled = true;
             ShowListenTogetherDialog();
             return true;

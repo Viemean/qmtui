@@ -82,7 +82,7 @@ public sealed partial class PlayerControlBar
 
     private static int GetRow1AlignedControl(int row0Index) => row0Index switch
     {
-        1 => 3,   // [S] 收藏   -> [O] 循环模式 (X = Pos.AnchorEnd(50))
+        1 => 3,   // [F] 收藏   -> [O] 循环模式 (X = Pos.AnchorEnd(50))
         12 => 4,  // [A] 添加   -> [J] 上一首   (X = Pos.AnchorEnd(39))
         2 => 5,   // [ 分享 ]   -> [ 播放/暂停 ] (X = Pos.AnchorEnd(28))
         8 => 6,   // [ 转存 ]   -> 下一首 [L]   (X = Pos.AnchorEnd(19))
@@ -92,8 +92,8 @@ public sealed partial class PlayerControlBar
 
     private static int GetRow0AlignedControl(int row1Index) => row1Index switch
     {
-        0 => 1,   // 进度条     -> [S] 收藏 (最左可获焦控制按钮)
-        3 => 1,   // [O] 循环模式 -> [S] 收藏 (X = Pos.AnchorEnd(50))
+        0 => 1,   // 进度条     -> [F] 收藏 (最左可获焦控制按钮)
+        3 => 1,   // [O] 循环模式 -> [F] 收藏 (X = Pos.AnchorEnd(50))
         4 => 12,  // [J] 上一首 -> [A] 添加   (X = Pos.AnchorEnd(39))
         5 => 2,   // [ 播放/暂停 ] -> [ 分享 ] (X = Pos.AnchorEnd(28))
         6 => 8,   // 下一首 [L] -> [ 转存 ]   (X = Pos.AnchorEnd(19))
@@ -282,7 +282,7 @@ public sealed partial class PlayerControlBar
     public void SetFavoriteStatus(bool isFavorite)
     {
         _isFavorite = isFavorite;
-        _favBtn.Text = isFavorite ? "[S] 已收藏" : "[S] 收藏  ";
+        _favBtn.Text = isFavorite ? "[F] 已收藏" : "[F] 收藏  ";
         if (isFavorite)
         {
             _favBtn.SetScheme(MikuTheme.FavoriteActive);

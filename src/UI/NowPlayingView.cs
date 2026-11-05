@@ -83,6 +83,8 @@ public sealed partial class NowPlayingView : View
     public event Action? FocusChangedNotification;
     public event Action? ShowQueueRequested;
     public event Action? AddToPlaylistRequested;
+    public event Action? FavoriteRequested;
+    public event Action? ListenTogetherRequested;
 
     public NowPlayingView()
     {
@@ -532,6 +534,20 @@ public sealed partial class NowPlayingView : View
             if (ch == 'A')
             {
                 AddToPlaylistRequested?.Invoke();
+                k.Handled = true;
+                return;
+            }
+
+            if (ch == 'F')
+            {
+                FavoriteRequested?.Invoke();
+                k.Handled = true;
+                return;
+            }
+
+            if (ch == 'K')
+            {
+                ListenTogetherRequested?.Invoke();
                 k.Handled = true;
                 return;
             }

@@ -405,7 +405,7 @@ public sealed partial class MainWindow
         {
             if (_isViewingPlaylistsList || _isViewingAlbumsList)
             {
-                _controlBar.UpdateStatus("[操作提示] 当前在目录视图，请进入歌曲列表后再按 S 收藏");
+                _controlBar.UpdateStatus("[操作提示] 当前在目录视图，请进入歌曲列表后再按 F 收藏");
                 return;
             }
 

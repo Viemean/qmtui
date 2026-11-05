@@ -244,10 +244,10 @@ public sealed partial class PlayerControlBar : FrameView
         };
         Add(_progressLabel);
 
-        // 收藏/已收藏 按钮 (快捷键 S) - 放置在音质按钮左侧（第 0 行）
+        // 收藏/已收藏 按钮 (快捷键 F) - 放置在音质按钮左侧（第 0 行）
         _favBtn = new Button
         {
-            Text = "[S] 收藏  ",
+            Text = "[F] 收藏  ",
             Width = 10,
             NoDecorations = true,
             X = Pos.AnchorEnd(50),
