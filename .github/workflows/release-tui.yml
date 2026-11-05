@@ -34,6 +34,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: QmTui.csproj
 
       - name: Install Native Build Dependencies
         run: |
@@ -110,11 +112,21 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: QmTui.csproj
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+
+      - name: Cache GStreamer Windows runtime & installer
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/qmtui/gst_installer
+          key: gst-msvc-${{ matrix.arch }}-${{ hashFiles('setup_win_gst.py') }}
+          restore-keys: |
+            gst-msvc-${{ matrix.arch }}-
 
       - name: Setup MSVC Toolchain
         uses: ilammy/msvc-dev-cmd@v1
@@ -149,6 +161,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: QmTui.csproj
 
       - name: Build and Package macOS (arm64)
         run: |

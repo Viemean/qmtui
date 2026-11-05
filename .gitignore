@@ -18,6 +18,8 @@ qmtui
 *.media
 *.raw.cs
 node_modules/
+__pycache__/
+*.pyc
 
 # IDE 与环境配置
 .idea/

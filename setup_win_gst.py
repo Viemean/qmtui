@@ -9,6 +9,8 @@ import shutil
 import struct
 import subprocess
 import sys
+import time
+import urllib.error
 import urllib.request
 
 DEFAULT_VERSION = "1.28.8"
@@ -107,28 +109,102 @@ def parse_pe_imports(filepath: str) -> list[str]:
         return []
 
 
-def download_file(url: str, dest_path: str):
+def download_file(url: str, dest_path: str, max_retries: int = 5):
     if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
         print(f"[setup_win_gst] 安装包已存在: {dest_path}")
         return
 
-    print(f"[setup_win_gst] 正在下载 GStreamer 官方安装包: {url}")
+    print(f"[setup_win_gst] 准备下载 GStreamer 官方安装包: {url}")
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
     temp_path = dest_path + ".download"
 
-    def report_hook(block_num, block_size, total_size):
-        downloaded = block_num * block_size
-        if total_size > 0:
-            percent = downloaded * 100 / total_size
-            mb = downloaded / (1024 * 1024)
-            total_mb = total_size / (1024 * 1024)
-            sys.stdout.write(f"\r  -> 下载进度: {percent:.1f}% ({mb:.1f} MB / {total_mb:.1f} MB)")
-            sys.stdout.flush()
+    is_ci = not sys.stdout.isatty()
+    last_reported_pct = -10
 
-    urllib.request.urlretrieve(url, temp_path, reporthook=report_hook)
-    print()
-    os.replace(temp_path, dest_path)
-    print(f"[setup_win_gst] 下载完成: {dest_path}")
+    for attempt in range(1, max_retries + 1):
+        try:
+            downloaded = os.path.getsize(temp_path) if os.path.exists(temp_path) else 0
+            headers = {"User-Agent": "qmtui-build/1.0"}
+            if downloaded > 0:
+                headers["Range"] = f"bytes={downloaded}-"
+                print(f"[setup_win_gst] 尝试从字节偏移 {downloaded} 处断点续传 (第 {attempt}/{max_retries} 次尝试)...")
+            else:
+                print(f"[setup_win_gst] 开始下载 (第 {attempt}/{max_retries} 次尝试)...")
+
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                status = resp.status
+                if status == 206:
+                    file_mode = "ab"
+                    cr = resp.headers.get("Content-Range", "")
+                    if "/" in cr:
+                        total_size = int(cr.split("/")[-1])
+                    else:
+                        content_len = resp.headers.get("Content-Length")
+                        total_size = downloaded + int(content_len) if content_len else 0
+                elif status == 200:
+                    file_mode = "wb"
+                    downloaded = 0
+                    content_len = resp.headers.get("Content-Length")
+                    total_size = int(content_len) if content_len else 0
+                else:
+                    raise RuntimeError(f"意外的 HTTP 状态码: {status}")
+
+                with open(temp_path, file_mode) as f:
+                    chunk_size = 128 * 1024
+                    while True:
+                        chunk = resp.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+
+                        if total_size > 0:
+                            percent = downloaded * 100 / total_size
+                            mb = downloaded / (1024 * 1024)
+                            total_mb = total_size / (1024 * 1024)
+                            if is_ci:
+                                current_pct_step = int(percent // 10) * 10
+                                if current_pct_step > last_reported_pct:
+                                    last_reported_pct = current_pct_step
+                                    print(f"  -> 下载进度: {percent:.1f}% ({mb:.1f} MB / {total_mb:.1f} MB)")
+                            else:
+                                sys.stdout.write(f"\r  -> 下载进度: {percent:.1f}% ({mb:.1f} MB / {total_mb:.1f} MB)")
+                                sys.stdout.flush()
+
+            if not is_ci:
+                print()
+
+            final_size = os.path.getsize(temp_path)
+            if total_size > 0 and final_size < total_size:
+                raise urllib.error.ContentTooShortError(
+                    f"下载字节不足: 当前 {final_size} / 预期 {total_size}", None
+                )
+
+            os.replace(temp_path, dest_path)
+            print(f"[setup_win_gst] 下载完成: {dest_path}")
+            return
+
+        except urllib.error.HTTPError as e:
+            if e.code == 416:
+                print("[setup_win_gst] Range 请求超出范围，清理临时文件重新开始...")
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            print(f"\n[setup_win_gst] HTTP 请求失败 ({e})")
+            if attempt < max_retries:
+                wait_time = min(attempt * 3, 15)
+                print(f"[setup_win_gst] 等待 {wait_time} 秒后重试...")
+                time.sleep(wait_time)
+            else:
+                raise RuntimeError(f"多次重试后仍然无法完成下载: {url}") from e
+        except Exception as e:
+            print(f"\n[setup_win_gst] 下载过程中断 ({type(e).__name__}: {e})")
+            if attempt < max_retries:
+                wait_time = min(attempt * 3, 15)
+                print(f"[setup_win_gst] 等待 {wait_time} 秒后重试...")
+                time.sleep(wait_time)
+            else:
+                raise RuntimeError(f"多次重试后仍然无法完成下载: {url}") from e
 
 
 def locate_gst_directories(root_dir: str):
