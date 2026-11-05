@@ -58,17 +58,34 @@ public sealed class QueueDrawerDialog : Dialog
         _queueListView.KeyBindings.Remove(Key.Space);
         Add(_queueListView);
 
-        var hintLabel = new Label
+        Button CreateActionButton(string text, Pos x, Action action)
         {
-            Text = "[Enter/双击] 播放   [D/Del] 移除选中   [C] 清空列表   [Esc/E] 关闭",
-            X = 2,
-            Y = Pos.AnchorEnd(1)
-        };
-        hintLabel.SetScheme(new Scheme
+            var btn = new Button
+            {
+                Text = text,
+                X = x,
+                Y = Pos.AnchorEnd(1),
+                NoDecorations = true,
+                ShadowStyle = ShadowStyles.None,
+                CanFocus = false
+            };
+            btn.TabStop = TabBehavior.NoStop;
+            btn.KeyBindings.Remove(Key.Space);
+            btn.SetScheme(MikuTheme.SearchCategoryDim);
+            btn.Accepting += (s, e) => action();
+            return btn;
+        }
+
+        var playBtn = CreateActionButton("[Enter] 播放", 2, () =>
         {
-            Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, Color.None)
+            int idx = _queueListView.SelectedItem ?? -1;
+            PlaySongAtIndex(idx);
         });
-        Add(hintLabel);
+        var removeBtn = CreateActionButton("[Del] 移除选中", Pos.Right(playBtn) + 2, RemoveCurrentSelectedItem);
+        var clearBtn = CreateActionButton("[C] 清空列表", Pos.Right(removeBtn) + 2, ConfirmAndClearUpcoming);
+        var closeBtn = CreateActionButton("[Esc] 关闭", Pos.Right(clearBtn) + 2, () => Application.RequestStop(this));
+
+        Add(playBtn, removeBtn, clearBtn, closeBtn);
 
         ReloadQueueData();
 
@@ -135,9 +152,7 @@ public sealed class QueueDrawerDialog : Dialog
                 return;
             }
 
-            bool isD = k == Key.DeleteChar || k == Key.D || k == Key.D.WithShift ||
-                       k.AsRune.Value == 'd' || k.AsRune.Value == 'D';
-            if (isD)
+            if (k == Key.DeleteChar)
             {
                 k.Handled = true;
                 RemoveCurrentSelectedItem();
@@ -149,8 +164,7 @@ public sealed class QueueDrawerDialog : Dialog
             if (isC)
             {
                 k.Handled = true;
-                PlaybackQueueService.Instance.ClearUpcoming();
-                ReloadQueueData();
+                ConfirmAndClearUpcoming();
                 return;
             }
         }
@@ -161,6 +175,80 @@ public sealed class QueueDrawerDialog : Dialog
             if (k.Handled) return;
             HandleKeyAction(k);
         };
+    }
+
+    private void ConfirmAndClearUpcoming()
+    {
+        if (_cachedSongs.Count == 0) return;
+
+        var confirmDlg = new Dialog
+        {
+            Title = "清空确认",
+            Width = 46,
+            Height = 8,
+            X = Pos.Center(),
+            Y = Pos.Center()
+        };
+        confirmDlg.SetScheme(TransparentDialogScheme);
+
+        var msg = new Label
+        {
+            Text = "确定要清空待播歌曲列表吗？",
+            X = Pos.Center(),
+            Y = 1
+        };
+        msg.SetScheme(TransparentDialogScheme);
+        confirmDlg.Add(msg);
+
+        var okBtn = new Button
+        {
+            Text = "确定 (Enter)",
+            X = Pos.Center() - 14,
+            Y = Pos.AnchorEnd(1),
+            ShadowStyle = ShadowStyles.None
+        };
+        okBtn.SetScheme(TransparentDialogScheme);
+
+        var cancelBtn = new Button
+        {
+            Text = "取消 (Esc)",
+            X = Pos.Center() + 2,
+            Y = Pos.AnchorEnd(1),
+            ShadowStyle = ShadowStyles.None
+        };
+        cancelBtn.SetScheme(TransparentDialogScheme);
+
+        okBtn.Accepting += (s, e) =>
+        {
+            Application.RequestStop(confirmDlg);
+            PlaybackQueueService.Instance.ClearUpcoming();
+            ReloadQueueData();
+        };
+
+        cancelBtn.Accepting += (s, e) =>
+        {
+            Application.RequestStop(confirmDlg);
+        };
+
+        confirmDlg.KeyDown += (s, k) =>
+        {
+            if (k == Key.Enter || k.AsRune.Value == '\r' || k.AsRune.Value == '\n')
+            {
+                k.Handled = true;
+                Application.RequestStop(confirmDlg);
+                PlaybackQueueService.Instance.ClearUpcoming();
+                ReloadQueueData();
+            }
+            else if (k == Key.Esc)
+            {
+                k.Handled = true;
+                Application.RequestStop(confirmDlg);
+            }
+        };
+
+        confirmDlg.Add(okBtn, cancelBtn);
+        okBtn.SetFocus();
+        Application.Run(confirmDlg);
     }
 
     private void PlaySongAtIndex(int idx)
