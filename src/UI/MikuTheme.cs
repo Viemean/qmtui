@@ -131,7 +131,9 @@ public static class MikuTheme
     public static Scheme FrameBorder { get; private set; } = CreateFrameBorderActiveScheme(s_darkPalette);
     public static Scheme FrameBorderDim { get; private set; } = CreateFrameBorderDimScheme(s_darkPalette);
     public static Scheme FrameBorderActive { get; private set; } = CreateFrameBorderActiveScheme(s_darkPalette);
-    public static Scheme TitleHighlight { get; private set; } = CreateTitleHighlightScheme(s_darkPalette);
+    public static Scheme TitleHighlight => TitleHighlightActive;
+    public static Scheme TitleHighlightActive { get; private set; } = CreateTitleHighlightActiveScheme(s_darkPalette);
+    public static Scheme TitleHighlightDim { get; private set; } = CreateTitleHighlightDimScheme(s_darkPalette);
     public static Scheme QrCode { get; private set; } = CreateQrCodeScheme();
     public static Scheme SearchCategoryActive { get; private set; } = CreateSearchCategoryActiveScheme(s_darkPalette);
     public static Scheme SearchCategoryDim { get; private set; } = CreateSearchCategoryDimScheme(s_darkPalette);
@@ -249,19 +251,35 @@ public static class MikuTheme
         };
     }
 
-    private static Scheme CreateTitleHighlightScheme(MikuPalette p)
+    private static Scheme CreateTitleHighlightActiveScheme(MikuPalette p)
     {
         return new Scheme
         {
-            Normal = new Attribute(p.QqGreenPrimary, Color.None),
+            Normal = new Attribute(p.QqGreenLight, Color.None),
             Focus = new Attribute(p.QqGreenLight, Color.None),
             HotNormal = new Attribute(p.QqGreenLight, Color.None),
             HotFocus = new Attribute(Color.White, p.MikuPinkAccent),
             Disabled = new Attribute(p.MikuTextMuted, Color.None),
             Highlight = new Attribute(p.QqGreenLight, Color.None),
-            Active = new Attribute(p.QqGreenPrimary, Color.None),
-            ReadOnly = new Attribute(p.QqGreenPrimary, Color.None),
-            Editable = new Attribute(p.QqGreenPrimary, Color.None)
+            Active = new Attribute(p.QqGreenLight, Color.None),
+            ReadOnly = new Attribute(p.QqGreenLight, Color.None),
+            Editable = new Attribute(p.QqGreenLight, Color.None)
+        };
+    }
+
+    private static Scheme CreateTitleHighlightDimScheme(MikuPalette p)
+    {
+        return new Scheme
+        {
+            Normal = new Attribute(p.MikuTextWhite, Color.None),
+            Focus = new Attribute(p.MikuTextWhite, Color.None),
+            HotNormal = new Attribute(p.MikuPinkAccent, Color.None),
+            HotFocus = new Attribute(Color.White, p.MikuPinkAccent),
+            Disabled = new Attribute(p.MikuTextMuted, Color.None),
+            Highlight = new Attribute(p.MikuTextWhite, Color.None),
+            Active = new Attribute(p.MikuTextWhite, Color.None),
+            ReadOnly = new Attribute(p.MikuTextWhite, Color.None),
+            Editable = new Attribute(p.MikuTextWhite, Color.None)
         };
     }
 
@@ -323,8 +341,8 @@ public static class MikuTheme
             HotNormal = new Attribute(p.MikuTextSub, Color.None),
             HotFocus = new Attribute(Color.White, p.QqGreenPrimary),
             Disabled = new Attribute(p.MikuTextMuted, Color.None),
-            Highlight = new Attribute(p.MikuTextMuted, Color.None),
-            Active = new Attribute(p.MikuTextMuted, Color.None),
+            Highlight = new Attribute(p.QqGreenPrimary, Color.None),
+            Active = new Attribute(p.QqGreenLight, Color.None),
             ReadOnly = new Attribute(p.MikuTextMuted, Color.None),
             Editable = new Attribute(p.MikuTextMuted, Color.None)
         };
@@ -371,7 +389,8 @@ public static class MikuTheme
         FrameBorder = CreateFrameBorderActiveScheme(s_currentPalette);
         FrameBorderDim = CreateFrameBorderDimScheme(s_currentPalette);
         FrameBorderActive = CreateFrameBorderActiveScheme(s_currentPalette);
-        TitleHighlight = CreateTitleHighlightScheme(s_currentPalette);
+        TitleHighlightActive = CreateTitleHighlightActiveScheme(s_currentPalette);
+        TitleHighlightDim = CreateTitleHighlightDimScheme(s_currentPalette);
         QrCode = CreateQrCodeScheme();
         SearchCategoryActive = CreateSearchCategoryActiveScheme(s_currentPalette);
         SearchCategoryDim = CreateSearchCategoryDimScheme(s_currentPalette);
@@ -385,6 +404,8 @@ public static class MikuTheme
         SchemeManager.AddScheme("FrameBorderDim", FrameBorderDim);
         SchemeManager.AddScheme("FrameBorderActive", FrameBorderActive);
         SchemeManager.AddScheme("TitleHighlight", TitleHighlight);
+        SchemeManager.AddScheme("TitleHighlightActive", TitleHighlightActive);
+        SchemeManager.AddScheme("TitleHighlightDim", TitleHighlightDim);
         SchemeManager.AddScheme("QrCode", QrCode);
     }
 

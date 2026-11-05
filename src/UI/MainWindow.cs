@@ -1240,10 +1240,18 @@ public sealed partial class MainWindow : Window
             TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop
         };
         _lyricTitleLabel.SetScheme(MikuTheme.TitleHighlight);
+        long lastToggleCommentTick = 0;
         _lyricTitleLabel.MouseEvent += (s, m) =>
         {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked) || m.Flags.HasFlag(MouseFlags.LeftButtonPressed))
+            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
             {
+                long now = Environment.TickCount64;
+                if (now - lastToggleCommentTick < 300)
+                {
+                    m.Handled = true;
+                    return;
+                }
+                lastToggleCommentTick = now;
                 ToggleCommentView();
                 m.Handled = true;
             }

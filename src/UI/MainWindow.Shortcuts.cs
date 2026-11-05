@@ -434,8 +434,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        // 帮助总览不设 _isNowPlayingViewActive 守卫：底部提示栏在大播放界面/沉浸/AOD 下是隐藏的，
-        // 那几个界面反而是唯一需要键位说明的地方
+        // 帮助总览不设 _isNowPlayingViewActive 守卫：底部提示栏在全屏播放视图及 AOD 下隐藏
         if (k == Key.F1 || k.AsRune.Value == '?')
         {
             if (_isSearchActive || _searchField.HasFocus) return;
@@ -799,8 +798,13 @@ public sealed partial class MainWindow
         _miniCoverView.SetScheme(MikuTheme.FrameBorderDim);
         _miniCoverView.SetNeedsDraw();
 
+        _sidebarTitleLabel?.SetScheme(sidebarFocused ? MikuTheme.TitleHighlightActive : MikuTheme.TitleHighlightDim);
         _sidebarTitleLabel?.SetNeedsDraw();
+
+        _songListTitleLabel?.SetScheme(songListFocused ? MikuTheme.TitleHighlightActive : MikuTheme.TitleHighlightDim);
         _songListTitleLabel?.SetNeedsDraw();
+
+        _lyricTitleLabel?.SetScheme(lyricFocused ? MikuTheme.TitleHighlightActive : MikuTheme.TitleHighlightDim);
         _lyricTitleLabel?.SetNeedsDraw();
     }
 
