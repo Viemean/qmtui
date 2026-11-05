@@ -1373,24 +1373,9 @@ public sealed partial class MainWindow : Window
         Add(_aodView);
         if (_isWebMode)
         {
-            _lastUserActivityTick = Environment.TickCount64;
-            _aodInactivityTimerToken = Application.AddTimeout(TimeSpan.FromSeconds(1), () =>
-            {
-                if (_activeModalDialog != null || (Application.TopRunnableView != null && !(Application.TopRunnableView is MainWindow)))
-                {
-                    _lastUserActivityTick = Environment.TickCount64;
-                    return true;
-                }
-
-                if (!_isAodMode && Environment.TickCount64 - _lastUserActivityTick >= 15000)
-                {
-                    Application.Invoke(EnterAodMode);
-                }
-                return true;
-            });
             if (_player is WebPlayer wp)
             {
-                _controlBar.UpdateStatus($"Web播放已就绪: {wp.Url} (15秒无操作息屏)");
+                _controlBar.UpdateStatus($"Web播放已就绪: {wp.Url}");
             }
         }
         _controlBar.NowPlayingClicked += ToggleNowPlayingView;
@@ -1927,9 +1912,7 @@ public sealed partial class MainWindow : Window
         int themeAnchorOffset = themeBtnWidth + 1;
         _themeBtn.X = Pos.AnchorEnd(themeAnchorOffset);
 
-        // 帮助按钮 [?] 帮助 (排在主题按钮左侧，间隔 2 列)
-        // 刻意不跟 识曲/账号/Web 一起隐藏：那三个按钮在大播放界面/沉浸/AOD 下不可见，
-        // 而主题按钮常驻，挂在它左边可让帮助入口在所有界面都紧贴右上角按钮簇
+        // 帮助按钮 [?] 帮助常驻显示在主题按钮左侧，间隔 2 列
         const string helpText = "[?] 帮助";
         _helpBtn.Text = helpText;
         int helpBtnWidth = helpText.GetVisualWidth();

@@ -75,14 +75,12 @@ public sealed partial class MainWindow
                 if (!Utils.AudioDeviceHelper.HasAudioOutputDevice() && !_isTuiAudioDisabled)
                 {
                     _ = SetTuiAudioDisabledAsync(true);
-                    _controlBar.UpdateStatus($"Web服务已启动: {_standaloneWebServer.LocalUrl} (无本地音频输出，已自动切换为仅Web播放，15秒无操作息屏)");
+                    _controlBar.UpdateStatus($"Web服务已启动: {_standaloneWebServer.LocalUrl} (无本地音频输出，已自动切换为仅Web播放)");
                 }
                 else
                 {
-                    _controlBar.UpdateStatus($"Web服务已启动: {_standaloneWebServer.LocalUrl} (15秒无操作息屏)");
+                    _controlBar.UpdateStatus($"Web服务已启动: {_standaloneWebServer.LocalUrl}");
                 }
-
-                EnableWebAodWatchdog();
                 if (openDialog)
                 {
                     ShowWebStatusDialog(_standaloneWebServer.LocalUrl);
@@ -260,25 +258,6 @@ public sealed partial class MainWindow
         }
     }
 
-    private void EnableWebAodWatchdog()
-    {
-        if (_aodInactivityTimerToken != null) return;
-        _lastUserActivityTick = Environment.TickCount64;
-        _aodInactivityTimerToken = Application.AddTimeout(TimeSpan.FromSeconds(1), () =>
-        {
-            if (_standaloneWebServer == null || !_standaloneWebServer.IsRunning)
-            {
-                _aodInactivityTimerToken = null;
-                return false;
-            }
-
-            if (!_isAodMode && Environment.TickCount64 - _lastUserActivityTick >= 15000)
-            {
-                Application.Invoke(EnterAodMode);
-            }
-            return true;
-        });
-    }
 
     private async Task TogglePlayOrPauseAsync()
     {
