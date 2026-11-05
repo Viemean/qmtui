@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # 默认版本号、目标架构与编译模式
-VERSION="0.5.1"
+VERSION="0.5.2"
 ARCH="x64"
 USE_AOT=false
 
