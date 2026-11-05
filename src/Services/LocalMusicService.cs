@@ -715,11 +715,7 @@ public static class LocalMusicService
         };
     }
 
-    internal static string ComputeMd5(string input)
-    {
-        var bytes = MD5.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    internal static string ComputeMd5(string input) => CryptoHelper.ComputeMd5Hex(input);
 
     private static string ExpandHome(string path)
     {

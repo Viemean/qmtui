@@ -574,17 +574,17 @@ public sealed class PlaybackQueueService
                 if (i > 0) sb.Append(',');
                 var s = _activeSongs[i];
                 sb.Append('{')
-                  .Append("\"mid\":\"").Append(JsonEscape(s.Mid)).Append("\",")
-                  .Append("\"title\":\"").Append(JsonEscape(s.Title)).Append("\",")
-                  .Append("\"artist\":\"").Append(JsonEscape(s.Artist)).Append("\",")
-                  .Append("\"album\":\"").Append(JsonEscape(s.Album)).Append("\",")
+                  .Append("\"mid\":\"").Append(JsonHelper.EscapeString(s.Mid)).Append("\",")
+                  .Append("\"title\":\"").Append(JsonHelper.EscapeString(s.Title)).Append("\",")
+                  .Append("\"artist\":\"").Append(JsonHelper.EscapeString(s.Artist)).Append("\",")
+                  .Append("\"album\":\"").Append(JsonHelper.EscapeString(s.Album)).Append("\",")
                   .Append("\"duration\":").Append(s.Duration).Append(',')
-                  .Append("\"media_mid\":\"").Append(JsonEscape(s.MediaMid)).Append("\",")
+                  .Append("\"media_mid\":\"").Append(JsonHelper.EscapeString(s.MediaMid)).Append("\",")
                   .Append("\"id\":").Append(s.Id).Append(',')
-                  .Append("\"album_mid\":\"").Append(JsonEscape(s.AlbumMid)).Append("\",")
-                  .Append("\"local_file_path\":\"").Append(JsonEscape(s.LocalFilePath ?? "")).Append("\",")
-                  .Append("\"webdav_href\":\"").Append(JsonEscape(s.WebDavHref ?? "")).Append("\",")
-                  .Append("\"webdav_server_id\":\"").Append(JsonEscape(s.WebDavServerId ?? "")).Append('\"')
+                  .Append("\"album_mid\":\"").Append(JsonHelper.EscapeString(s.AlbumMid)).Append("\",")
+                  .Append("\"local_file_path\":\"").Append(JsonHelper.EscapeString(s.LocalFilePath ?? "")).Append("\",")
+                  .Append("\"webdav_href\":\"").Append(JsonHelper.EscapeString(s.WebDavHref ?? "")).Append("\",")
+                  .Append("\"webdav_server_id\":\"").Append(JsonHelper.EscapeString(s.WebDavServerId ?? "")).Append('\"')
                   .Append('}');
             }
 
@@ -664,16 +664,5 @@ public sealed class PlaybackQueueService
         {
             AppLogger.Warn("PlaybackQueue", $"Failed to parse queue json: {ex.Message}");
         }
-    }
-
-    private static string JsonEscape(string? value)
-    {
-        if (string.IsNullOrEmpty(value)) return "";
-        return value
-            .Replace("\\", "\\\\")
-            .Replace("\"", "\\\"")
-            .Replace("\n", "\\n")
-            .Replace("\r", "\\r")
-            .Replace("\t", "\\t");
     }
 }

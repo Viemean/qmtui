@@ -1802,20 +1802,6 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 计算文本的终端视觉宽度（考虑 CJK 宽字符占 2 列）
-    /// </summary>
-    private static int GetVisualWidth(string text)
-    {
-        if (string.IsNullOrEmpty(text)) return 0;
-        int width = 0;
-        foreach (var ch in text)
-        {
-            width += ch > 127 ? 2 : 1;
-        }
-        return width;
-    }
-
-    /// <summary>
     /// 动态刷新顶部右上角按钮（主题、Web 协同、账号状态与识曲按钮）的防重叠独立布局
     /// 自右向左依次排列：[主题] -> [W] Web -> [U] 账号 -> [R] 识曲
     /// </summary>
@@ -1827,7 +1813,7 @@ public sealed partial class MainWindow : Window
         // 最右侧：主题切换按钮 [主题:自动] / [主题:亮色] / [主题:暗色] (右侧保留 1 列安全留白)
         var themeText = GetThemeButtonText();
         _themeBtn.Text = themeText;
-        int themeBtnWidth = GetVisualWidth(themeText);
+        int themeBtnWidth = themeText.GetVisualWidth();
         int themeAnchorOffset = themeBtnWidth + 1;
         _themeBtn.X = Pos.AnchorEnd(themeAnchorOffset);
 
@@ -1835,21 +1821,21 @@ public sealed partial class MainWindow : Window
         var isWebRunning = (_standaloneWebServer?.IsRunning == true) || (_player is WebPlayer);
         var webText = isWebRunning ? "[W] Web:开" : "[W] Web";
         _webBtn.Text = webText;
-        int webBtnWidth = GetVisualWidth(webText);
+        int webBtnWidth = webText.GetVisualWidth();
         int webAnchorOffset = themeAnchorOffset + 2 + webBtnWidth;
         _webBtn.X = Pos.AnchorEnd(webAnchorOffset);
 
         // 账号按钮 [U] 登录 / [U] 账号: ... (排在 Web 按钮左侧，间隔 2 列)
         var statusText = GetUserStatusText();
         _userStatusBtn.Text = statusText;
-        int userBtnWidth = GetVisualWidth(statusText);
+        int userBtnWidth = statusText.GetVisualWidth();
         int userAnchorOffset = webAnchorOffset + 2 + userBtnWidth;
         _userStatusBtn.X = Pos.AnchorEnd(userAnchorOffset);
 
         // 识曲按钮 [R] 识曲 (排在账号按钮左侧，间隔 2 列)
         const string recText = "[R] 识曲";
         _recognizeBtn.Text = recText;
-        int recBtnWidth = GetVisualWidth(recText);
+        int recBtnWidth = recText.GetVisualWidth();
         int recAnchorOffset = userAnchorOffset + 2 + recBtnWidth;
         _recognizeBtn.X = Pos.AnchorEnd(recAnchorOffset);
 
@@ -1857,15 +1843,15 @@ public sealed partial class MainWindow : Window
         int contextButtonsWidth = 0;
         if (_searchSongsBtn?.Visible == true)
         {
-            contextButtonsWidth += GetVisualWidth(_searchSongsBtn.Text.ToString()) + 1;
+            contextButtonsWidth += _searchSongsBtn.Text.ToString().GetVisualWidth() + 1;
         }
         if (_searchPlaylistsBtn?.Visible == true)
         {
-            contextButtonsWidth += GetVisualWidth(_searchPlaylistsBtn.Text.ToString()) + 1;
+            contextButtonsWidth += _searchPlaylistsBtn.Text.ToString().GetVisualWidth() + 1;
         }
         if (_searchAlbumsBtn?.Visible == true)
         {
-            contextButtonsWidth += GetVisualWidth(_searchAlbumsBtn.Text.ToString()) + 1;
+            contextButtonsWidth += _searchAlbumsBtn.Text.ToString().GetVisualWidth() + 1;
         }
 
         int categoryOffset = contextButtonsWidth > 0 ? contextButtonsWidth + 2 : 2;

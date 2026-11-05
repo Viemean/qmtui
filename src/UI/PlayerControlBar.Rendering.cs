@@ -326,17 +326,6 @@ public sealed partial class PlayerControlBar
         NowPlayingClicked?.Invoke();
     }
 
-    private static int GetDisplayWidth(string text)
-    {
-        if (string.IsNullOrEmpty(text)) return 0;
-        int w = 0;
-        foreach (var ch in text)
-        {
-            w += ch > 127 ? 2 : 1;
-        }
-        return w;
-    }
-
     public void UpdateStatus(string text)
     {
         // 若为 [播放中]、[已暂停]、[空闲] 等常规播放状态，直接忽略前缀，保持显示“歌手 - 歌曲名字 - 专辑名字”
@@ -384,7 +373,7 @@ public sealed partial class PlayerControlBar
 
     private void UpdateQualityPosition()
     {
-        int qualityWidth = Math.Max(8, GetDisplayWidth(_qualityBtn.Text) + 4);
+        int qualityWidth = Math.Max(8, _qualityBtn.Text.GetVisualWidth() + 4);
         _qualityBtn.Width = qualityWidth;
         _qualityBtn.X = Pos.AnchorEnd(qualityWidth);
         _qualityBtn.Y = 0;

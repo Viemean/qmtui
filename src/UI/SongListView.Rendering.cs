@@ -4,6 +4,7 @@ using Rectangle = System.Drawing.Rectangle;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Text;
 using QmTui.Models;
+using QmTui.Utils;
 
 namespace QmTui.UI;
 
@@ -15,7 +16,7 @@ public sealed partial class SongListView
 
         int curWidth = Viewport.Width > 0 ? Viewport.Width : Frame.Width;
         int maxW = Math.Max(12, curWidth - 4);
-        int textW = GetDisplayWidth(_currentFullTitle);
+        int textW = _currentFullTitle.GetVisualWidth();
 
         if (textW <= maxW)
         {
@@ -53,7 +54,7 @@ public sealed partial class SongListView
 
         int curWidth = Viewport.Width > 0 ? Viewport.Width : Frame.Width;
         int maxW = Math.Max(12, curWidth - 4);
-        int textW = GetDisplayWidth(fullText);
+        int textW = fullText.GetVisualWidth();
 
         if (textW <= maxW)
         {
@@ -114,7 +115,7 @@ public sealed partial class SongListView
 
         string FormatRow(string content)
         {
-            int w = GetDisplayWidth(content);
+            int w = content.GetVisualWidth();
             if (w < innerW)
             {
                 return pad + "| " + content + new string(' ', innerW - w) + " |";
@@ -128,7 +129,7 @@ public sealed partial class SongListView
 
         string FormatCenteredRow(string content)
         {
-            int w = GetDisplayWidth(content);
+            int w = content.GetVisualWidth();
             if (w >= innerW)
             {
                 return FormatRow(content);
@@ -384,7 +385,7 @@ public sealed partial class SongListView
             return TruncateAndPadWide(text, targetWidth);
         }
 
-        int textW = GetDisplayWidth(text);
+        int textW = text.GetVisualWidth();
         int bracketOverhead = 4; // "[ " + " ]"
         if (targetWidth <= bracketOverhead)
         {
@@ -427,20 +428,7 @@ public sealed partial class SongListView
         return _songs.Count >= 1000 ? 4 : (_songs.Count >= 100 ? 3 : 2);
     }
 
-    public static int GetDisplayWidth(string text)
-    {
-        if (string.IsNullOrEmpty(text)) return 0;
-        return text.GetColumns();
-    }
-
-    private static readonly string s_spaces = new(' ', 256);
-
-    public static string GetPadding(int count)
-    {
-        if (count <= 0) return "";
-        if (count <= s_spaces.Length) return s_spaces[..count];
-        return new string(' ', count);
-    }
+    public static string GetPadding(int count) => TerminalStringExtensions.GetPadding(count);
 
     private static string GetMarqueeSlice(System.Text.Rune[] runes, int offset, int targetWidth)
     {
@@ -479,53 +467,5 @@ public sealed partial class SongListView
     /// <param name="text">待对齐的原文本。</param>
     /// <param name="targetWidth">目标终端显示列宽。</param>
     /// <returns>符合目标列宽的格式化字符串。</returns>
-    public static string TruncateAndPadWide(string text, int targetWidth)
-    {
-        if (targetWidth <= 0) return "";
-        if (string.IsNullOrEmpty(text))
-        {
-            return GetPadding(targetWidth);
-        }
-
-        int limit = Math.Max(1, targetWidth - 2);
-        int cutCharIndex = -1;
-        int cutWidth = 0;
-        int totalWidth = 0;
-        int charIndex = 0;
-
-        foreach (var rune in text.EnumerateRunes())
-        {
-            int runeW = rune.GetColumns();
-            if (cutCharIndex < 0 && totalWidth + runeW > limit)
-            {
-                cutCharIndex = charIndex;
-                cutWidth = totalWidth;
-            }
-            totalWidth += runeW;
-            charIndex += rune.Utf16SequenceLength;
-
-            if (totalWidth > targetWidth)
-            {
-                break;
-            }
-        }
-
-        if (totalWidth == targetWidth)
-        {
-            return text;
-        }
-
-        if (totalWidth < targetWidth)
-        {
-            return text + GetPadding(targetWidth - totalWidth);
-        }
-
-        int pad = targetWidth - cutWidth - 2;
-        if (pad <= 0)
-        {
-            return string.Concat(text.AsSpan(0, cutCharIndex), "..");
-        }
-
-        return string.Concat(text.AsSpan(0, cutCharIndex), "..", GetPadding(pad));
-    }
+    public static string TruncateAndPadWide(string text, int targetWidth) => text.TruncateAndPadWide(targetWidth);
 }

@@ -187,12 +187,12 @@ public static class RecentPlayHistory
             {
                 var s = snapshot[i];
                 sb.Append("  {");
-                sb.Append($"\"mid\":\"{JsonEscape(s.Mid)}\",");
-                sb.Append($"\"title\":\"{JsonEscape(s.Title)}\",");
-                sb.Append($"\"artist\":\"{JsonEscape(s.Artist)}\",");
-                sb.Append($"\"album\":\"{JsonEscape(s.Album)}\",");
+                sb.Append($"\"mid\":\"{JsonHelper.EscapeString(s.Mid)}\",");
+                sb.Append($"\"title\":\"{JsonHelper.EscapeString(s.Title)}\",");
+                sb.Append($"\"artist\":\"{JsonHelper.EscapeString(s.Artist)}\",");
+                sb.Append($"\"album\":\"{JsonHelper.EscapeString(s.Album)}\",");
                 sb.Append($"\"duration\":{s.Duration},");
-                sb.Append($"\"media_mid\":\"{JsonEscape(s.MediaMid)}\",");
+                sb.Append($"\"media_mid\":\"{JsonHelper.EscapeString(s.MediaMid)}\",");
                 sb.Append($"\"id\":{s.Id}");
                 sb.Append(i < snapshot.Count - 1 ? "},\n" : "}\n");
             }
@@ -205,7 +205,4 @@ public static class RecentPlayHistory
             AppLogger.Error("RecentPlayHistory", "Failed to save recent play history", ex);
         }
     }
-
-    private static string JsonEscape(string s) =>
-        s?.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r") ?? "";
 }

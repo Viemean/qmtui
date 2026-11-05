@@ -46,13 +46,8 @@ public sealed partial class MusicApi
             openId ??= "";
             accessToken ??= "";
 
-            var timeKey = Convert.ToHexString(
-                MD5.HashData(Encoding.UTF8.GetBytes($"{optime}{playTimeSec}{uin}{PlayStreamTimeKeySalt}"))
-            ).ToUpperInvariant();
-
-            var vkey = Convert.ToHexStringLower(
-                MD5.HashData(Encoding.UTF8.GetBytes($"{device.OpenUdid}:{optime}"))
-            );
+            var timeKey = CryptoHelper.ComputeMd5Hex($"{optime}{playTimeSec}{uin}{PlayStreamTimeKeySalt}").ToUpperInvariant();
+            var vkey = CryptoHelper.ComputeMd5Hex($"{device.OpenUdid}:{optime}");
 
             int hUid = 0;
             foreach (char ch in device.OpenUdid)
@@ -90,9 +85,9 @@ public sealed partial class MusicApi
             });
             string tid = $"{ComputeKh(device.OpenUdid).PadLeft(10, '0')[..10]}{ComputeKh(reversedUdid).PadLeft(9, '0')[..9]}";
 
-            var p1 = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes($"{device.OpenUdid}_p1")));
-            var p2 = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes($"{device.OpenUdid}_p2")));
-            var p3 = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes($"{device.OpenUdid}_p3")))[..24];
+            var p1 = CryptoHelper.ComputeMd5Hex($"{device.OpenUdid}_p1");
+            var p2 = CryptoHelper.ComputeMd5Hex($"{device.OpenUdid}_p2");
+            var p3 = CryptoHelper.ComputeMd5Hex($"{device.OpenUdid}_p3")[..24];
             string taid = $"{p1}{p2}{p3}";
 
             var xml = string.Concat(

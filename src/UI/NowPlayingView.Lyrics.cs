@@ -190,7 +190,7 @@ public sealed partial class NowPlayingView
 
         int containerW = _lastSongInfoTargetCols > 0 ? _lastSongInfoTargetCols : (_songInfoContainer.Frame.Width > 0 ? _songInfoContainer.Frame.Width : 40);
         int artistW = _artistLink.ContentWidth;
-        int rawTitleW = MainWindow.GetDisplayWidth(_songTitleLabel.Text);
+        int rawTitleW = _songTitleLabel.Text.GetVisualWidth();
         int maxTitleW = Math.Max(4, containerW - artistW - 3);
         _songTitleLabel.Width = Math.Min(rawTitleW, maxTitleW);
 

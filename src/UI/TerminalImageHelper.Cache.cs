@@ -678,7 +678,7 @@ public static partial class TerminalImageHelper
     {
         if (string.IsNullOrWhiteSpace(url) || cancellationToken.IsCancellationRequested) return null;
 
-        var urlHash = Convert.ToHexString(System.Security.Cryptography.MD5.HashData(Encoding.UTF8.GetBytes(url))).ToLowerInvariant();
+        var urlHash = CryptoHelper.ComputeMd5Hex(url);
         var localFile = Path.Combine(s_cacheDir, $"http_{urlHash}.raw");
         var pngFile = Path.Combine(s_cacheDir, $"http_{urlHash}.png");
         if (File.Exists(pngFile))

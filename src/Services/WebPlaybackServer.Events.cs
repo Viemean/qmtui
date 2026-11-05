@@ -238,7 +238,7 @@ public sealed partial class WebPlaybackServer
                              ? CurrentPlayUrl : "/stream/audio";
             }
         }
-        sb.Append($"\"streamUrl\":\"{EscapeJson(streamUrl)}\",");
+        sb.Append($"\"streamUrl\":\"{JsonHelper.EscapeString(streamUrl)}\",");
 
         sb.Append("\"song\":");
         if (CurrentSong == null)
@@ -249,12 +249,12 @@ public sealed partial class WebPlaybackServer
         {
             sb.Append('{');
             sb.Append($"\"id\":{CurrentSong.Id},");
-            sb.Append($"\"mid\":\"{EscapeJson(CurrentSong.Mid)}\",");
-            sb.Append($"\"title\":\"{EscapeJson(CurrentSong.Title)}\",");
-            sb.Append($"\"artist\":\"{EscapeJson(CurrentSong.Artist)}\",");
-            sb.Append($"\"album\":\"{EscapeJson(CurrentSong.Album)}\",");
-            sb.Append($"\"albumMid\":\"{EscapeJson(CurrentSong.AlbumMid)}\",");
-            sb.Append($"\"quality\":\"{EscapeJson(CurrentSong.Quality)}\",");
+            sb.Append($"\"mid\":\"{JsonHelper.EscapeString(CurrentSong.Mid)}\",");
+            sb.Append($"\"title\":\"{JsonHelper.EscapeString(CurrentSong.Title)}\",");
+            sb.Append($"\"artist\":\"{JsonHelper.EscapeString(CurrentSong.Artist)}\",");
+            sb.Append($"\"album\":\"{JsonHelper.EscapeString(CurrentSong.Album)}\",");
+            sb.Append($"\"albumMid\":\"{JsonHelper.EscapeString(CurrentSong.AlbumMid)}\",");
+            sb.Append($"\"quality\":\"{JsonHelper.EscapeString(CurrentSong.Quality)}\",");
             sb.Append($"\"isLocal\":{(CurrentSong.IsLocal ? "true" : "false")}");
             sb.Append("},");
         }
@@ -268,8 +268,8 @@ public sealed partial class WebPlaybackServer
                 if (i > 0) sb.Append(',');
                 sb.Append('{');
                 sb.Append($"\"timeMs\":{(long)l.Timestamp.TotalMilliseconds},");
-                sb.Append($"\"text\":\"{EscapeJson(l.Text)}\",");
-                sb.Append($"\"trans\":\"{EscapeJson(l.Trans)}\"");
+                sb.Append($"\"text\":\"{JsonHelper.EscapeString(l.Text)}\",");
+                sb.Append($"\"trans\":\"{JsonHelper.EscapeString(l.Trans)}\"");
                 sb.Append('}');
             }
         }
@@ -277,15 +277,6 @@ public sealed partial class WebPlaybackServer
 
         sb.Append('}');
         return sb.ToString();
-    }
-
-    private static string EscapeJson(string? s)
-    {
-        if (string.IsNullOrEmpty(s)) return "";
-        return s.Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\r", "")
-                .Replace("\n", "\\n");
     }
 
     private void BroadcastSse(string json)

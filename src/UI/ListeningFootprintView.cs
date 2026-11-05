@@ -9,6 +9,7 @@ using Terminal.Gui.Views;
 using QmTui.Api;
 using QmTui.Models;
 using QmTui.Services;
+using QmTui.Utils;
 
 namespace QmTui.UI;
 
@@ -490,8 +491,8 @@ public sealed class ListeningFootprintView : FrameView
             foreach (var item in _favoriteSongs)
             {
                 string mLabel = $"{item.Month,2}月. ";
-                string titleStr = SongListView.TruncateAndPadWide(item.Song.Title, favTitleW);
-                string artistStr = SongListView.TruncateAndPadWide(item.Song.Artist, favArtistW);
+                string titleStr = item.Song.Title.TruncateAndPadWide(favTitleW);
+                string artistStr = item.Song.Artist.TruncateAndPadWide(favArtistW);
                 favItems.Add($"{mLabel}{titleStr}  {artistStr}");
             }
             if (favItems.Count == 0)
@@ -540,8 +541,8 @@ public sealed class ListeningFootprintView : FrameView
             var item = _rankSongs[i];
             var s = item.Song;
             string idxStr = $"{i + 1,2}. ";
-            string titleStr = SongListView.TruncateAndPadWide(s.Title, titleW);
-            string artistStr = SongListView.TruncateAndPadWide(s.Artist, artistW);
+            string titleStr = s.Title.TruncateAndPadWide(titleW);
+            string artistStr = s.Artist.TruncateAndPadWide(artistW);
             if (isYear)
             {
                 listItems.Add($"{idxStr}{titleStr}  {artistStr}");

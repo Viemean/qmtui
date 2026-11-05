@@ -102,7 +102,7 @@ public static class AcousticRecognizeClient
             int fpType = feature.FeatureType + 1;
 
             string signStr = $"{channel.Salt}{timestamp}";
-            string veriStr = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(signStr)));
+            string veriStr = CryptoHelper.ComputeMd5Hex(signStr);
 
             string header = $"v={_pv}&source={channel.Source}&time={timestamp}&veri_str={veriStr}&cmd=1&info={feature.Duration:F1},{feature.Data.Length},10306&type=0&session_id={sessionId}&feature_type={fpType}&confidence={feature.Confidence:F1}\0";
             byte[] headerBytes = Encoding.UTF8.GetBytes(header);

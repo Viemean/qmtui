@@ -14,6 +14,7 @@ using QmTui.Models;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 using Color = Terminal.Gui.Drawing.Color;
 using Rectangle = System.Drawing.Rectangle;
+using QmTui.Utils;
 
 namespace QmTui.UI;
 
@@ -120,7 +121,7 @@ public sealed partial class NowPlayingView
         // 第 0 行：歌曲名 - 歌手
         int containerW = targetCols > 0 ? targetCols : (_songInfoContainer.Frame.Width > 0 ? _songInfoContainer.Frame.Width : 40);
         int artistW = _artistLink.ContentWidth;
-        int rawTitleW = MainWindow.GetDisplayWidth(_songTitleLabel.Text);
+        int rawTitleW = _songTitleLabel.Text.GetVisualWidth();
         int maxTitleW = Math.Max(4, containerW - artistW - 3);
 
         _songTitleLabel.X = 0;
@@ -436,7 +437,7 @@ public sealed class InteractiveLinkView : Label
     private void UpdateMetrics()
     {
         Text = _text;
-        ContentWidth = MainWindow.GetDisplayWidth(_text);
+        ContentWidth = _text.GetVisualWidth();
         Width = ContentWidth;
         UpdateVisualScheme();
     }

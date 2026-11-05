@@ -10,6 +10,7 @@ using Terminal.Gui.Views;
 using Color = Terminal.Gui.Drawing.Color;
 using Attribute = Terminal.Gui.Drawing.Attribute;
 using QmTui.Models;
+using QmTui.Utils;
 
 namespace QmTui.UI;
 
@@ -192,7 +193,7 @@ public sealed class LyricListDataSource : IListDataSource
 
     private static (string CenteredText, int LeadingPad) CenterLyricTextWithPad(string text, int targetWidth)
     {
-        int w = MainWindow.GetDisplayWidth(text);
+        int w = text.GetVisualWidth();
         if (w >= targetWidth) return (text, 0);
         int pad = Math.Max(0, (targetWidth - w) / 2);
         return (new string(' ', pad) + text, pad);
@@ -248,7 +249,7 @@ public sealed class LyricListDataSource : IListDataSource
         for (int i = 0; i < text.Length && colsDrawn < width; i++)
         {
             char ch = text[i];
-            int chCols = ch > 127 ? 2 : 1;
+            int chCols = ch.GetVisualWidth();
             if (colsDrawn + chCols > width) break;
 
             Attribute currentAttr;
@@ -289,7 +290,7 @@ public sealed class LyricListDataSource : IListDataSource
         for (int i = 0; i < str.Length && colsDrawn < width; i++)
         {
             char ch = str[i];
-            int chCols = ch > 127 ? 2 : 1;
+            int chCols = ch.GetVisualWidth();
             if (colsDrawn + chCols > width) break;
             listView.AddRune((Rune)ch);
             colsDrawn += chCols;

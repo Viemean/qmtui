@@ -391,20 +391,16 @@ public static class LocalLyricAutoMatcher
         }
     }
 
-    internal static string ComputePathKey(string pathOrHref)
-    {
-        byte[] hash = MD5.HashData(Encoding.UTF8.GetBytes(pathOrHref.Trim()));
-        return Convert.ToHexString(hash).ToLowerInvariant();
-    }
+    internal static string ComputePathKey(string pathOrHref) =>
+        CryptoHelper.ComputeMd5Hex(pathOrHref.Trim());
 
     internal static string ComputeMetaKey(string title, string artist, double durationSeconds)
     {
-        var cleanTitle = WebDavService.CleanTrackNumberPrefix(title).Trim().ToLowerInvariant();
+        var cleanTitle = MusicTitleHelper.CleanTrackNumberPrefix(title).Trim().ToLowerInvariant();
         var cleanArtist = (string.IsNullOrWhiteSpace(artist) || artist == "未知歌手") ? "" : artist.Trim().ToLowerInvariant();
         int bucket = durationSeconds > 0 ? (int)Math.Round(durationSeconds / 5.0) * 5 : 0;
         string raw = $"{cleanTitle}|{cleanArtist}|{bucket}";
-        byte[] hash = MD5.HashData(Encoding.UTF8.GetBytes(raw));
-        return Convert.ToHexString(hash).ToLowerInvariant();
+        return CryptoHelper.ComputeMd5Hex(raw);
     }
 
     #endregion

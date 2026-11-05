@@ -1,4 +1,5 @@
 using Terminal.Gui.Text;
+using QmTui.Utils;
 
 namespace QmTui.Models;
 
@@ -307,8 +308,8 @@ public record QualityOption(
     public string DisplayText(bool isCurrent)
     {
         var mark = isCurrent ? " ✓" : "";
-        var paddedName = PadRightDisplay(Name, 16);
-        var paddedSpec = PadRightDisplay(Spec, 18);
+        var paddedName = Name.PadRightVisual(16);
+        var paddedSpec = Spec.PadRightVisual(18);
 
         if (!Available)
         {
@@ -316,7 +317,7 @@ public record QualityOption(
         }
 
         var sizeStr = FormatFileSize(FileSizeBytes);
-        var paddedSize = string.IsNullOrEmpty(sizeStr) ? "" : PadLeftDisplay(sizeStr, 8);
+        var paddedSize = string.IsNullOrEmpty(sizeStr) ? "" : sizeStr.PadLeftVisual(8);
         var bitratePart = string.IsNullOrEmpty(BitrateInfo) ? "" : $"{{{BitrateInfo}}}";
 
         if (string.IsNullOrEmpty(paddedSize) && string.IsNullOrEmpty(bitratePart))
@@ -329,40 +330,5 @@ public record QualityOption(
         return $"{paddedName}  {paddedSpec}  {sizeCol}{bitrateCol}{mark}";
     }
 
-    public static string FormatFileSize(long bytes)
-    {
-        if (bytes <= 0) return "";
-        if (bytes >= 1024L * 1024L * 1024L)
-            return $"{bytes / (1024.0 * 1024.0 * 1024.0):F1}GB";
-        if (bytes >= 1024L * 1024L)
-            return $"{bytes / (1024.0 * 1024.0):F1}MB";
-        if (bytes >= 1024L)
-            return $"{bytes / 1024.0:F1}KB";
-        return $"{bytes}B";
-    }
-
-    private static int GetDisplayWidth(string text)
-    {
-        if (string.IsNullOrEmpty(text)) return 0;
-        int width = 0;
-        foreach (var rune in text.EnumerateRunes())
-        {
-            width += rune.GetColumns() > 0 ? rune.GetColumns() : 1;
-        }
-        return width;
-    }
-
-    private static string PadRightDisplay(string text, int targetWidth)
-    {
-        int w = GetDisplayWidth(text);
-        int pad = targetWidth - w;
-        return pad > 0 ? text + new string(' ', pad) : text;
-    }
-
-    private static string PadLeftDisplay(string text, int targetWidth)
-    {
-        int w = GetDisplayWidth(text);
-        int pad = targetWidth - w;
-        return pad > 0 ? new string(' ', pad) + text : text;
-    }
+    public static string FormatFileSize(long bytes) => FormatHelper.FormatFileSize(bytes);
 }

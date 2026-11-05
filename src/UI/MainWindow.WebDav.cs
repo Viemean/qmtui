@@ -112,7 +112,7 @@ public sealed partial class MainWindow
             }
             else
             {
-                var sizeMb = it.ContentLength > 0 ? $" ({it.ContentLength / 1024 / 1024.0:F1}MB)" : "";
+                var sizeMb = it.ContentLength > 0 ? $" ({FormatHelper.FormatFileSize(it.ContentLength)})" : "";
                 displayLines.Add($"🎵 {it.Name}{sizeMb}");
             }
         }

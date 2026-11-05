@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using QmTui.Models;
 using QmTui.Services;
+using QmTui.Utils;
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
@@ -201,8 +202,8 @@ public sealed class QueueDrawerDialog : Dialog
         {
             var s = _cachedSongs[i];
             string marker = (i == curIdx) ? "▶ " : "  ";
-            string titlePart = SongListView.TruncateAndPadWide(s.Title, 34);
-            string artistPart = SongListView.TruncateAndPadWide(s.Artist, 24);
+            string titlePart = s.Title.TruncateAndPadWide(34);
+            string artistPart = s.Artist.TruncateAndPadWide(24);
             displayItems.Add($"{marker}{i + 1,2}. {titlePart} - {artistPart}");
         }
 

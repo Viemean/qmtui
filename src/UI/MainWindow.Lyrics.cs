@@ -84,21 +84,10 @@ public sealed partial class MainWindow
         _lyricScrollBar?.UpdateMetrics(_lyricDataSource.Count, _lyricListView.Viewport.Height, _lyricListView.Viewport.Y);
     }
 
-    public static int GetDisplayWidth(string text)
-    {
-        if (string.IsNullOrEmpty(text)) return 0;
-        int w = 0;
-        foreach (var ch in text)
-        {
-            w += ch > 127 ? 2 : 1;
-        }
-        return w;
-    }
-
     public static string CenterLyricText(string text, int targetWidth)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
-        int w = GetDisplayWidth(text);
+        int w = text.GetVisualWidth();
         if (w >= targetWidth) return text;
         int pad = Math.Max(0, (targetWidth - w) / 2);
         return new string(' ', pad) + text;
@@ -114,7 +103,7 @@ public sealed partial class MainWindow
             return lines;
         }
 
-        if (GetDisplayWidth(text) <= maxWidth)
+        if (text.GetVisualWidth() <= maxWidth)
         {
             lines.Add(text);
             return lines;
@@ -126,7 +115,7 @@ public sealed partial class MainWindow
 
         foreach (var token in tokens)
         {
-            int tokenWidth = GetDisplayWidth(token);
+            int tokenWidth = token.GetVisualWidth();
             if (curWidth + tokenWidth <= maxWidth)
             {
                 curLine.Append(token);
@@ -149,7 +138,7 @@ public sealed partial class MainWindow
                 {
                     foreach (var ch in token)
                     {
-                        int chW = ch > 127 ? 2 : 1;
+                        int chW = ch.GetVisualWidth();
                         if (curWidth + chW > maxWidth)
                         {
                             var s = curLine.ToString().Trim();
@@ -167,7 +156,7 @@ public sealed partial class MainWindow
                     if (!string.IsNullOrEmpty(trimmedToken))
                     {
                         curLine.Append(trimmedToken);
-                        curWidth += GetDisplayWidth(trimmedToken);
+                        curWidth += trimmedToken.GetVisualWidth();
                     }
                 }
             }

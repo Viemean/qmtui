@@ -1030,7 +1030,7 @@ public sealed class SongCommentView : View
             int curWidth = 0;
             foreach (var rune in raw.EnumerateRunes())
             {
-                int w = rune.Value > 127 ? 2 : 1;
+                int w = rune.GetVisualWidth();
                 if (curWidth + w > maxWidth)
                 {
                     lines.Add(curLine.ToString());

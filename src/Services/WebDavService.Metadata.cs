@@ -110,22 +110,7 @@ public static partial class WebDavService
         };
     }
 
-    public static string CleanTrackNumberPrefix(string raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw)) return raw;
-        var s = raw.Trim();
-        // 剥离如 "01. ", "02 - ", "01 ", "[01] ", "(01) " 等音轨序号前缀
-        var match = System.Text.RegularExpressions.Regex.Match(s, @"^(?:\[?\d{1,3}\]?[\.\-_\s]+)(.+)");
-        if (match.Success && match.Groups.Count > 1)
-        {
-            var cleaned = match.Groups[1].Value.Trim();
-            if (!string.IsNullOrEmpty(cleaned))
-            {
-                return cleaned;
-            }
-        }
-        return s;
-    }
+    public static string CleanTrackNumberPrefix(string raw) => MusicTitleHelper.CleanTrackNumberPrefix(raw);
 
     public static (string Title, string Artist) InferTitleArtist(string filename)
     {
@@ -233,11 +218,7 @@ public static partial class WebDavService
         return fullUri.AbsoluteUri;
     }
 
-    private static string ComputeMd5(string input)
-    {
-        var bytes = MD5.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    private static string ComputeMd5(string input) => CryptoHelper.ComputeMd5Hex(input);
 
     public static async Task<bool> TryEnrichSingleSongHeaderAsync(WebDavServer server, WebDavSongCache cache)
     {

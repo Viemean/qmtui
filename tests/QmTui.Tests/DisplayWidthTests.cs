@@ -1,39 +1,41 @@
+using System.Text;
 using Xunit;
 using QmTui.UI;
+using QmTui.Utils;
 
 namespace QmTui.Tests;
 
 public class DisplayWidthTests
 {
     [Fact]
-    public void GetDisplayWidth_Ascii_ReturnsCharCount()
+    public void GetVisualWidth_Ascii_ReturnsCharCount()
     {
         var text = "Hello World!";
-        var width = SongListView.GetDisplayWidth(text);
+        var width = text.GetVisualWidth();
         Assert.Equal(12, width);
     }
 
     [Fact]
-    public void GetDisplayWidth_Chinese_ReturnsDoubleWidth()
+    public void GetVisualWidth_Chinese_ReturnsDoubleWidth()
     {
         var text = "七里香";
-        var width = SongListView.GetDisplayWidth(text);
+        var width = text.GetVisualWidth();
         Assert.Equal(6, width);
     }
 
     [Fact]
-    public void GetDisplayWidth_Mixed_CalculatesAccurately()
+    public void GetVisualWidth_Mixed_CalculatesAccurately()
     {
         var text = "周杰伦 - 晴天 (Live)";
-        var width = SongListView.GetDisplayWidth(text);
+        var width = text.GetVisualWidth();
         Assert.Equal(20, width);
     }
 
     [Fact]
-    public void GetDisplayWidth_LatinAccented_CountsAsSingleColumn()
+    public void GetVisualWidth_LatinAccented_CountsAsSingleColumn()
     {
         var text = "Café";
-        var width = SongListView.GetDisplayWidth(text);
+        var width = text.GetVisualWidth();
         Assert.Equal(4, width);
     }
 
@@ -43,7 +45,7 @@ public class DisplayWidthTests
         var text = "晴天";
         var padded = SongListView.TruncateAndPadWide(text, 10);
 
-        Assert.Equal(10, SongListView.GetDisplayWidth(padded));
+        Assert.Equal(10, padded.GetVisualWidth());
         Assert.StartsWith("晴天", padded);
         Assert.EndsWith("      ", padded);
     }
@@ -55,7 +57,7 @@ public class DisplayWidthTests
         var result = SongListView.TruncateAndPadWide(text, 6);
 
         Assert.Equal(text, result);
-        Assert.Equal(6, SongListView.GetDisplayWidth(result));
+        Assert.Equal(6, result.GetVisualWidth());
     }
 
     [Fact]
@@ -64,7 +66,7 @@ public class DisplayWidthTests
         var text = "这是一首非常非常长的歌曲名字";
         var truncated = SongListView.TruncateAndPadWide(text, 12);
 
-        Assert.Equal(12, SongListView.GetDisplayWidth(truncated));
+        Assert.Equal(12, truncated.GetVisualWidth());
         Assert.Contains("..", truncated);
     }
 
@@ -74,8 +76,8 @@ public class DisplayWidthTests
         var item1 = SongListView.TruncateAndPadWide("短歌单", 30) + "  " + SongListView.TruncateAndPadWide("12 首", 10);
         var item2 = SongListView.TruncateAndPadWide("超长标题歌单名字测试一二三四五六七八九十", 30) + "  " + SongListView.TruncateAndPadWide("176 首", 10);
 
-        Assert.Equal(30 + 2 + 10, SongListView.GetDisplayWidth(item1));
-        Assert.Equal(30 + 2 + 10, SongListView.GetDisplayWidth(item2));
+        Assert.Equal(30 + 2 + 10, item1.GetVisualWidth());
+        Assert.Equal(30 + 2 + 10, item2.GetVisualWidth());
     }
 
     [Fact]
@@ -84,7 +86,7 @@ public class DisplayWidthTests
         var text = "晴天";
         var result = SongListView.TruncateAndPadWide(text, 5);
 
-        Assert.Equal(5, SongListView.GetDisplayWidth(result));
+        Assert.Equal(5, result.GetVisualWidth());
         Assert.Equal("晴天 ", result);
     }
 
@@ -94,7 +96,7 @@ public class DisplayWidthTests
         var text = "周杰伦晴天音乐";
         var result = SongListView.TruncateAndPadWide(text, 7);
 
-        Assert.Equal(7, SongListView.GetDisplayWidth(result));
+        Assert.Equal(7, result.GetVisualWidth());
         Assert.EndsWith(" ", result);
         Assert.Contains("..", result);
     }
@@ -111,5 +113,34 @@ public class DisplayWidthTests
     {
         Assert.Equal("     ", SongListView.TruncateAndPadWide("", 5));
         Assert.Equal("     ", SongListView.TruncateAndPadWide(null!, 5));
+    }
+
+    [Fact]
+    public void TerminalStringExtensions_GetVisualWidth_CalculatesCorrectly()
+    {
+        Assert.Equal(0, ((string?)null).GetVisualWidth());
+        Assert.Equal(0, "".GetVisualWidth());
+        Assert.Equal(5, "Hello".GetVisualWidth());
+        Assert.Equal(6, "七里香".GetVisualWidth());
+        Assert.Equal(4, "Café".GetVisualWidth());
+    }
+
+    [Fact]
+    public void TerminalStringExtensions_PaddingVisual_CalculatesCorrectly()
+    {
+        Assert.Equal("七里香    ", "七里香".PadRightVisual(10));
+        Assert.Equal("    七里香", "七里香".PadLeftVisual(10));
+        Assert.Equal("七里香", "七里香".PadRightVisual(6));
+        Assert.Equal("          ", ((string?)null).PadRightVisual(10));
+    }
+
+    [Fact]
+    public void CharAndRuneExtensions_GetVisualWidth_CalculatesCorrectly()
+    {
+        Assert.Equal(1, 'A'.GetVisualWidth());
+        Assert.Equal(1, ' '.GetVisualWidth());
+        Assert.Equal(2, '中'.GetVisualWidth());
+        Assert.Equal(1, new Rune('A').GetVisualWidth());
+        Assert.Equal(2, new Rune('中').GetVisualWidth());
     }
 }

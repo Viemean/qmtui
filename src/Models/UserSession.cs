@@ -144,45 +144,45 @@ public sealed class UserSession
             List<string> cookiePairs = [];
             foreach (var kvp in Cookies)
             {
-                cookiePairs.Add($"\"{JsonEscape(kvp.Key)}\":\"{JsonEscape(kvp.Value)}\"");
+                cookiePairs.Add($"\"{JsonHelper.EscapeString(kvp.Key)}\":\"{JsonHelper.EscapeString(kvp.Value)}\"");
             }
 
             string lastSongJson = "null";
             if (LastPlayedSong != null)
             {
                 lastSongJson = "{" +
-                    $"\"mid\":\"{JsonEscape(LastPlayedSong.Mid)}\"," +
-                    $"\"title\":\"{JsonEscape(LastPlayedSong.Title)}\"," +
-                    $"\"artist\":\"{JsonEscape(LastPlayedSong.Artist)}\"," +
-                    $"\"album\":\"{JsonEscape(LastPlayedSong.Album)}\"," +
+                    $"\"mid\":\"{JsonHelper.EscapeString(LastPlayedSong.Mid)}\"," +
+                    $"\"title\":\"{JsonHelper.EscapeString(LastPlayedSong.Title)}\"," +
+                    $"\"artist\":\"{JsonHelper.EscapeString(LastPlayedSong.Artist)}\"," +
+                    $"\"album\":\"{JsonHelper.EscapeString(LastPlayedSong.Album)}\"," +
                     $"\"duration\":{LastPlayedSong.Duration}," +
-                    $"\"media_mid\":\"{JsonEscape(LastPlayedSong.MediaMid)}\"," +
+                    $"\"media_mid\":\"{JsonHelper.EscapeString(LastPlayedSong.MediaMid)}\"," +
                     $"\"id\":{LastPlayedSong.Id}," +
-                    $"\"album_mid\":\"{JsonEscape(LastPlayedSong.AlbumMid)}\"," +
-                    $"\"local_file_path\":\"{JsonEscape(LastPlayedSong.LocalFilePath ?? "")}\"," +
-                    $"\"webdav_href\":\"{JsonEscape(LastPlayedSong.WebDavHref ?? "")}\"," +
-                    $"\"webdav_server_id\":\"{JsonEscape(LastPlayedSong.WebDavServerId ?? "")}\"" +
+                    $"\"album_mid\":\"{JsonHelper.EscapeString(LastPlayedSong.AlbumMid)}\"," +
+                    $"\"local_file_path\":\"{JsonHelper.EscapeString(LastPlayedSong.LocalFilePath ?? "")}\"," +
+                    $"\"webdav_href\":\"{JsonHelper.EscapeString(LastPlayedSong.WebDavHref ?? "")}\"," +
+                    $"\"webdav_server_id\":\"{JsonHelper.EscapeString(LastPlayedSong.WebDavServerId ?? "")}\"" +
                     "}";
             }
 
             List<string> singerList = [];
             foreach (var smid in FavoriteSingers)
             {
-                singerList.Add($"\"{JsonEscape(smid)}\"");
+                singerList.Add($"\"{JsonHelper.EscapeString(smid)}\"");
             }
 
             return $"{{" +
-                $"\"uin\":\"{JsonEscape(Uin)}\"," +
-                $"\"nick\":\"{JsonEscape(Nick)}\"," +
+                $"\"uin\":\"{JsonHelper.EscapeString(Uin)}\"," +
+                $"\"nick\":\"{JsonHelper.EscapeString(Nick)}\"," +
                 $"\"is_vip\":{(IsVip ? "true" : "false")}," +
                 $"\"is_svip\":{(IsSvip ? "true" : "false")}," +
-                $"\"music_key\":\"{JsonEscape(MusicKey)}\"," +
-                $"\"preferred_quality\":\"{JsonEscape(PreferredQuality)}\"," +
-                $"\"encrypted_uin\":\"{JsonEscape(EncryptedUin)}\"," +
-                $"\"avatar_url\":\"{JsonEscape(AvatarUrl)}\"," +
+                $"\"music_key\":\"{JsonHelper.EscapeString(MusicKey)}\"," +
+                $"\"preferred_quality\":\"{JsonHelper.EscapeString(PreferredQuality)}\"," +
+                $"\"encrypted_uin\":\"{JsonHelper.EscapeString(EncryptedUin)}\"," +
+                $"\"avatar_url\":\"{JsonHelper.EscapeString(AvatarUrl)}\"," +
                 $"\"vip_level\":{VipLevel}," +
                 $"\"music_level\":{MusicLevel}," +
-                $"\"vip_expire_at\":\"{JsonEscape(VipExpireAt)}\"," +
+                $"\"vip_expire_at\":\"{JsonHelper.EscapeString(VipExpireAt)}\"," +
                 $"\"volume\":{Volume}," +
                 $"\"playback_mode\":\"{PlaybackMode}\"," +
                 $"\"last_position\":{LastPlaybackPositionSeconds:F2}," +
@@ -314,7 +314,4 @@ public sealed class UserSession
         }
         return sb.ToString();
     }
-
-    private static string JsonEscape(string s) =>
-        s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
 }
