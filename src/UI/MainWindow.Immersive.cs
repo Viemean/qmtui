@@ -43,7 +43,7 @@ public sealed partial class MainWindow
 
         // 下方控制栏与快捷栏显隐
         _controlBar.Visible = !enable;
-        _hotkeyHintLabel.Visible = !enable;
+        _footerBar.Visible = !enable;
 
         // 主视窗尺寸自适应：全屏时自第 0 行顶格起，高度延伸至铺满最底行
         int topY = enable ? 0 : 1;
@@ -262,7 +262,7 @@ public sealed partial class MainWindow
         _userStatusBtn.Visible = false;
         _recognizeBtn.Visible = false;
         _webBtn.Visible = false;
-        _hotkeyHintLabel.Visible = !_isImmersiveMode;
+        _footerBar.Visible = !_isImmersiveMode;
 
         _nowPlayingView.SetSong(_activeSong, AudioQualityHelper.GetBadge(_actualQualityTier));
         if (!string.IsNullOrEmpty(_currentCoverFilePath))
@@ -303,7 +303,7 @@ public sealed partial class MainWindow
         _userStatusBtn.Visible = !_isImmersiveMode;
         _recognizeBtn.Visible = !_isImmersiveMode;
         _webBtn.Visible = !_isImmersiveMode;
-        _hotkeyHintLabel.Visible = !_isImmersiveMode;
+        _footerBar.Visible = !_isImmersiveMode;
         UpdateTopContextButtons();
 
         _isSearchActive = false;
@@ -340,7 +340,7 @@ public sealed partial class MainWindow
         _recognizeBtn.Visible = false;
         _webBtn.Visible = false;
         _controlBar.Visible = false;
-        _hotkeyHintLabel.Visible = false;
+        _footerBar.Visible = false;
         _sidebarTitleLabel.Visible = false;
         _songListTitleLabel.Visible = false;
         _lyricTitleLabel.Visible = false;
@@ -409,7 +409,7 @@ public sealed partial class MainWindow
         }
 
         _controlBar.Visible = !_isImmersiveMode;
-        _hotkeyHintLabel.Visible = !_isImmersiveMode;
+        _footerBar.Visible = !_isImmersiveMode;
 
         UpdatePlayerStatus();
         UpdateFrameBorderHighlights();

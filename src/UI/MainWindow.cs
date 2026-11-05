@@ -41,7 +41,8 @@ public sealed partial class MainWindow : Window
     private readonly SongCommentView _songCommentView;
     private bool _isCommentViewActive;
     private readonly PlayerControlBar _controlBar;
-    private readonly Label _hotkeyHintLabel;
+    private readonly View _footerBar;
+    private readonly List<FooterActionButton> _footerButtons = [];
     private readonly Label _sidebarTitleLabel;
     private readonly Label _songListTitleLabel;
     private readonly Label _lyricTitleLabel;
@@ -1132,10 +1133,9 @@ public sealed partial class MainWindow : Window
         };
         Add(_controlBar);
 
-        // 底部快捷键操作指南
-        _hotkeyHintLabel = new Label
+        // 底部快捷按键操作栏（纯鼠标交互，悬停高亮，不污染键盘 Tab 流转）
+        _footerBar = new View
         {
-            Text = " [V]播放界面  [K]一起听  [B]通知  [M]静音  [- / +]音量  [/]搜索  [E]队列  [G]查找  [C]评论",
             X = 0,
             Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),
@@ -1143,24 +1143,91 @@ public sealed partial class MainWindow : Window
             CanFocus = false,
             TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop
         };
-        _hotkeyHintLabel.SetScheme(new Scheme
+        _footerBar.SetScheme(new Scheme
         {
-            Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextSub, MikuTheme.MikuBgSurface)
+            Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.MikuTextMuted, MikuTheme.MikuBgSurface)
         });
-        _hotkeyHintLabel.MouseEvent += (s, m) =>
+
+        var btnV = new FooterActionButton(" [V]播放界面", " [V]界面", ToggleNowPlayingView);
+        var btnK = new FooterActionButton("[K]一起听", "[K]一起听", ShowListenTogetherDialog);
+        var btnB = new FooterActionButton("[B]通知", "[B]通知", ToggleDesktopNotification);
+        var btnM = new FooterActionButton("[M]静音", "[M]静音", ToggleMute);
+        var btnVol = new FooterActionButton("[- / +]音量", "[-/+]音量", (flags) =>
         {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked) && m.Position.HasValue)
+            if (flags.HasFlag(MouseFlags.WheeledUp))
             {
-                string text = _hotkeyHintLabel.Text ?? "";
-                int commentIdx = text.IndexOf("[C]", StringComparison.Ordinal);
-                if (commentIdx >= 0 && m.Position.Value.X >= commentIdx)
-                {
-                    ToggleCommentView();
-                    m.Handled = true;
-                }
+                AdjustVolume(5);
             }
-        };
-        Add(_hotkeyHintLabel);
+            else if (flags.HasFlag(MouseFlags.WheeledDown))
+            {
+                AdjustVolume(-5);
+            }
+            else if (flags.HasFlag(MouseFlags.LeftButtonClicked) || flags.HasFlag(MouseFlags.RightButtonClicked))
+            {
+                _controlBar?.UpdateStatus("请使用滚轮切换音量");
+            }
+        });
+        var btnSearch = new FooterActionButton("[/]搜索", "[/]搜索", () =>
+        {
+            if (_isNowPlayingViewActive) return;
+            _searchField.CanFocus = true;
+            _isSearchActive = true;
+            _searchField.SetFocus();
+        });
+        var btnNext = new FooterActionButton("[N]下一首", "[N]下一首", () =>
+        {
+            if (_isNowPlayingViewActive || _currentViewMode == ViewMode.GuessRecommend || _songListView.Songs.Count == 0) return;
+            int curIdx = _songListView.SelectedItem ?? -1;
+            if (curIdx >= 0 && curIdx < _songListView.Songs.Count)
+            {
+                var song = _songListView.Songs[curIdx];
+                PlaybackQueueService.Instance.InsertNext(song);
+                _controlBar?.UpdateStatus($"下一首将播放: {song.Title} - {song.Artist}");
+            }
+        });
+        var btnQueue = new FooterActionButton("[E]队列", "[E]队列", () =>
+        {
+            if (_isNowPlayingViewActive) return;
+            ShowQueueDrawerDialog();
+        });
+        var btnFind = new FooterActionButton("[G]查找", "[G]查找", () =>
+        {
+            if (_isNowPlayingViewActive) return;
+            ToggleQuickSearch();
+        });
+        var btnComment = new FooterActionButton("[C]评论", "[C]评论", () =>
+        {
+            if (_isNowPlayingViewActive && _nowPlayingView != null)
+            {
+                if (_nowPlayingView.CommentView.IsImagePreviewActive)
+                {
+                    _nowPlayingView.CommentView.CloseCommentImagePreview();
+                    return;
+                }
+                if (!_nowPlayingView.IsCommentViewActive && (_activeSong == null || _activeSong.IsLocal || _activeSong.IsWebDav || _activeSong.IsPureLocalOrWebDav))
+                {
+                    _controlBar.UpdateStatus("[评论] 当前不是在线音乐，无法查看评论");
+                    return;
+                }
+                _nowPlayingView.ToggleCommentView();
+                return;
+            }
+
+            if (!_isCommentViewActive && (_activeSong == null || _activeSong.IsLocal || _activeSong.IsWebDav || _activeSong.IsPureLocalOrWebDav))
+            {
+                _controlBar.UpdateStatus("[评论] 当前不是在线音乐，无法查看评论");
+                return;
+            }
+
+            ToggleCommentView();
+        });
+
+        _footerButtons.AddRange([btnV, btnK, btnB, btnM, btnVol, btnSearch, btnNext, btnQueue, btnFind, btnComment]);
+        foreach (var btn in _footerButtons)
+        {
+            _footerBar.Add(btn);
+        }
+        Add(_footerBar);
 
         _listenTogetherStatusLabel = new Label
         {
@@ -1186,7 +1253,7 @@ public sealed partial class MainWindow : Window
         };
         Add(_listenTogetherStatusLabel);
 
-        // 顶部三大窗格置顶常驻高亮标题（即使未获焦暗化边框线条，标题文本始终保持翡翠薄荷绿高亮）
+        // 顶部三大窗格置顶常驻高亮标题
         _sidebarTitleLabel = new Label
         {
             Text = " 导航 ",
@@ -1198,7 +1265,7 @@ public sealed partial class MainWindow : Window
         _sidebarTitleLabel.SetScheme(MikuTheme.TitleHighlight);
         _sidebarTitleLabel.MouseEvent += (s, m) =>
         {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked) || m.Flags.HasFlag(MouseFlags.LeftButtonPressed))
+            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
             {
                 SetFocusToWindow(0);
                 m.Handled = true;
@@ -1216,7 +1283,7 @@ public sealed partial class MainWindow : Window
         _songListTitleLabel.SetScheme(MikuTheme.TitleHighlight);
         _songListTitleLabel.MouseEvent += (s, m) =>
         {
-            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked) || m.Flags.HasFlag(MouseFlags.LeftButtonPressed))
+            if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
             {
                 SetFocusToWindow(1);
                 m.Handled = true;
@@ -1246,13 +1313,11 @@ public sealed partial class MainWindow : Window
             if (m.Flags.HasFlag(MouseFlags.LeftButtonClicked))
             {
                 long now = Environment.TickCount64;
-                if (now - lastToggleCommentTick < 300)
+                if (now - lastToggleCommentTick > 300)
                 {
-                    m.Handled = true;
-                    return;
+                    lastToggleCommentTick = now;
+                    ToggleCommentView();
                 }
-                lastToggleCommentTick = now;
-                ToggleCommentView();
                 m.Handled = true;
             }
         };
@@ -1409,6 +1474,10 @@ public sealed partial class MainWindow : Window
         _lyricListView.SetScheme(MikuTheme.Lyric);
         MikuTheme.ApplyTo(_controlBar, MikuTheme.PlayerBar);
         _artistAlbumDetailView.ApplyInnerScheme();
+        foreach (var btn in _footerButtons)
+        {
+            btn.UpdateScheme();
+        }
 
         // 统一监听各视窗焦点变化，动态高亮获焦激活面板的边框
         _sidebarList.HasFocusChanged += (s, e) => Application.Invoke(UpdateFrameBorderHighlights);
@@ -1493,28 +1562,45 @@ public sealed partial class MainWindow : Window
 
     public void UpdateFooterLayout()
     {
+        if (_footerButtons.Count < 10) return;
+
         int width = Viewport.Width > 0 ? Viewport.Width : (Application.Driver?.Cols ?? 120);
         bool isTogetherActive = _listenTogetherStatusLabel.Visible;
         int reservedRight = isTogetherActive ? 18 : 0;
-        _hotkeyHintLabel.Width = Dim.Fill(reservedRight);
+        _footerBar.Width = Dim.Fill(reservedRight);
 
         int availableWidth = width - reservedRight;
-        if (availableWidth >= 92)
+        bool showAll = availableWidth >= 96;
+        bool show80 = availableWidth >= 80;
+        bool show62 = availableWidth >= 62;
+
+        _footerButtons[0].Text = showAll ? _footerButtons[0].FullText : _footerButtons[0].ShortText;
+        _footerButtons[0].Visible = true;
+
+        _footerButtons[1].Visible = true;
+        _footerButtons[2].Visible = show80;
+        _footerButtons[3].Visible = show62;
+
+        _footerButtons[4].Text = showAll ? _footerButtons[4].FullText : _footerButtons[4].ShortText;
+        _footerButtons[4].Visible = show62;
+
+        _footerButtons[5].Visible = true;
+        _footerButtons[6].Visible = show62;
+        _footerButtons[7].Visible = show62;
+        _footerButtons[8].Visible = showAll;
+        _footerButtons[9].Visible = show80;
+
+        int curX = 0;
+        foreach (var btn in _footerButtons)
         {
-            _hotkeyHintLabel.Text = " [V]播放界面  [K]一起听  [B]通知  [M]静音  [- / +]音量  [/]搜索  [E]队列  [G]查找  [C]评论";
+            if (btn.Visible)
+            {
+                btn.X = curX;
+                curX += btn.Text.GetVisualWidth() + 2;
+            }
         }
-        else if (availableWidth >= 74)
-        {
-            _hotkeyHintLabel.Text = " [V]界面  [K]一起听  [B]通知  [M]静音  [-/+]音量  [/]搜索  [E]队列  [C]评论";
-        }
-        else if (availableWidth >= 54)
-        {
-            _hotkeyHintLabel.Text = " [V]界面  [K]一起听  [M]静音  [-/+]音量  [/]搜索  [E]队列";
-        }
-        else
-        {
-            _hotkeyHintLabel.Text = " [V]界面  [K]一起听  [/]搜索";
-        }
+        _footerBar.SetNeedsLayout();
+        _footerBar.SetNeedsDraw();
     }
 
     public void UpdateSidebarLayout()
@@ -1970,6 +2056,10 @@ public sealed partial class MainWindow : Window
         _songCommentView.RefreshTheme();
         _miniCoverView.SetScheme(MikuTheme.FrameBorderDim);
         _miniCoverView.SetNeedsDraw();
+        foreach (var btn in _footerButtons)
+        {
+            btn.UpdateScheme();
+        }
 
         if (_artistAlbumDetailView.Visible)
         {
