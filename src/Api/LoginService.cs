@@ -569,7 +569,6 @@ public sealed partial class LoginService
                 ? (cookies.TryGetValue("access_token", out var wxat) && !string.IsNullOrEmpty(wxat) ? wxat : (cookies.TryGetValue("psrf_wx_access_token", out var pat) ? pat : ""))
                 : (cookies.TryGetValue("psrf_qqaccess_token", out var qqat) && !string.IsNullOrEmpty(qqat) ? qqat : (cookies.TryGetValue("access_token", out var at) ? at : ""));
 
-            // 1. 统一账户网关续签通道 (覆盖官方 App 扫码、微信扫码与 QQ 互联扫码)
             if (!string.IsNullOrEmpty(refreshToken) && !string.IsNullOrEmpty(currentUin))
             {
                 AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting token refresh via music.login.LoginServer (Channel 1)...");
@@ -579,7 +578,6 @@ public sealed partial class LoginService
                 }
             }
 
-            // 2. 微信登录专有换票重试
             if (isWeChat && !string.IsNullOrEmpty(refreshToken) && !string.IsNullOrEmpty(currentUin))
             {
                 AppLogger.Info("LoginService", "EnsureMusicKeyAsync: Attempting token refresh via WeChat LoginServer (Channel 2)...");
@@ -589,7 +587,6 @@ public sealed partial class LoginService
                 }
             }
 
-            // 3. QQ 互联 OAuth 降级换票兜底 (非微信账号且具备 openid 与 accessToken)
             if (!isWeChat && !string.IsNullOrEmpty(openid) && !string.IsNullOrEmpty(accessToken))
             {
                 var qqRefreshToken = cookies.TryGetValue("psrf_qqrefresh_token", out var qrt) && !string.IsNullOrEmpty(qrt) ? qrt
@@ -741,6 +738,7 @@ public sealed partial class LoginService
     /// <summary>
     /// 使用微信登录下发的 refresh_token 与 openid 刷新 musickey 凭据。
     /// </summary>
+    /// <returns>若刷新并更新凭据成功则为 true，否则为 false。</returns>
     public static async Task<bool> RefreshWeChatLoginTokenAsync(
         string musicId,
         string musicKey,

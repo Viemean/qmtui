@@ -208,7 +208,7 @@ public sealed class TvConnectServer : IDisposable
 
                     _ = HandleIncomingConnectionAsync(client, activeCts.Token);
                 }
-            }, activeCts.Token);
+            });
         }
     }
 
