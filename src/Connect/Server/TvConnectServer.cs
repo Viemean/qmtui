@@ -410,6 +410,13 @@ public sealed class TvConnectServer : IDisposable
         if (msg == null) return;
         AppLogger.Info("TvConnectServer", $"Received connect action: {msg.Action}");
 
+        bool isPreAuthAction = msg.Action is ConnectActions.Ping or ConnectActions.PairRequest or ConnectActions.Disconnect;
+        if (!isPreAuthAction && (!_activeClients.TryGetValue(socket, out var authSession) || authSession.Device == null))
+        {
+            AppLogger.Warn("TvConnectServer", $"Dropped unauthenticated action: {msg.Action}");
+            return;
+        }
+
         switch (msg.Action)
         {
             case ConnectActions.Ping:
