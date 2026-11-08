@@ -162,6 +162,10 @@ public sealed partial class MusicApi
                 return [];
             }
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             AppLogger.Error("MusicApi", $"{featureName} error", ex);

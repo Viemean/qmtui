@@ -22,7 +22,7 @@ public sealed partial class MusicApi
     private static string BuildGetRecentHistoryPayload(int type, long updateTime)
     {
         var uin = UserSession.Current.Uin;
-        var authst = UserSession.Current.MusicKey;
+        var authst = UserSession.Current.MusicKey ?? "";
         int loginType = authst.StartsWith("W_X", StringComparison.Ordinal) ? 1 : 2;
 
         return $$"""
@@ -52,7 +52,7 @@ public sealed partial class MusicApi
     private static string BuildReportRecentHistoryPayload(string id, int type, long lastTime, int listenCnt)
     {
         var uin = UserSession.Current.Uin;
-        var authst = UserSession.Current.MusicKey;
+        var authst = UserSession.Current.MusicKey ?? "";
         int loginType = authst.StartsWith("W_X", StringComparison.Ordinal) ? 1 : 2;
 
         return $$"""

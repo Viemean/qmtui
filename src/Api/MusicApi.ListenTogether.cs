@@ -75,16 +75,11 @@ public sealed partial class MusicApi
         var songTitle = song.Title ?? "";
 
         var songsToSync = playlist != null && playlist.Count > 0 ? playlist.Take(1000).ToList() : [song];
-        if (songsToSync.Count == 0) songsToSync.Add(song);
-
-        int currIdx = 0;
-        for (int i = 0; i < songsToSync.Count; i++)
+        int currIdx = songsToSync.FindIndex(s => s.Id == songId);
+        if (currIdx < 0)
         {
-            if (songsToSync[i].Id == songId)
-            {
-                currIdx = i;
-                break;
-            }
+            songsToSync.Insert(0, song);
+            currIdx = 0;
         }
 
         using var stream = new MemoryStream();
@@ -152,7 +147,7 @@ public sealed partial class MusicApi
             if (string.IsNullOrEmpty(showId)) return null;
 
             var createUin = roomInfo.TryGetProperty("createUin", out var cUinProp) ? cUinProp.GetString() ?? "" : "";
-            var shareUrl = $"https://i.y.qq.com/n2/m/share/listen_together/index.html?showid={showId}&songid={songId}";
+            var shareUrl = $"https://i.y.qq.com/n2/m/share/listen_together/index.html?showid={Uri.EscapeDataString(showId)}&songid={songId}";
 
             return new ListenTogetherRoomInfo
             {

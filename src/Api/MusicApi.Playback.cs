@@ -27,16 +27,30 @@ public sealed partial class MusicApi
     /// <summary>
     /// 探测指定曲目在各音质档位下的可用状态及播放参数。
     /// </summary>
+    /// <summary>
+    /// 探测歌曲在各音质档位的可用性与直链地址。
+    /// </summary>
     /// <param name="songMid">歌曲唯一字符串标识。</param>
     /// <param name="mediaMid">媒体文件标识，为空时使用 <paramref name="songMid"/> 兜底。</param>
     /// <param name="ct">异步操作取消令牌。</param>
     /// <returns>各音质候选选项列表；若请求失败返回空列表。</returns>
-    public static async Task<List<QualityOption>> ProbeSongQualitiesAsync(string songMid, string mediaMid = "", CancellationToken ct = default)
+    public static Task<List<QualityOption>> ProbeSongQualitiesAsync(string songMid, string mediaMid = "", CancellationToken ct = default)
+        => ProbeSongQualitiesAsync(songMid, mediaMid, refineMetadata: true, ct);
+
+    /// <summary>
+    /// 探测歌曲在各音质档位的可用性与直链地址。
+    /// </summary>
+    /// <param name="songMid">歌曲唯一字符串标识。</param>
+    /// <param name="mediaMid">媒体文件标识，为空时使用 <paramref name="songMid"/> 兜底。</param>
+    /// <param name="refineMetadata">是否通过 Range/本地缓存精化规格元数据（取播放链接时可为 false 以降低延迟）。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>各音质候选选项列表；若请求失败返回空列表。</returns>
+    public static async Task<List<QualityOption>> ProbeSongQualitiesAsync(string songMid, string mediaMid, bool refineMetadata, CancellationToken ct = default)
     {
-        return await ProbeSongQualitiesInternalAsync(songMid, mediaMid, canRetryWithRenew: true, ct).ConfigureAwait(false);
+        return await ProbeSongQualitiesInternalAsync(songMid, mediaMid, canRetryWithRenew: true, refineMetadata, ct).ConfigureAwait(false);
     }
 
-    private static async Task<List<QualityOption>> ProbeSongQualitiesInternalAsync(string songMid, string mediaMid, bool canRetryWithRenew, CancellationToken ct)
+    private static async Task<List<QualityOption>> ProbeSongQualitiesInternalAsync(string songMid, string mediaMid, bool canRetryWithRenew, bool refineMetadata, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(mediaMid) || mediaMid.Contains("://") || mediaMid.Contains('/')) mediaMid = songMid;
 
@@ -99,12 +113,15 @@ public sealed partial class MusicApi
                     var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
                     if (renewed)
                     {
-                        return await ProbeSongQualitiesInternalAsync(songMid, mediaMid, canRetryWithRenew: false, ct).ConfigureAwait(false);
+                        return await ProbeSongQualitiesInternalAsync(songMid, mediaMid, canRetryWithRenew: false, refineMetadata, ct).ConfigureAwait(false);
                     }
                 }
             }
 
-            await RefineQualityMetadataAsync(options, doc.RootElement, songMid, ct).ConfigureAwait(false);
+            if (refineMetadata)
+            {
+                await RefineQualityMetadataAsync(options, doc.RootElement, songMid, ct).ConfigureAwait(false);
+            }
 
             var validTiers = options
                 .Where(o => o.Available && DeviceAudioCapability.IsTierSupported(o.Tier))
@@ -116,6 +133,10 @@ public sealed partial class MusicApi
             }
 
             return options;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -541,7 +562,7 @@ public sealed partial class MusicApi
     /// <returns>三元组：Url 为直链地址（无音源时为 <see langword="null"/>），Quality 为音质徽标名称，Tier 为最终匹配的音质档位。</returns>
     public static async Task<(string? Url, string Quality, AudioQualityTier Tier)> GetPlayUrlForTierAsync(string songMid, string mediaMid = "", AudioQualityTier preferred = AudioQualityTier.SQ, CancellationToken ct = default)
     {
-        var options = await ProbeSongQualitiesAsync(songMid, mediaMid, ct).ConfigureAwait(false);
+        var options = await ProbeSongQualitiesAsync(songMid, mediaMid, refineMetadata: false, ct).ConfigureAwait(false);
 
         // 先尝试用户偏好的目标档位
         var target = options.FirstOrDefault(o => o.Tier == preferred && o.Available);
@@ -618,8 +639,11 @@ public sealed partial class MusicApi
             var uin = string.IsNullOrEmpty(UserSession.Current.Uin) ? "0" : UserSession.Current.Uin;
             var authst = UserSession.Current.MusicKey ?? "";
             var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
-            var payload = $"{{\"comm\":{{\"uin\":\"{uin}\",\"format\":\"json\",\"ct\":28,\"cv\":1,\"authst\":\"{authst}\",\"tmeAppID\":\"qqmusic\"}}," +
-                $"\"songinfo\":{{\"module\":\"music.pf_song_detail_svr\",\"method\":\"get_song_detail_yqq\",\"param\":{{\"song_mid\":\"{songMid}\"}}}}}}";
+            var escapedUin = JsonEncodedText.Encode(uin).ToString();
+            var escapedAuthst = JsonEncodedText.Encode(authst).ToString();
+            var escapedMid = JsonEncodedText.Encode(songMid).ToString();
+            var payload = $"{{\"comm\":{{\"uin\":\"{escapedUin}\",\"format\":\"json\",\"ct\":28,\"cv\":1,\"authst\":\"{escapedAuthst}\",\"tmeAppID\":\"qqmusic\"}}," +
+                $"\"songinfo\":{{\"module\":\"music.pf_song_detail_svr\",\"method\":\"get_song_detail_yqq\",\"param\":{{\"song_mid\":\"{escapedMid}\"}}}}}}";
 
             using var req = new HttpRequestMessage(HttpMethod.Post, url);
             req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
@@ -671,8 +695,11 @@ public sealed partial class MusicApi
             var uin = string.IsNullOrEmpty(UserSession.Current.Uin) ? "0" : UserSession.Current.Uin;
             var authst = UserSession.Current.MusicKey ?? "";
             var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
-            var payload = $"{{\"comm\":{{\"uin\":\"{uin}\",\"format\":\"json\",\"ct\":28,\"cv\":1,\"authst\":\"{authst}\",\"tmeAppID\":\"qqmusic\"}}," +
-                $"\"songinfo\":{{\"module\":\"music.pf_song_detail_svr\",\"method\":\"get_song_detail_yqq\",\"param\":{{\"song_mid\":\"{songMid}\"}}}}}}";
+            var escapedUin = JsonEncodedText.Encode(uin).ToString();
+            var escapedAuthst = JsonEncodedText.Encode(authst).ToString();
+            var escapedMid = JsonEncodedText.Encode(songMid).ToString();
+            var payload = $"{{\"comm\":{{\"uin\":\"{escapedUin}\",\"format\":\"json\",\"ct\":28,\"cv\":1,\"authst\":\"{escapedAuthst}\",\"tmeAppID\":\"qqmusic\"}}," +
+                $"\"songinfo\":{{\"module\":\"music.pf_song_detail_svr\",\"method\":\"get_song_detail_yqq\",\"param\":{{\"song_mid\":\"{escapedMid}\"}}}}}}";
 
             using var req = new HttpRequestMessage(HttpMethod.Post, url);
             req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
