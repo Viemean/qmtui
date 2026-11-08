@@ -939,6 +939,132 @@ public sealed partial class MainWindow
         RunModalDialog(dlg);
     }
 
+    private static long s_skipDeleteConfirmUntilTick;
+
+    private bool PromptSongDeleteConfirmation(string targetListName, Song song)
+    {
+        if (Environment.TickCount64 < s_skipDeleteConfirmUntilTick)
+        {
+            return true;
+        }
+
+        bool confirmed = false;
+        bool remember3Min = false;
+
+        var dlg = new Dialog
+        {
+            Title = "移除歌曲确认",
+            Width = 56,
+            Height = 10,
+            X = Pos.Center(),
+            Y = Pos.Center()
+        };
+        dlg.SetScheme(TransparentDialogScheme);
+
+        var titleLabel = new Label
+        {
+            Text = $"确定要从「{targetListName}」中移除歌曲吗？",
+            X = Pos.Center(),
+            Y = 1
+        };
+        titleLabel.SetScheme(TransparentDialogScheme);
+
+        var songLabel = new Label
+        {
+            Text = $"《{song.Title}》- {song.Artist}",
+            X = Pos.Center(),
+            Y = 2
+        };
+        songLabel.SetScheme(new Scheme
+        {
+            Normal = new Terminal.Gui.Drawing.Attribute(MikuTheme.QqGreenLight, Color.None)
+        });
+
+        var rememberBtn = new Button
+        {
+            Text = "[ ] 3分钟内不再提示 (T)",
+            X = Pos.Center(),
+            Y = 4,
+            NoDecorations = true,
+            ShadowStyle = ShadowStyles.None
+        };
+        rememberBtn.SetScheme(TransparentDialogScheme);
+        rememberBtn.Accepting += (s, e) =>
+        {
+            remember3Min = !remember3Min;
+            rememberBtn.Text = remember3Min ? "[X] 3分钟内不再提示 (T)" : "[ ] 3分钟内不再提示 (T)";
+            rememberBtn.SetScheme(new Scheme
+            {
+                Normal = new Terminal.Gui.Drawing.Attribute(remember3Min ? MikuTheme.QqGreenLight : MikuTheme.MikuTextMuted, Color.None)
+            });
+        };
+
+        var yesBtn = new Button
+        {
+            Text = "确定 (Enter)",
+            X = Pos.Center() - 14,
+            Y = Pos.AnchorEnd(1),
+            ShadowStyle = ShadowStyles.None
+        };
+        yesBtn.SetScheme(TransparentDialogScheme);
+        yesBtn.Accepting += (s, e) =>
+        {
+            confirmed = true;
+            if (remember3Min)
+            {
+                s_skipDeleteConfirmUntilTick = Environment.TickCount64 + 180_000;
+            }
+            Application.RequestStop(dlg);
+        };
+
+        var noBtn = new Button
+        {
+            Text = "取消 (Esc)",
+            X = Pos.Center() + 2,
+            Y = Pos.AnchorEnd(1),
+            ShadowStyle = ShadowStyles.None
+        };
+        noBtn.SetScheme(TransparentDialogScheme);
+        noBtn.Accepting += (s, e) =>
+        {
+            Application.RequestStop(dlg);
+        };
+
+        dlg.Add(titleLabel, songLabel, rememberBtn, yesBtn, noBtn);
+
+        dlg.KeyDown += (s, k) =>
+        {
+            if (k.AsRune.Value == 't' || k.AsRune.Value == 'T')
+            {
+                k.Handled = true;
+                remember3Min = !remember3Min;
+                rememberBtn.Text = remember3Min ? "[X] 3分钟内不再提示 (T)" : "[ ] 3分钟内不再提示 (T)";
+                rememberBtn.SetScheme(new Scheme
+                {
+                    Normal = new Terminal.Gui.Drawing.Attribute(remember3Min ? MikuTheme.QqGreenLight : MikuTheme.MikuTextMuted, Color.None)
+                });
+            }
+            else if (k.AsRune.Value == 'y' || k.AsRune.Value == 'Y')
+            {
+                k.Handled = true;
+                confirmed = true;
+                s_skipDeleteConfirmUntilTick = Environment.TickCount64 + 180_000;
+                Application.RequestStop(dlg);
+            }
+            else if (k == Key.Esc)
+            {
+                k.Handled = true;
+                Application.RequestStop(dlg);
+            }
+        };
+
+        MikuTheme.ApplyTo(dlg, TransparentDialogScheme);
+        yesBtn.SetFocus();
+
+        RunModalDialog(dlg);
+        return confirmed;
+    }
+
     private static string FormatTierDisplay(string tierBadge, string? quality)
     {
         if (string.IsNullOrWhiteSpace(quality))

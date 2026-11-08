@@ -82,7 +82,7 @@ public sealed class WebdavManageDialog : Dialog
         _selectBtn = new Button { Text = "激活 (Enter)", X = 2, Y = 13 };
         _addBtn = new Button { Text = "添加 (A)", X = Pos.Right(_selectBtn) + 2, Y = 13 };
         _editBtn = new Button { Text = "编辑 (E)", X = Pos.Right(_addBtn) + 2, Y = 13 };
-        _deleteBtn = new Button { Text = "删除 (D)", X = Pos.Right(_editBtn) + 2, Y = 13 };
+        _deleteBtn = new Button { Text = "删除 (Del)", X = Pos.Right(_editBtn) + 2, Y = 13 };
 
         _selectBtn.SetScheme(TransparentDialogScheme);
         _addBtn.SetScheme(TransparentDialogScheme);
@@ -167,7 +167,7 @@ public sealed class WebdavManageDialog : Dialog
         char c = char.ToUpperInvariant((char)k.AsRune.Value);
         bool isA = k == Key.A || c == 'A';
         bool isE = k == Key.E || c == 'E';
-        bool isD = k == Key.D || k == Key.DeleteChar || c == 'D';
+        bool isDel = k == Key.DeleteChar;
 
         if (isA)
         {
@@ -181,7 +181,7 @@ public sealed class WebdavManageDialog : Dialog
             ShowEditDialog();
             return true;
         }
-        if (isD)
+        if (isDel)
         {
             k.Handled = true;
             DeleteCurrentServer();

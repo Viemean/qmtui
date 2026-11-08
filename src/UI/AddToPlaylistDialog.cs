@@ -100,10 +100,10 @@ public sealed class AddToPlaylistDialog : Dialog
 
         var deleteBtn = new Button
         {
-            Text = "[D] 删除歌单",
+            Text = "[Del] 删除歌单",
             X = Pos.Right(createBtn) + 1,
             Y = Pos.AnchorEnd(1),
-            Width = 13,
+            Width = 15,
             NoDecorations = true,
             CanFocus = true,
             TabStop = TabBehavior.TabStop
@@ -171,9 +171,8 @@ public sealed class AddToPlaylistDialog : Dialog
                 return;
             }
 
-            bool isD = k == Key.D || k == Key.D.WithShift ||
-                       k.AsRune.Value == 'd' || k.AsRune.Value == 'D';
-            if (isD)
+            bool isDel = k == Key.DeleteChar;
+            if (isDel)
             {
                 k.Handled = true;
                 await HandleDeleteSelectedPlaylistAsync();
@@ -261,12 +260,8 @@ public sealed class AddToPlaylistDialog : Dialog
                 return;
             }
 
-            bool isD = k == Key.D || k == Key.D.WithShift ||
-                       k.AsRune.Value == 'd' || k.AsRune.Value == 'D' ||
-                       k.ToString().Equals("d", StringComparison.OrdinalIgnoreCase) ||
-                       k.ToString().Equals("Key.D", StringComparison.OrdinalIgnoreCase);
-
-            if (isD)
+            bool isDel = k == Key.DeleteChar;
+            if (isDel)
             {
                 k.Handled = true;
                 await HandleDeleteSelectedPlaylistAsync();

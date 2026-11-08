@@ -181,7 +181,7 @@ public sealed partial class MainWindow
             Application.Invoke(() =>
             {
                 if (IsStale()) return;
-                _songListView.SetSongs(recentSongs, $"最近播放: 共 {recentSongs.Count} 首 (按 D 移除历史)");
+                _songListView.SetSongs(recentSongs, $"最近播放: 共 {recentSongs.Count} 首 (按 Del 移除历史)");
                 _songListView.SetPlayingSong(song.Mid);
             });
         }

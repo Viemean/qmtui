@@ -397,33 +397,11 @@ public sealed partial class MainWindow
 
     private async Task HandleSmartFavoriteAsync()
     {
-        var focused = Application.Navigation?.GetFocused();
-        int focusedWindow = GetFocusedWindowIndex(focused);
-
-        Song? targetSong;
-        if (focusedWindow == 1) // 只有聚焦中间主界面时收藏选中的歌曲
+        var targetSong = _activeSong;
+        if (targetSong == null)
         {
-            if (_isViewingPlaylistsList || _isViewingAlbumsList)
-            {
-                _controlBar.UpdateStatus("[操作提示] 当前在目录视图，请进入歌曲列表后再按 F 收藏");
-                return;
-            }
-
-            targetSong = _songListView.GetSelectedSong();
-            if (targetSong == null)
-            {
-                _controlBar.UpdateStatus("[操作提示] 当前歌曲列表中未选中任何曲目");
-                return;
-            }
-        }
-        else // 其它界面（边栏、歌词、底栏、全屏播放界面等）均收藏当前正在播放的曲目
-        {
-            targetSong = _activeSong;
-            if (targetSong == null)
-            {
-                _controlBar.UpdateStatus("[操作提示] 当前暂无播放曲目，请先点播歌曲");
-                return;
-            }
+            _controlBar.UpdateStatus("[操作提示] 当前暂无播放曲目，请先点播歌曲");
+            return;
         }
 
         if (targetSong.IsLocal || targetSong.IsWebDav)
@@ -446,7 +424,7 @@ public sealed partial class MainWindow
 
         if (_isViewingPlaylistsList)
         {
-            _controlBar.UpdateStatus("[操作提示] 当前在歌单目录，请在歌曲列表中按 D 移除歌曲");
+            _controlBar.UpdateStatus("[操作提示] 当前在歌单目录，请在歌曲列表中按 Del 移除歌曲");
             return;
         }
 
@@ -482,6 +460,11 @@ public sealed partial class MainWindow
 
         if (isFavoriteList)
         {
+            if (!PromptSongDeleteConfirmation("我的喜欢", song))
+            {
+                return;
+            }
+
             _controlBar.UpdateStatus($"[正在移除] 正在从我的喜欢中移除《{song.Title}》...");
             var ok = await MusicApi.RemoveSongFromFavoriteAsync(song);
             if (ok)
@@ -507,6 +490,11 @@ public sealed partial class MainWindow
             if (!playlist.IsCreated)
             {
                 _controlBar.UpdateStatus("[无法移除] 收藏的他人的外部歌单不支持单曲删除");
+                return;
+            }
+
+            if (!PromptSongDeleteConfirmation(playlist.Title, song))
+            {
                 return;
             }
 
@@ -878,7 +866,7 @@ public sealed partial class MainWindow
                         items.Add($"{(i + 1):D2}  {a.Title}  -  {a.Artist}  (共 {a.SongCount} 首)");
                     }
 
-                    _songListView.SetCustomItems(items, $"收藏专辑: 共 {_cachedAlbums.Count} 张 (按 Enter 进入专辑，按 D 取消收藏)", async (newIdx) =>
+                    _songListView.SetCustomItems(items, $"收藏专辑: 共 {_cachedAlbums.Count} 张 (按 Enter 进入专辑，按 Del 取消收藏)", async (newIdx) =>
                     {
                         if (newIdx >= 0 && newIdx < _cachedAlbums.Count)
                         {

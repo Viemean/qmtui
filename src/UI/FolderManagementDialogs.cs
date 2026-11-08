@@ -155,7 +155,7 @@ public sealed class FolderManageDialog : Dialog
 
         var tipLabel = new Label
         {
-            Text = "已添加的扫描目录 (按 D 移除选中项，按 A 新增)：",
+            Text = "已添加的扫描目录 (按 Del 移除选中项，按 A 新增)：",
             X = 2,
             Y = 0
         };
@@ -177,7 +177,7 @@ public sealed class FolderManageDialog : Dialog
 
         var hintLabel = new Label
         {
-            Text = "[A] 添加目录   [D] 删除目录   [R] 重新扫描   [Esc] 关闭",
+            Text = "[A] 添加目录   [Del] 删除目录   [R] 重新扫描   [Esc] 关闭",
             X = 2,
             Y = 9
         };
@@ -203,7 +203,7 @@ public sealed class FolderManageDialog : Dialog
                 RequestStop();
                 _onAddRequested.Invoke();
             }
-            else if (c == 'D')
+            else if (k == Key.DeleteChar)
             {
                 k.Handled = true;
                 DeleteSelected();

@@ -134,7 +134,7 @@ public sealed partial class MainWindow
                 return;
             }
 
-            _songListView.SetSongs(localSongs, $"最近播放: 共 {localSongs.Count} 首 (按 D 移除历史)");
+            _songListView.SetSongs(localSongs, $"最近播放: 共 {localSongs.Count} 首 (按 Del 移除历史)");
             if (_activeSong != null)
             {
                 _songListView.SetPlayingSong(_activeSong.Mid);
@@ -178,7 +178,7 @@ public sealed partial class MainWindow
                     return;
                 }
 
-                _songListView.SetSongs(cloudSongs, $"最近播放: 共 {cloudSongs.Count} 首 (按 D 移除历史)");
+                _songListView.SetSongs(cloudSongs, $"最近播放: 共 {cloudSongs.Count} 首 (按 Del 移除历史)");
                 if (_activeSong != null)
                 {
                     _songListView.SetPlayingSong(_activeSong.Mid);
@@ -233,7 +233,7 @@ public sealed partial class MainWindow
                 items.Add($"{(i + 1):D2}  {typeStr,-6}  {p.Title}  (共 {p.SongNum} 首)");
             }
 
-            var headerTitle = $"我的歌单: 共 {playlists.Count} 个 (按 N 新建歌单 / 按 D 删除歌单 / 按 Esc 退回)";
+            var headerTitle = $"我的歌单: 共 {playlists.Count} 个 (按 N 新建歌单 / 按 Del 删除歌单 / 按 Esc 退回)";
             _songListView.SetCustomItems(items, headerTitle, async (idx) =>
             {
                 if (idx >= 0 && idx < _cachedPlaylists.Count)
@@ -383,7 +383,7 @@ public sealed partial class MainWindow
                 items.Add($"{(i + 1):D2}  {a.Title}  -  {a.Artist}  (共 {a.SongCount} 首)");
             }
 
-            _songListView.SetCustomItems(items, $"收藏专辑: 共 {albums.Count} 张 (按 Enter 进入专辑，按 D 取消收藏)", async (idx) =>
+            _songListView.SetCustomItems(items, $"收藏专辑: 共 {albums.Count} 张 (按 Enter 进入专辑，按 Del 取消收藏)", async (idx) =>
             {
                 if (idx >= 0 && idx < _cachedAlbums.Count)
                 {

@@ -173,11 +173,8 @@ public sealed partial class MainWindow
                 return;
             }
 
-            bool isD = k == Key.DeleteChar || k == Key.D || k == Key.D.WithShift ||
-                       k.AsRune.Value == 'd' || k.AsRune.Value == 'D' ||
-                       k.ToString().Equals("d", StringComparison.OrdinalIgnoreCase) ||
-                       k.ToString().Equals("Key.D", StringComparison.OrdinalIgnoreCase);
-            if (isD)
+            bool isDel = k == Key.DeleteChar;
+            if (isDel)
             {
                 k.Handled = true;
                 queueDrawer.RemoveCurrentSelectedItem();
@@ -342,7 +339,7 @@ public sealed partial class MainWindow
                 HandleCreatePlaylistAsync();
                 return;
             }
-            if (c == 'D' && GetFocusedWindowIndex(focused) == 1)
+            if (k == Key.DeleteChar && GetFocusedWindowIndex(focused) == 1)
             {
                 k.Handled = true;
                 await HandleDeleteSelectedPlaylistAsync();
@@ -595,8 +592,7 @@ public sealed partial class MainWindow
             return true;
         }
 
-        bool isD = c == 'D' || k == Key.DeleteChar;
-        if (isD)
+        if (k == Key.DeleteChar)
         {
             if (_isNowPlayingViewActive) return true;
             k.Handled = true;
