@@ -393,11 +393,17 @@ public static partial class LyricParser
                 if (!isMeta && transList.Count > 0)
                 {
                     var exact = transList.Find(t => Math.Abs((t.Timestamp - qrcLine.Timestamp).TotalMilliseconds) < 80);
-                    if (exact.Text != null && !qrcUsedSet.Contains(exact) &&
-                        exact.Text != "//" && !exact.Text.Contains("享有") && !exact.Text.Contains("大模型") && !exact.Text.Contains("翻译贡献"))
+                    if (exact.Text != null)
                     {
-                        transText = exact.Text;
-                        qrcUsedSet.Add(exact);
+                        if (!qrcUsedSet.Contains(exact) &&
+                            exact.Text != "//" &&
+                            !exact.Text.Contains("享有") &&
+                            !exact.Text.Contains("大模型") &&
+                            !exact.Text.Contains("翻译贡献"))
+                        {
+                            transText = exact.Text;
+                            qrcUsedSet.Add(exact);
+                        }
                     }
                     else if (cleanTList.Count > 0)
                     {
@@ -415,8 +421,22 @@ public static partial class LyricParser
                                     best = candidates[c];
                                 }
                             }
-                            transText = best.Text;
-                            qrcUsedSet.Add(best);
+
+                            bool closerToNext = false;
+                            if (i + 1 < qrcLines.Count)
+                            {
+                                var nextDiff = Math.Abs((best.Timestamp - qrcLines[i + 1].Timestamp).TotalMilliseconds);
+                                if (nextDiff < minDiff)
+                                {
+                                    closerToNext = true;
+                                }
+                            }
+
+                            if (!closerToNext)
+                            {
+                                transText = best.Text;
+                                qrcUsedSet.Add(best);
+                            }
                         }
                         else if (cleanTList.Count == qrcLines.Count && i < cleanTList.Count && !qrcUsedSet.Contains(cleanTList[i]))
                         {
@@ -461,11 +481,17 @@ public static partial class LyricParser
             {
                 // 精确匹配 (< 80ms)
                 var exact = transItems.Find(t => Math.Abs((t.Timestamp - orig.Timestamp).TotalMilliseconds) < 80);
-                if (exact.Text != null && !usedSet.Contains(exact) &&
-                    exact.Text != "//" && !exact.Text.Contains("享有") && !exact.Text.Contains("大模型") && !exact.Text.Contains("翻译贡献"))
+                if (exact.Text != null)
                 {
-                    transText = exact.Text;
-                    usedSet.Add(exact);
+                    if (!usedSet.Contains(exact) &&
+                        exact.Text != "//" &&
+                        !exact.Text.Contains("享有") &&
+                        !exact.Text.Contains("大模型") &&
+                        !exact.Text.Contains("翻译贡献"))
+                    {
+                        transText = exact.Text;
+                        usedSet.Add(exact);
+                    }
                 }
                 else if (cleanTrans.Count > 0)
                 {
@@ -484,8 +510,22 @@ public static partial class LyricParser
                                 best = candidates[c];
                             }
                         }
-                        transText = best.Text;
-                        usedSet.Add(best);
+
+                        bool closerToNext = false;
+                        if (i + 1 < origItems.Count)
+                        {
+                            var nextDiff = Math.Abs((best.Timestamp - origItems[i + 1].Timestamp).TotalMilliseconds);
+                            if (nextDiff < minDiff)
+                            {
+                                closerToNext = true;
+                            }
+                        }
+
+                        if (!closerToNext)
+                        {
+                            transText = best.Text;
+                            usedSet.Add(best);
+                        }
                     }
                     // 总行数完全一致时的同索引保底回退
                     else if (cleanTrans.Count == origItems.Count && i < cleanTrans.Count && !usedSet.Contains(cleanTrans[i]))
@@ -516,20 +556,7 @@ public static partial class LyricParser
             return true;
         }
 
-        // 制作人员常见标识
-        if (t.StartsWith("词：") || t.StartsWith("词:") || t.StartsWith("作词：") || t.StartsWith("作词:") ||
-            t.StartsWith("曲：") || t.StartsWith("曲:") || t.StartsWith("作曲：") || t.StartsWith("作曲:") ||
-            t.StartsWith("编曲：") || t.StartsWith("编曲:") || t.StartsWith("制作：") || t.StartsWith("制作:") ||
-            t.StartsWith("制作人：") || t.StartsWith("制作人:") || t.StartsWith("监制：") || t.StartsWith("监制:") ||
-            t.StartsWith("混音：") || t.StartsWith("混音:") || t.StartsWith("录音：") || t.StartsWith("录音:") ||
-            t.StartsWith("母带：") || t.StartsWith("母带:") || t.StartsWith("出品：") || t.StartsWith("出品:") ||
-            t.StartsWith("企划：") || t.StartsWith("企划:") || t.StartsWith("OP：") || t.StartsWith("OP:") ||
-            t.StartsWith("SP：") || t.StartsWith("SP:"))
-        {
-            return true;
-        }
-
-        return false;
+        return MetaInfoRegex().IsMatch(t);
     }
 
     private static readonly string[] s_placeholderKeywords =
@@ -667,6 +694,8 @@ public static partial class LyricParser
             if (match.Success)
             {
                 return match.Groups[1].Value
+                    .Replace("&#10;", "\n")
+                    .Replace("&#13;", "\r")
                     .Replace("&apos;", "'")
                     .Replace("&quot;", "\"")
                     .Replace("&gt;", ">")
@@ -790,5 +819,8 @@ public static partial class LyricParser
 
     [GeneratedRegex(@"<(\d{1,2}):(\d{1,2})(?:[\.:](\d{1,3}))?>")]
     private static partial Regex EnhancedTimestampRegex();
+
+    [GeneratedRegex(@"^(词|作词|曲|作曲|编曲|制作|制作人|监制|混音|录音|母带|出品|企划|谱务|助理|演唱|歌手|吉他|贝斯|鼓|键盘|弦乐|伴唱|和声|设计|封面|文案|发行|特别鸣谢|统筹|策划|录音棚|混音室|母带室|音频工程|音乐制作|配唱|OP|SP|Lyrics|Composed|Arranger|Arranged|Producer|Produced|Mixed|Mixing|Mastered|Mastering|Vocal|Vocals|Scoring|Guitar|Bass|Drums|Keyboard|Strings|Special Thanks)(\s+[A-Za-z\s/]+)?[:：]", RegexOptions.IgnoreCase)]
+    private static partial Regex MetaInfoRegex();
 }
 

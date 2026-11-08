@@ -259,6 +259,63 @@ public class LyricParserTests
         Assert.Equal(2, lines[0].Words!.Count);
         Assert.True(LyricParser.HasWordLevelSync(lines));
     }
+
+    [Fact]
+    public void MergeLyrics_MetaStaffLinesWithEmptyTranslationPlaceholder_DoesNotMisalignSubsequentLyrics()
+    {
+        var rawLyric = """
+            [00:01.05]谱务 Scoring：markmilian/auburn
+            [00:01.13]出品 Produced by：测试工作室
+            [00:01.28]I once wished to disappear
+            """;
+        var rawTrans = """
+            [00:01.05]//
+            [00:01.13]//
+            [00:01.28]我以前许愿消失于世上
+            """;
+
+        var merged = LyricParser.MergeLyrics(rawLyric, rawTrans);
+
+        Assert.Equal(3, merged.Count);
+        Assert.Equal("谱务 Scoring：markmilian/auburn", merged[0].Text);
+        Assert.Equal("", merged[0].Trans);
+
+        Assert.Equal("出品 Produced by：测试工作室", merged[1].Text);
+        Assert.Equal("", merged[1].Trans);
+
+        Assert.Equal("I once wished to disappear", merged[2].Text);
+        Assert.Equal("我以前许愿消失于世上", merged[2].Trans);
+    }
+
+    [Fact]
+    public void MergeLyrics_QrcStaffLineWithNearbyTranslation_DoesNotStealNextLineTranslation()
+    {
+        var qrcXml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <QrcInfos>
+            <LyricInfo>
+            <Lyric_1 LyricType="1" LyricContent="[1057,79]谱务 Scoring：markmilian/auburn&#10;[1137,147]出品 Produced by：测试工作室&#10;[1285,6492](1285,100)I (1385,100)once (1485,200)wished" />
+            </LyricInfo>
+            </QrcInfos>
+            """;
+        var rawTrans = """
+            [00:01.05]//
+            [00:01.13]//
+            [00:01.28]我以前许愿消失于世上
+            """;
+
+        var merged = LyricParser.MergeLyrics(qrcXml, rawTrans);
+
+        Assert.Equal(3, merged.Count);
+        Assert.Equal("谱务 Scoring：markmilian/auburn", merged[0].Text);
+        Assert.Equal("", merged[0].Trans);
+
+        Assert.Equal("出品 Produced by：测试工作室", merged[1].Text);
+        Assert.Equal("", merged[1].Trans);
+
+        Assert.Equal("I once wished", merged[2].Text);
+        Assert.Equal("我以前许愿消失于世上", merged[2].Trans);
+    }
 }
 
 
