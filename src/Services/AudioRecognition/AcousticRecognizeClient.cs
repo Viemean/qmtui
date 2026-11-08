@@ -2,6 +2,7 @@
 // Internal optimized acoustic network transport kernel
 // </auto-generated>
 #nullable enable
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -104,7 +105,7 @@ public static class AcousticRecognizeClient
             string signStr = $"{channel.Salt}{timestamp}";
             string veriStr = CryptoHelper.ComputeMd5Hex(signStr);
 
-            string header = $"v={_pv}&source={channel.Source}&time={timestamp}&veri_str={veriStr}&cmd=1&info={feature.Duration:F1},{feature.Data.Length},10306&type=0&session_id={sessionId}&feature_type={fpType}&confidence={feature.Confidence:F1}\0";
+            string header = string.Create(CultureInfo.InvariantCulture, $"v={_pv}&source={channel.Source}&time={timestamp}&veri_str={veriStr}&cmd=1&info={feature.Duration:F1},{feature.Data.Length},10306&type=0&session_id={sessionId}&feature_type={fpType}&confidence={feature.Confidence:F1}\0");
             byte[] headerBytes = Encoding.UTF8.GetBytes(header);
 
             byte[] rawPayload = new byte[headerBytes.Length + feature.Data.Length];
