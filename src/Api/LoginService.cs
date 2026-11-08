@@ -200,7 +200,11 @@ public sealed partial class LoginService
         {
             var redirectUrl = matches[2].Groups[1].Value;
             var nick = matches.Count >= 6 ? matches[5].Groups[1].Value : "";
-            await ExchangeCheckSigCookiesAsync(redirectUrl, qrsig, nick, ct).ConfigureAwait(false);
+            var exchanged = await ExchangeCheckSigCookiesAsync(redirectUrl, qrsig, nick, ct).ConfigureAwait(false);
+            if (!exchanged)
+            {
+                return new PollStatus(QrLoginEvent.Error, -1, "QQ 登录凭证交换失败");
+            }
         }
         return new PollStatus(MapQrEvent(code), code, message);
     }
@@ -281,7 +285,8 @@ public sealed partial class LoginService
     /// <summary>
     /// 请求 check_sig 换取最终登录 Session Cookie
     /// </summary>
-    private static async Task ExchangeCheckSigCookiesAsync(string redirectUrl, string qrsig, string nick, CancellationToken ct)
+    /// <returns>若凭据交换成功并保存基础会话返回 true，否则返回 false。</returns>
+    private static async Task<bool> ExchangeCheckSigCookiesAsync(string redirectUrl, string qrsig, string nick, CancellationToken ct)
     {
         Dictionary<string, string> cookieDict = [];
         string uin = "";
@@ -293,7 +298,7 @@ public sealed partial class LoginService
             if (uinMatch.Success)
             {
                 uin = uinMatch.Groups[1].Value.TrimStart('o');
-                AppLogger.Info("LoginService", $"Extracted uin from redirectUrl query: {uin}");
+                AppLogger.Info("LoginService", "Extracted uin from redirectUrl query");
             }
         }
 
@@ -302,7 +307,7 @@ public sealed partial class LoginService
         {
             try
             {
-                AppLogger.Info("LoginService", $"Requesting check_sig URL: {redirectUrl}");
+                AppLogger.Info("LoginService", "Requesting check_sig URL");
                 using var checkReq = new HttpRequestMessage(HttpMethod.Get, redirectUrl);
                 checkReq.Headers.Add("Cookie", $"qrsig={qrsig};");
 
@@ -336,7 +341,7 @@ public sealed partial class LoginService
                 if (checkResp.Headers.Location != null)
                 {
                     var jumpUrl = checkResp.Headers.Location.ToString();
-                    AppLogger.Info("LoginService", $"Following check_sig redirect: {jumpUrl}");
+                    AppLogger.Info("LoginService", $"Following check_sig redirect to host: {checkResp.Headers.Location.Host}");
                     var cookieHeader = string.Join("; ", cookieDict.Select(kv => $"{kv.Key}={kv.Value}"));
                     using var jumpReq = new HttpRequestMessage(HttpMethod.Get, jumpUrl);
                     jumpReq.Headers.Add("Cookie", cookieHeader);
@@ -355,9 +360,14 @@ public sealed partial class LoginService
                     }
                 }
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 AppLogger.Error("LoginService", "Exception during check_sig exchange", ex);
+                return false;
             }
         }
 
@@ -366,6 +376,12 @@ public sealed partial class LoginService
         if (string.IsNullOrEmpty(skey) && cookieDict.TryGetValue("p_skey", out var ps))
         {
             skey = ps;
+        }
+
+        if (string.IsNullOrEmpty(uin) || string.IsNullOrEmpty(skey))
+        {
+            AppLogger.Warn("LoginService", "check_sig exchange completed but uin or skey is missing");
+            return false;
         }
 
         // 补充音乐平台必要 Cookie
@@ -392,6 +408,7 @@ public sealed partial class LoginService
         // 自动触发第二阶段：向平台申请 OAuth2 Code 并换取专属 musickey 完整凭据
         AppLogger.Info("LoginService", "Starting Phase 2: Automatically exchanging OAuth2 Code for full VIP musickey...");
         await ExchangeMusicKeyByOAuthAsync(cookieDict, ct).ConfigureAwait(false);
+        return true;
     }
 
     private static async Task<bool> ExchangeWeChatCodeAsync(string code, CancellationToken ct)
@@ -1104,7 +1121,7 @@ public sealed partial class LoginService
             if (authResp.Headers.Location != null)
             {
                 var loc = authResp.Headers.Location.ToString();
-                AppLogger.Info("LoginService", $"OAuth authorize redirect location: {loc}");
+                AppLogger.Info("LoginService", "OAuth authorize returned redirect");
                 var codeMatch = CodeQueryRegex().Match(loc);
                 if (codeMatch.Success)
                 {
@@ -1114,7 +1131,7 @@ public sealed partial class LoginService
             else
             {
                 var body = await authResp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                AppLogger.Debug("LoginService", $"OAuth authorize body: {(body.Length > 200 ? body[..200] : body)}");
+                AppLogger.Debug("LoginService", $"OAuth authorize body length: {body.Length}");
                 var codeMatch = CodeQueryRegex().Match(body);
                 if (codeMatch.Success)
                 {
@@ -1128,7 +1145,7 @@ public sealed partial class LoginService
                 return false;
             }
 
-            AppLogger.Info("LoginService", $"Successfully captured OAuth code: {code}");
+            AppLogger.Info("LoginService", "Successfully captured OAuth code");
 
             // 调用 u.y.qq.com 接口换取专属 musickey
             var musicLoginUrl = "https://u.y.qq.com/cgi-bin/musicu.fcg";

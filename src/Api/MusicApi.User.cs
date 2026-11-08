@@ -85,8 +85,8 @@ public sealed partial class MusicApi
                 }
             }
 
-            // 若未成功获取 VIP 身份且允许重试续期，则尝试自动刷新 Token
-            if (canRetryWithRenew && (!hasProfile || !hasVipIdentity || !UserSession.Current.IsVip))
+            // 若未成功获取 VIP 身份节点且允许重试续期，则尝试自动刷新 Token
+            if (canRetryWithRenew && (!hasProfile || !hasVipIdentity))
             {
                 AppLogger.Info("MusicApi", "Session VIP status invalid or expired, attempting automatic token renewal...");
                 var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
