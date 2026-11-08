@@ -107,17 +107,24 @@ public sealed partial class MusicApi
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
             if (!root.TryGetProperty("req", out var reqObj)) return null;
-            if (!reqObj.TryGetProperty("code", out var codeProp) || codeProp.GetInt32() != 0) return null;
+            if (!reqObj.TryGetProperty("code", out var codeProp) ||
+                codeProp.ValueKind != JsonValueKind.Number ||
+                !codeProp.TryGetInt32(out var code) || code != 0) return null;
             if (!reqObj.TryGetProperty("data", out var dataObj)) return null;
 
             int totalCount = 0;
-            if (dataObj.TryGetProperty("TotalCmNum", out var totalProp) && totalProp.ValueKind == JsonValueKind.Number)
+            if (dataObj.TryGetProperty("TotalCmNum", out var totalProp) &&
+                totalProp.ValueKind == JsonValueKind.Number &&
+                totalProp.TryGetInt32(out var totalCm))
             {
-                totalCount = totalProp.GetInt32();
+                totalCount = totalCm;
             }
-            else if (dataObj.TryGetProperty("CommentList", out var cl) && cl.TryGetProperty("Total", out var tProp) && tProp.ValueKind == JsonValueKind.Number)
+            else if (dataObj.TryGetProperty("CommentList", out var cl) &&
+                     cl.TryGetProperty("Total", out var tProp) &&
+                     tProp.ValueKind == JsonValueKind.Number &&
+                     tProp.TryGetInt32(out var totalCl))
             {
-                totalCount = tProp.GetInt32();
+                totalCount = totalCl;
             }
 
             List<SongComment> hotList = [];
@@ -154,7 +161,7 @@ public sealed partial class MusicApi
                 {
                     foreach (var elem in cArr.EnumerateArray())
                     {
-                        if (elem.TryGetProperty("SeqNo", out var sq))
+                        if (elem.TryGetProperty("SeqNo", out var sq) && sq.ValueKind == JsonValueKind.String)
                         {
                             var s = sq.GetString();
                             if (!string.IsNullOrEmpty(s))
@@ -185,17 +192,17 @@ public sealed partial class MusicApi
     {
         try
         {
-            var seqNo = obj.TryGetProperty("SeqNo", out var sq) ? sq.GetString() ?? "" : "";
-            var rawCmId = obj.TryGetProperty("CmId", out var ci) ? ci.GetString() ?? "" : "";
+            var seqNo = obj.TryGetProperty("SeqNo", out var sq) && sq.ValueKind == JsonValueKind.String ? sq.GetString() ?? "" : "";
+            var rawCmId = obj.TryGetProperty("CmId", out var ci) && ci.ValueKind == JsonValueKind.String ? ci.GetString() ?? "" : "";
             var commentId = !string.IsNullOrEmpty(rawCmId) ? rawCmId : seqNo;
             if (string.IsNullOrEmpty(commentId)) return null;
 
-            var nick = obj.TryGetProperty("Nick", out var nk) ? nk.GetString() ?? "" : "";
+            var nick = obj.TryGetProperty("Nick", out var nk) && nk.ValueKind == JsonValueKind.String ? nk.GetString() ?? "" : "";
             if (nick.StartsWith('@')) nick = nick[1..];
             if (string.IsNullOrWhiteSpace(nick)) nick = "匿名用户";
 
-            var avatarUrl = obj.TryGetProperty("Avatar", out var av) ? av.GetString() ?? "" : "";
-            var rawContent = obj.TryGetProperty("Content", out var ct) ? ct.GetString() ?? "" : "";
+            var avatarUrl = obj.TryGetProperty("Avatar", out var av) && av.ValueKind == JsonValueKind.String ? av.GetString() ?? "" : "";
+            var rawContent = obj.TryGetProperty("Content", out var ct) && ct.ValueKind == JsonValueKind.String ? ct.GetString() ?? "" : "";
             var content = DecodeHtmlEntities(rawContent);
             if (string.IsNullOrWhiteSpace(content)) return null;
 

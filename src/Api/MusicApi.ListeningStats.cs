@@ -73,16 +73,18 @@ public sealed partial class MusicApi
                 if (data.TryGetProperty("today", out var today) &&
                     today.TryGetProperty("listenTime", out var lt) &&
                     lt.TryGetProperty("listenTimeSec", out var secElem) &&
-                    secElem.ValueKind == JsonValueKind.Number)
+                    secElem.ValueKind == JsonValueKind.Number &&
+                    secElem.TryGetInt32(out var parsedSec))
                 {
-                    todaySec = secElem.GetInt32();
+                    todaySec = parsedSec;
                 }
 
                 if (data.TryGetProperty("total", out var total) &&
                     total.TryGetProperty("day", out var dayElem) &&
-                    dayElem.ValueKind == JsonValueKind.Number)
+                    dayElem.ValueKind == JsonValueKind.Number &&
+                    dayElem.TryGetInt32(out var parsedDays))
                 {
-                    totalDays = dayElem.GetInt32();
+                    totalDays = parsedDays;
                 }
 
                 return new ListeningStatsResult(todaySec, totalDays);
@@ -123,13 +125,14 @@ public sealed partial class MusicApi
             var uin = UserSession.Current.Uin;
             var uinNum = long.TryParse(uin, out var parsedUin) ? parsedUin : 0L;
 
+            var escapedDate = !string.IsNullOrWhiteSpace(date) ? JsonEncodedText.Encode(date).ToString() : "";
             string barParam = string.IsNullOrWhiteSpace(date)
                 ? $$"""{ "type": {{(int)period}}, "optionType": 1, "version": "v2" }"""
-                : $$"""{ "type": {{(int)period}}, "date": "{{date}}", "optionType": 1, "version": "v2" }""";
+                : $$"""{ "type": {{(int)period}}, "date": "{{escapedDate}}", "optionType": 1, "version": "v2" }""";
 
             string rankParam = string.IsNullOrWhiteSpace(date)
                 ? $$"""{ "type": {{(int)period}}, "version": "v2" }"""
-                : $$"""{ "type": {{(int)period}}, "date": "{{date}}", "version": "v2" }""";
+                : $$"""{ "type": {{(int)period}}, "date": "{{escapedDate}}", "version": "v2" }""";
 
             var payload = $$"""
                 {
@@ -175,7 +178,7 @@ public sealed partial class MusicApi
             {
                 foreach (var d in adElem.EnumerateArray())
                 {
-                    var s = d.GetString();
+                    var s = d.ValueKind == JsonValueKind.String ? d.GetString() : (d.ValueKind == JsonValueKind.Number ? d.GetRawText() : null);
                     if (!string.IsNullOrWhiteSpace(s))
                     {
                         availableDates.Add(s);
@@ -263,6 +266,7 @@ public sealed partial class MusicApi
             List<ListeningChartPoint> chartPoints = [];
             if (activePeriodObj.ValueKind == JsonValueKind.Object &&
                 activePeriodObj.TryGetProperty("chart", out var chartObj) &&
+                chartObj.ValueKind == JsonValueKind.Object &&
                 chartObj.TryGetProperty("chartInfo", out var chartInfo) &&
                 chartInfo.ValueKind == JsonValueKind.Object)
             {
@@ -297,6 +301,7 @@ public sealed partial class MusicApi
             if (chartPoints.Count == 0 &&
                 barData.ValueKind == JsonValueKind.Object &&
                 barData.TryGetProperty("bar", out var barBlock) &&
+                barBlock.ValueKind == JsonValueKind.Object &&
                 barBlock.TryGetProperty("optionResults", out var optResMap) &&
                 optResMap.ValueKind == JsonValueKind.Object)
             {
@@ -334,8 +339,8 @@ public sealed partial class MusicApi
                 foreach (var sItem in singersElem.EnumerateArray())
                 {
                     long sId = sItem.TryGetProperty("id", out var idE) && idE.TryGetInt64(out var id) ? id : 0L;
-                    string sName = sItem.TryGetProperty("name", out var nE) ? nE.GetString() ?? "" : "";
-                    string sCover = sItem.TryGetProperty("cover", out var cE) ? cE.GetString() ?? "" : "";
+                    string sName = GetStringSafe(sItem, "name");
+                    string sCover = GetStringSafe(sItem, "cover");
                     long sSec = sItem.TryGetProperty("listenTimeSec", out var secE) && secE.TryGetInt64(out var sec) ? sec : 0L;
 
                     if (!string.IsNullOrWhiteSpace(sName))
@@ -352,8 +357,8 @@ public sealed partial class MusicApi
                 foreach (var sItem in optRes.EnumerateArray())
                 {
                     long sId = sItem.TryGetProperty("id", out var idE) && idE.TryGetInt64(out var id) ? id : 0L;
-                    string sName = sItem.TryGetProperty("name", out var nE) ? nE.GetString() ?? "" : "";
-                    string sCover = sItem.TryGetProperty("singerAvatar", out var cE) ? cE.GetString() ?? "" : "";
+                    string sName = GetStringSafe(sItem, "name");
+                    string sCover = GetStringSafe(sItem, "singerAvatar");
                     long sSec = sItem.TryGetProperty("value", out var valE) && valE.TryGetInt64(out var v) ? v : 0L;
 
                     if (!string.IsNullOrWhiteSpace(sName))
@@ -370,9 +375,9 @@ public sealed partial class MusicApi
             {
                 foreach (var hl in hlArray.EnumerateArray())
                 {
-                    string hlTitle = hl.TryGetProperty("title", out var htE) ? htE.GetString() ?? "" : "";
-                    string hlSub = hl.TryGetProperty("subtitle", out var hsE) ? hsE.GetString() ?? "" : "";
-                    string hlTips = hl.TryGetProperty("tips", out var hpE) ? hpE.GetString() ?? "" : "";
+                    string hlTitle = GetStringSafe(hl, "title");
+                    string hlSub = GetStringSafe(hl, "subtitle");
+                    string hlTips = GetStringSafe(hl, "tips");
                     if (!string.IsNullOrWhiteSpace(hlTitle))
                     {
                         highLights.Add(new ListeningHighlight(hlTitle, hlSub, hlTips));
@@ -445,6 +450,13 @@ public sealed partial class MusicApi
             return new ListeningReportData(period, date ?? "", "", 0L, 0, 0, 0, 0, [], [], [], [], [], []);
         }
     }
+
+    private static string GetStringSafe(JsonElement obj, string propertyName) =>
+        obj.ValueKind == JsonValueKind.Object &&
+        obj.TryGetProperty(propertyName, out var elem) &&
+        elem.ValueKind == JsonValueKind.String
+            ? elem.GetString() ?? ""
+            : "";
 }
 
 /// <summary>

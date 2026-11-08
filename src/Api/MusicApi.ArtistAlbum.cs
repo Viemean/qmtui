@@ -49,12 +49,12 @@ public sealed partial class MusicApi
                 var albums = new List<Album>(listArr.GetArrayLength());
                 foreach (var item in listArr.EnumerateArray())
                 {
-                    long id = item.TryGetProperty("id", out var idProp) ? idProp.GetInt64() : 0;
-                    string mid = item.TryGetProperty("mid", out var midProp) ? midProp.GetString() ?? "" : "";
-                    string name = item.TryGetProperty("name", out var nProp) ? nProp.GetString() ?? "" : "";
-                    int songCount = item.TryGetProperty("songnum", out var scProp) ? scProp.GetInt32() : 0;
-                    string logo = item.TryGetProperty("logo", out var lProp) ? lProp.GetString() ?? "" : "";
-                    long pubtime = item.TryGetProperty("pubtime", out var ptProp) ? ptProp.GetInt64() : 0;
+                    long id = item.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.Number ? idProp.GetInt64() : 0;
+                    string mid = item.TryGetProperty("mid", out var midProp) && midProp.ValueKind == JsonValueKind.String ? midProp.GetString() ?? "" : "";
+                    string name = item.TryGetProperty("name", out var nProp) && nProp.ValueKind == JsonValueKind.String ? nProp.GetString() ?? "" : "";
+                    int songCount = item.TryGetProperty("songnum", out var scProp) && scProp.ValueKind == JsonValueKind.Number ? scProp.GetInt32() : 0;
+                    string logo = item.TryGetProperty("logo", out var lProp) && lProp.ValueKind == JsonValueKind.String ? lProp.GetString() ?? "" : "";
+                    long pubtime = item.TryGetProperty("pubtime", out var ptProp) && ptProp.ValueKind == JsonValueKind.Number ? ptProp.GetInt64() : 0;
 
                     bool hasSingers = item.TryGetProperty("v_singer", out var singerArr) && singerArr.ValueKind == JsonValueKind.Array;
                     var artists = new List<string>(hasSingers ? singerArr.GetArrayLength() : 0);
@@ -62,7 +62,7 @@ public sealed partial class MusicApi
                     {
                         foreach (var singer in singerArr.EnumerateArray())
                         {
-                            if (singer.TryGetProperty("name", out var sNameProp))
+                            if (singer.TryGetProperty("name", out var sNameProp) && sNameProp.ValueKind == JsonValueKind.String)
                             {
                                 var sn = sNameProp.GetString();
                                 if (!string.IsNullOrEmpty(sn)) artists.Add(sn);
@@ -342,7 +342,7 @@ public sealed partial class MusicApi
                         }
                     }
                     // 若尚未找到精确匹配项，记录首个包含匹配项作为备选
-                    else if (string.IsNullOrEmpty(bestMid) &&
+                    else if (string.IsNullOrEmpty(bestMid) && !string.IsNullOrEmpty(name) &&
                              (name.Contains(singerName, StringComparison.OrdinalIgnoreCase) ||
                               singerName.Contains(name, StringComparison.OrdinalIgnoreCase)))
                     {
@@ -682,6 +682,11 @@ public sealed partial class MusicApi
         if (string.IsNullOrEmpty(artistName) && songs.Count > 0)
         {
             artistName = songs[0].Artist;
+        }
+
+        if (string.IsNullOrEmpty(albumName) && songs.Count == 0)
+        {
+            return null;
         }
 
         return new AlbumDetail(albumMid, albumName, artistName, publishDate, company, desc, songs, albumId);

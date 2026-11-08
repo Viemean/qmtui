@@ -142,18 +142,18 @@ public sealed partial class MusicApi
     {
         var track = item.TryGetProperty("track", out var tr) ? tr : item;
 
-        var mid = track.TryGetProperty("mid", out var m) ? m.GetString() ?? "" : "";
-        if (string.IsNullOrEmpty(mid) && track.TryGetProperty("songmid", out var sm))
+        var mid = track.TryGetProperty("mid", out var m) && m.ValueKind == JsonValueKind.String ? m.GetString() ?? "" : "";
+        if (string.IsNullOrEmpty(mid) && track.TryGetProperty("songmid", out var sm) && sm.ValueKind == JsonValueKind.String)
         {
             mid = sm.GetString() ?? "";
         }
 
-        var title = track.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
-        if (string.IsNullOrEmpty(title) && track.TryGetProperty("name", out var n))
+        var title = track.TryGetProperty("title", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? "" : "";
+        if (string.IsNullOrEmpty(title) && track.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String)
         {
             title = n.GetString() ?? "";
         }
-        if (string.IsNullOrEmpty(title) && track.TryGetProperty("songname", out var songNameProp))
+        if (string.IsNullOrEmpty(title) && track.TryGetProperty("songname", out var songNameProp) && songNameProp.ValueKind == JsonValueKind.String)
         {
             title = songNameProp.GetString() ?? "";
         }
@@ -176,20 +176,20 @@ public sealed partial class MusicApi
         {
             if (albumElem.ValueKind == JsonValueKind.Object)
             {
-                if (albumElem.TryGetProperty("name", out var an)) albumName = an.GetString() ?? "";
-                if (albumElem.TryGetProperty("mid", out var am)) albumMid = am.GetString() ?? "";
-                else if (albumElem.TryGetProperty("pmid", out var apm)) albumMid = apm.GetString() ?? "";
+                if (albumElem.TryGetProperty("name", out var an) && an.ValueKind == JsonValueKind.String) albumName = an.GetString() ?? "";
+                if (albumElem.TryGetProperty("mid", out var am) && am.ValueKind == JsonValueKind.String) albumMid = am.GetString() ?? "";
+                else if (albumElem.TryGetProperty("pmid", out var apm) && apm.ValueKind == JsonValueKind.String) albumMid = apm.GetString() ?? "";
             }
             else if (albumElem.ValueKind == JsonValueKind.String)
             {
                 albumName = albumElem.GetString() ?? "";
             }
         }
-        if (string.IsNullOrEmpty(albumName) && track.TryGetProperty("albumname", out var anProp))
+        if (string.IsNullOrEmpty(albumName) && track.TryGetProperty("albumname", out var anProp) && anProp.ValueKind == JsonValueKind.String)
         {
             albumName = anProp.GetString() ?? "";
         }
-        if (string.IsNullOrEmpty(albumMid) && track.TryGetProperty("albummid", out var amidProp))
+        if (string.IsNullOrEmpty(albumMid) && track.TryGetProperty("albummid", out var amidProp) && amidProp.ValueKind == JsonValueKind.String)
         {
             albumMid = amidProp.GetString() ?? "";
         }
@@ -209,15 +209,15 @@ public sealed partial class MusicApi
             foreach (var singer in singerArray.EnumerateArray())
             {
                 var sName = "";
-                if (singer.TryGetProperty("name", out var sNameProp)) sName = sNameProp.GetString() ?? "";
-                else if (singer.TryGetProperty("singer_name", out var snp)) sName = snp.GetString() ?? "";
-                else if (singer.TryGetProperty("singerName", out var snp2)) sName = snp2.GetString() ?? "";
+                if (singer.TryGetProperty("name", out var sNameProp) && sNameProp.ValueKind == JsonValueKind.String) sName = sNameProp.GetString() ?? "";
+                else if (singer.TryGetProperty("singer_name", out var snp) && snp.ValueKind == JsonValueKind.String) sName = snp.GetString() ?? "";
+                else if (singer.TryGetProperty("singerName", out var snp2) && snp2.ValueKind == JsonValueKind.String) sName = snp2.GetString() ?? "";
 
                 var sMid = "";
-                if (singer.TryGetProperty("mid", out var sMidProp)) sMid = sMidProp.GetString() ?? "";
-                else if (singer.TryGetProperty("singer_mid", out var smp)) sMid = smp.GetString() ?? "";
-                else if (singer.TryGetProperty("singerMID", out var smp2)) sMid = smp2.GetString() ?? "";
-                else if (singer.TryGetProperty("pmid", out var pmp)) sMid = pmp.GetString() ?? "";
+                if (singer.TryGetProperty("mid", out var sMidProp) && sMidProp.ValueKind == JsonValueKind.String) sMid = sMidProp.GetString() ?? "";
+                else if (singer.TryGetProperty("singer_mid", out var smp) && smp.ValueKind == JsonValueKind.String) sMid = smp.GetString() ?? "";
+                else if (singer.TryGetProperty("singerMID", out var smp2) && smp2.ValueKind == JsonValueKind.String) sMid = smp2.GetString() ?? "";
+                else if (singer.TryGetProperty("pmid", out var pmp) && pmp.ValueKind == JsonValueKind.String) sMid = pmp.GetString() ?? "";
 
                 long sId = 0;
                 if (singer.TryGetProperty("id", out var sIdProp) ||
