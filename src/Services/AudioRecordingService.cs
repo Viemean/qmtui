@@ -367,6 +367,7 @@ public sealed class AudioRecordingSession : IDisposable
 
                 lock (_lock)
                 {
+                    if (_isDisposed) break;
                     _pcmStream.Write(buffer, 0, buffer.Length);
                 }
             }
@@ -459,9 +460,10 @@ public sealed class AudioRecordingSession : IDisposable
                 samples[0] = (short)Math.Clamp(prev, short.MinValue, short.MaxValue);
                 for (int i = 1; i < sampleCount; i++)
                 {
-                    int cur = (samples[i] - dcOffset) - (int)(alpha * prev);
+                    int x = samples[i] - dcOffset;
+                    int cur = x - (int)(alpha * prev);
                     samples[i] = (short)Math.Clamp(cur, short.MinValue, short.MaxValue);
-                    prev = samples[i] - dcOffset;
+                    prev = x;
                 }
             }
 
@@ -711,8 +713,12 @@ public sealed class AudioRecordingSession : IDisposable
             }
         }
 
-        AppLogger.Force("AudioRecording", $"Stopped session. Captured {_pcmStream.Length} PCM bytes.");
-        _pcmStream.Dispose();
+        lock (_lock)
+        {
+            _isDisposed = true;
+            AppLogger.Force("AudioRecording", $"Stopped session. Captured {_pcmStream.Length} PCM bytes.");
+            _pcmStream.Dispose();
+        }
         _cts.Dispose();
     }
 }

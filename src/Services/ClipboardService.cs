@@ -140,9 +140,13 @@ public static class ClipboardService
             using var proc = Process.Start(psi);
             if (proc == null) return null;
 
-            var output = proc.StandardOutput.ReadToEnd();
-            proc.WaitForExit(500);
-            return proc.ExitCode == 0 ? output : null;
+            var readTask = proc.StandardOutput.ReadToEndAsync();
+            if (!proc.WaitForExit(500) || !readTask.Wait(200))
+            {
+                try { proc.Kill(true); } catch { }
+                return null;
+            }
+            return proc.ExitCode == 0 ? readTask.Result : null;
         }
         catch (Exception ex)
         {
