@@ -14,7 +14,7 @@ public static class AppLogger
     /// <summary>
     /// 当前日志输出文件的绝对路径
     /// </summary>
-    public static string LogFilePath => s_logFilePath ??= ResolveLogFilePath();
+    public static string LogFilePath => s_logFilePath ?? ResolveLogFilePath();
 
     /// <summary>
     /// 初始化日志服务，设定调试模式并轮转超限历史日志文件
@@ -28,7 +28,8 @@ public static class AppLogger
         {
             lock (s_lock)
             {
-                var filePath = LogFilePath;
+                s_logFilePath = ResolveLogFilePath();
+                var filePath = s_logFilePath;
                 var logDir = Path.GetDirectoryName(filePath);
                 if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
                 {
@@ -125,7 +126,10 @@ public static class AppLogger
         var filePath = LogFilePath;
         if (!string.IsNullOrEmpty(filePath))
         {
-            AppendLog(filePath, line);
+            lock (s_lock)
+            {
+                AppendLog(filePath, line);
+            }
         }
     }
 
@@ -152,11 +156,16 @@ public static class AppLogger
 
         try
         {
-            return Path.Combine(AppPathHelper.LogDir, "qmtui.log");
+            var dir = AppPathHelper.LogDir;
+            if (!string.IsNullOrEmpty(dir))
+            {
+                return Path.Combine(dir, "qmtui.log");
+            }
         }
         catch
         {
-            return Path.Combine(Path.GetTempPath(), "qmtui.log");
         }
+
+        return Path.Combine(Path.GetTempPath(), "qmtui.log");
     }
 }

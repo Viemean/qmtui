@@ -248,11 +248,13 @@ public static class QrcDecoder
 
     public static string DecodeQrc(string? hexData)
     {
-        if (string.IsNullOrWhiteSpace(hexData) || (hexData.Length % 2 != 0)) return "";
+        if (string.IsNullOrWhiteSpace(hexData)) return "";
+        var hex = hexData.Trim();
+        if (hex.Length % 2 != 0) return "";
         byte[] encrypted;
         try
         {
-            encrypted = Convert.FromHexString(hexData.Trim());
+            encrypted = Convert.FromHexString(hex);
         }
         catch
         {

@@ -57,7 +57,10 @@ public static class PngQrReader
                 cornerLen++;
             }
 
-            if (cornerLen < 3) cornerLen = 7;
+            if (cornerLen < 3)
+            {
+                return ["未检测到有效的二维码定位图案"];
+            }
             double modSize = cornerLen / 7.0;
             int qrWidth = maxX - minX + 1;
             int rawModules = (int)Math.Round(qrWidth / modSize);

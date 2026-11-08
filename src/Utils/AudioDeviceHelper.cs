@@ -143,10 +143,8 @@ public static class AudioDeviceHelper
             if (File.Exists(procCards))
             {
                 var content = File.ReadAllText(procCards).Trim();
-                if (!string.IsNullOrWhiteSpace(content) && !content.Contains("no soundcards"))
-                {
-                    return true;
-                }
+                return !string.IsNullOrWhiteSpace(content) &&
+                       !content.Contains("no soundcards", StringComparison.OrdinalIgnoreCase);
             }
         }
         catch { }
