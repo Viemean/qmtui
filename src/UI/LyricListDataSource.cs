@@ -356,10 +356,16 @@ public sealed class LyricListDataSource : IListDataSource
         var charTimes = row.CharTimes;
         Attribute? lastAttr = null;
 
-        for (int i = 0; i < text.Length && colsDrawn < width; i++)
+        for (int i = 0; i < text.Length && colsDrawn < width;)
         {
-            char ch = text[i];
-            int chCols = ch.GetVisualWidth();
+            var decodeStatus = Rune.DecodeFromUtf16(text.AsSpan(i), out var rune, out int charsConsumed);
+            if (decodeStatus != System.Buffers.OperationStatus.Done)
+            {
+                rune = Rune.ReplacementChar;
+                charsConsumed = 1;
+            }
+
+            int chCols = rune.GetVisualWidth();
             if (colsDrawn + chCols > width) break;
 
             Attribute currentAttr;
@@ -403,8 +409,9 @@ public sealed class LyricListDataSource : IListDataSource
                 listView.SetAttribute(currentAttr);
                 lastAttr = currentAttr;
             }
-            listView.AddRune((Rune)ch);
+            listView.AddRune(rune);
             colsDrawn += chCols;
+            i += charsConsumed;
         }
 
         listView.SetAttribute(dimAttr);
@@ -418,13 +425,19 @@ public sealed class LyricListDataSource : IListDataSource
     private static void RenderPlainText(ListView listView, string str, int width, int viewportX)
     {
         int colsDrawn = 0;
-        for (int i = 0; i < str.Length && colsDrawn < width; i++)
+        for (int i = 0; i < str.Length && colsDrawn < width;)
         {
-            char ch = str[i];
-            int chCols = ch.GetVisualWidth();
+            var decodeStatus = Rune.DecodeFromUtf16(str.AsSpan(i), out var rune, out int charsConsumed);
+            if (decodeStatus != System.Buffers.OperationStatus.Done)
+            {
+                rune = Rune.ReplacementChar;
+                charsConsumed = 1;
+            }
+            int chCols = rune.GetVisualWidth();
             if (colsDrawn + chCols > width) break;
-            listView.AddRune((Rune)ch);
+            listView.AddRune(rune);
             colsDrawn += chCols;
+            i += charsConsumed;
         }
         while (colsDrawn < width)
         {

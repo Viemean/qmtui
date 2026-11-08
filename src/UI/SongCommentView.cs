@@ -677,6 +677,7 @@ public sealed class SongCommentView : View
             _loadCts?.Cancel();
         }
         catch { }
+        _isLoading = false;
 
         if (_currentSong != null && (_hotComments.Count > 0 || _normalComments.Count > 0))
         {
@@ -861,6 +862,13 @@ public sealed class SongCommentView : View
                 _isLoading = false;
                 RebuildDisplayItems();
             });
+        }
+        finally
+        {
+            if (ct.IsCancellationRequested)
+            {
+                _isLoading = false;
+            }
         }
     }
 
