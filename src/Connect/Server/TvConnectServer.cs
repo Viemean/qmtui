@@ -19,10 +19,22 @@ public sealed class TvConnectServer : IDisposable
     private readonly System.Threading.Lock _gate = new();
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
+
+    private static readonly HashSet<string> s_allowedCoverExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg", ".jpeg", ".png", ".webp", ".bmp"
+    };
+
+    private static readonly HashSet<string> s_allowedAudioExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp3", ".flac", ".wav", ".m4a", ".ogg", ".aac", ".wma", ".ape", ".opus", ".dsf", ".dff", ".aiff"
+    };
+
     private sealed class ClientSession : IDisposable
     {
         public WebSocket Socket { get; }
         public ConnectDevice? Device { get; set; }
+        public int FailedPinAttempts { get; set; }
         private readonly SemaphoreSlim _sendLock = new(1, 1);
         private bool _disposed;
 
@@ -343,6 +355,7 @@ public sealed class TvConnectServer : IDisposable
 
     private async Task RunWebSocketSessionAsync(WebSocket socket, TcpClient client)
     {
+        const int maxMessageBytes = 1024 * 1024;
         var buffer = new byte[8192];
         var ms = new MemoryStream();
 
@@ -352,6 +365,7 @@ public sealed class TvConnectServer : IDisposable
             {
                 ms.SetLength(0);
                 WebSocketReceiveResult result;
+                bool messageTooLarge = false;
                 do
                 {
                     result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), _cts?.Token ?? CancellationToken.None).ConfigureAwait(false);
@@ -361,7 +375,19 @@ public sealed class TvConnectServer : IDisposable
                         break;
                     }
                     ms.Write(buffer, 0, result.Count);
+                    if (ms.Length > maxMessageBytes)
+                    {
+                        messageTooLarge = true;
+                        break;
+                    }
                 } while (!result.EndOfMessage);
+
+                if (messageTooLarge)
+                {
+                    AppLogger.Warn("TvConnectServer", "WebSocket message exceeded maximum permitted size, closing connection");
+                    await socket.CloseAsync(WebSocketCloseStatus.MessageTooBig, "Message too large", CancellationToken.None).ConfigureAwait(false);
+                    break;
+                }
 
                 if (result.MessageType == WebSocketMessageType.Text)
                 {
@@ -437,13 +463,32 @@ public sealed class TvConnectServer : IDisposable
                     var req = msg.DecodeData(ConnectJsonContext.Default.PairRequestPayload);
                     if (req != null)
                     {
-                        bool isTrusted = _storage.IsDeviceTrusted(req.Device.Id, req.Device.Token) ||
-                                         (!string.IsNullOrEmpty(req.PinCode) && req.PinCode == _storage.CurrentPinCode);
-
-                        if (isTrusted)
+                        if (_activeClients.TryGetValue(socket, out var session) && session.FailedPinAttempts >= 5)
                         {
+                            AppLogger.Warn("TvConnectServer", "Rejecting pair request: excessive failed attempts on session");
+                            var resp = new PairResponsePayload(Accepted: false, Message: "Too many failed attempts. Please reconnect.");
+                            await SendMessageAsync(socket, ConnectActions.PairResponse, resp, ConnectJsonContext.Default.PairResponsePayload).ConfigureAwait(false);
+                            break;
+                        }
+
+                        bool isDeviceTrusted = _storage.IsDeviceTrusted(req.Device.Id, req.Device.Token);
+                        bool isPinMatch = !string.IsNullOrEmpty(req.PinCode) &&
+                            CryptographicOperations.FixedTimeEquals(
+                                Encoding.UTF8.GetBytes(req.PinCode),
+                                Encoding.UTF8.GetBytes(_storage.CurrentPinCode));
+
+                        if (isDeviceTrusted || isPinMatch)
+                        {
+                            if (session != null)
+                            {
+                                session.FailedPinAttempts = 0;
+                            }
+                            if (isPinMatch)
+                            {
+                                _storage.GenerateNewPinCode();
+                            }
                             _storage.SavePairedDevice(req.Device);
-                            if (_activeClients.TryGetValue(socket, out var session))
+                            if (session != null)
                             {
                                 session.Device = req.Device;
                             }
@@ -460,31 +505,45 @@ public sealed class TvConnectServer : IDisposable
                         }
                         else
                         {
+                            if (session != null && !string.IsNullOrEmpty(req.PinCode))
+                            {
+                                session.FailedPinAttempts++;
+                            }
+
                             // 校验失败或等待用户批准
                             PairRequested?.Invoke(req.Device, req.PinCode, async accept =>
                             {
-                                if (accept)
+                                try
                                 {
-                                    _storage.SavePairedDevice(req.Device);
-                                    if (_activeClients.TryGetValue(socket, out var session))
+                                    if (accept)
                                     {
-                                        session.Device = req.Device;
+                                        _storage.GenerateNewPinCode();
+                                        _storage.SavePairedDevice(req.Device);
+                                        if (_activeClients.TryGetValue(socket, out var curSession))
+                                        {
+                                            curSession.Device = req.Device;
+                                            curSession.FailedPinAttempts = 0;
+                                        }
+                                        var local = _storage.GetLocalDevice(port: ActualPort);
+                                        var resp = new PairResponsePayload(
+                                            Accepted: true,
+                                            Message: "Paired successfully",
+                                            Device: local
+                                        );
+                                        await SendMessageAsync(socket, ConnectActions.PairResponse, resp, ConnectJsonContext.Default.PairResponsePayload).ConfigureAwait(false);
+                                        DeviceConnected?.Invoke(req.Device);
+                                        PlayerStateRequested?.Invoke();
+                                        QueueStateRequested?.Invoke();
                                     }
-                                    var local = _storage.GetLocalDevice(port: ActualPort);
-                                    var resp = new PairResponsePayload(
-                                        Accepted: true,
-                                        Message: "Paired successfully",
-                                        Device: local
-                                    );
-                                    await SendMessageAsync(socket, ConnectActions.PairResponse, resp, ConnectJsonContext.Default.PairResponsePayload).ConfigureAwait(false);
-                                    DeviceConnected?.Invoke(req.Device);
-                                    PlayerStateRequested?.Invoke();
-                                    QueueStateRequested?.Invoke();
+                                    else
+                                    {
+                                        var resp = new PairResponsePayload(Accepted: false, Message: "Pairing rejected by QMTUI user");
+                                        await SendMessageAsync(socket, ConnectActions.PairResponse, resp, ConnectJsonContext.Default.PairResponsePayload).ConfigureAwait(false);
+                                    }
                                 }
-                                else
+                                catch (Exception cbEx)
                                 {
-                                    var resp = new PairResponsePayload(Accepted: false, Message: "Pairing rejected by QMTUI user");
-                                    await SendMessageAsync(socket, ConnectActions.PairResponse, resp, ConnectJsonContext.Default.PairResponsePayload).ConfigureAwait(false);
+                                    AppLogger.Error("TvConnectServer", "Pair approval callback failed", cbEx);
                                 }
                             });
                         }
@@ -860,7 +919,7 @@ public sealed class TvConnectServer : IDisposable
                     try
                     {
                         var unescaped = Uri.UnescapeDataString(localCoverPath);
-                        if (File.Exists(unescaped))
+                        if (File.Exists(unescaped) && s_allowedCoverExtensions.Contains(Path.GetExtension(unescaped)))
                         {
                             coverPath = unescaped;
                         }
@@ -888,7 +947,7 @@ public sealed class TvConnectServer : IDisposable
                     for (int i = 0; i < 20; i++)
                     {
                         coverPath = CurrentCoverPathProvider?.Invoke();
-                        if (!string.IsNullOrEmpty(coverPath) && File.Exists(coverPath))
+                        if (!string.IsNullOrEmpty(coverPath) && File.Exists(coverPath) && s_allowedCoverExtensions.Contains(Path.GetExtension(coverPath)))
                         {
                             break;
                         }
@@ -896,7 +955,7 @@ public sealed class TvConnectServer : IDisposable
                     }
                 }
 
-                if (!string.IsNullOrEmpty(coverPath) && File.Exists(coverPath))
+                if (!string.IsNullOrEmpty(coverPath) && File.Exists(coverPath) && s_allowedCoverExtensions.Contains(Path.GetExtension(coverPath)))
                 {
                     var ext = Path.GetExtension(coverPath).ToLowerInvariant();
                     string contentType = ext switch
@@ -949,7 +1008,7 @@ public sealed class TvConnectServer : IDisposable
                     AppLogger.Debug("TvConnectServer", $"Failed to unescape audio stream path: {ex.Message}");
                 }
 
-                if (string.IsNullOrEmpty(decodedPath) || !File.Exists(decodedPath))
+                if (string.IsNullOrEmpty(decodedPath) || !File.Exists(decodedPath) || !s_allowedAudioExtensions.Contains(Path.GetExtension(decodedPath)))
                 {
                     await SendRawResponseAsync(stream, 404, "Not Found", "text/plain", "Not Found", ct).ConfigureAwait(false);
                     return;

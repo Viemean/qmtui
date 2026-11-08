@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using QmTui.Connect.Models;
 using QmTui.Utils;
@@ -40,7 +41,7 @@ public sealed class ConnectStorage
     /// <returns>新生成的 6 位数字 PIN 码。</returns>
     public string GenerateNewPinCode()
     {
-        CurrentPinCode = Random.Shared.Next(100000, 1000000).ToString("D6");
+        CurrentPinCode = RandomNumberGenerator.GetInt32(100000, 1000000).ToString("D6");
         return CurrentPinCode;
     }
 
@@ -165,22 +166,26 @@ public sealed class ConnectStorage
         try
         {
             Directory.CreateDirectory(s_configDir);
-            using var stream = File.Create(s_configPath);
-            using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
-
-            writer.WriteStartObject();
-            writer.WriteString("local_id", LocalDeviceId);
-            writer.WriteString("local_name", LocalDeviceName);
-            writer.WriteString("local_token", LocalToken);
-
-            writer.WriteStartArray("paired_devices");
-            foreach (var dev in _pairedDevices)
+            var tmpPath = $"{s_configPath}.tmp";
+            using (var stream = File.Create(tmpPath))
+            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
             {
-                JsonSerializer.Serialize(writer, dev, ConnectJsonContext.Default.ConnectDevice);
-            }
-            writer.WriteEndArray();
+                writer.WriteStartObject();
+                writer.WriteString("local_id", LocalDeviceId);
+                writer.WriteString("local_name", LocalDeviceName);
+                writer.WriteString("local_token", LocalToken);
 
-            writer.WriteEndObject();
+                writer.WriteStartArray("paired_devices");
+                foreach (var dev in _pairedDevices)
+                {
+                    JsonSerializer.Serialize(writer, dev, ConnectJsonContext.Default.ConnectDevice);
+                }
+                writer.WriteEndArray();
+
+                writer.WriteEndObject();
+            }
+
+            File.Move(tmpPath, s_configPath, overwrite: true);
         }
         catch (Exception ex)
         {

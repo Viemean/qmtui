@@ -100,6 +100,8 @@ public sealed class ConnectMdnsService : IDisposable
         var suffix = _storage.LocalDeviceId[^Math.Min(4, _storage.LocalDeviceId.Length)..];
         var instanceName = $"Melodist-TV-{suffix}";
 
+        var token = _cts.Token;
+
         // 启动原生 UDP 组播 5353 监听与按需响应
         Task.Run(async () =>
         {
@@ -122,7 +124,10 @@ public sealed class ConnectMdnsService : IDisposable
                 }
                 catch (Exception bindEx)
                 {
-                    AppLogger.Debug("ConnectMdns", $"UDP 5353 bind note: {bindEx.Message}");
+                    AppLogger.Warn("ConnectMdns", $"UDP 5353 bind failed, mDNS responder disabled: {bindEx.Message}");
+                    _udpClient?.Dispose();
+                    _udpClient = null;
+                    return;
                 }
 
                 AppLogger.Info("ConnectMdns", $"mDNS service discovery active for {instanceName} on {localIp}:{_port}");
@@ -131,7 +136,7 @@ public sealed class ConnectMdnsService : IDisposable
                 _ = Task.Run(async () =>
                 {
                     var multicastEp = new IPEndPoint(multicastAddress, 5353);
-                    for (int i = 0; i < 2 && !_cts.Token.IsCancellationRequested; i++)
+                    for (int i = 0; i < 2 && !token.IsCancellationRequested; i++)
                     {
                         try
                         {
@@ -145,14 +150,14 @@ public sealed class ConnectMdnsService : IDisposable
 
                         if (i == 0)
                         {
-                            await Task.Delay(1000, _cts.Token).ConfigureAwait(false);
+                            await Task.Delay(1000, token).ConfigureAwait(false);
                         }
                     }
 
                     // 之后采用低频保活广播（每 60 秒一次），避免频繁唤醒 CPU 与网络套接字
-                    while (!_cts.Token.IsCancellationRequested)
+                    while (!token.IsCancellationRequested)
                     {
-                        await Task.Delay(60000, _cts.Token).ConfigureAwait(false);
+                        await Task.Delay(60000, token).ConfigureAwait(false);
                         try
                         {
                             var packet = BuildCompleteDnsSdPacket(instanceName, localIp, _port, _storage.LocalDeviceId, _storage.LocalDeviceName, _storage.LocalToken, _storage.CurrentPinCode);
@@ -163,14 +168,14 @@ public sealed class ConnectMdnsService : IDisposable
                         }
                         catch { }
                     }
-                }, _cts.Token);
+                }, token);
 
                 // 监听传入查询
-                while (!_cts.Token.IsCancellationRequested)
+                while (!token.IsCancellationRequested && _udpClient != null)
                 {
                     try
                     {
-                        var result = await _udpClient.ReceiveAsync(_cts.Token).ConfigureAwait(false);
+                        var result = await _udpClient.ReceiveAsync(token).ConfigureAwait(false);
                         _ = HandleMdnsQueryAsync(result.Buffer, result.RemoteEndPoint, instanceName, localIp, multicastAddress);
                     }
                     catch (OperationCanceledException)
@@ -180,6 +185,7 @@ public sealed class ConnectMdnsService : IDisposable
                     catch (Exception ex)
                     {
                         AppLogger.Debug("ConnectMdns", $"Packet handle note: {ex.Message}");
+                        await Task.Delay(500, token).ConfigureAwait(false);
                     }
                 }
             }
@@ -187,7 +193,7 @@ public sealed class ConnectMdnsService : IDisposable
             {
                 AppLogger.Warn("ConnectMdns", $"ConnectMdnsService task error: {ex.Message}");
             }
-        }, _cts.Token);
+        }, token);
     }
 
     internal static bool ShouldHandleQuery(byte[] data, string instanceName)
@@ -307,8 +313,6 @@ public sealed class ConnectMdnsService : IDisposable
             [
                 $"id={deviceId}",
                 $"name={deviceName}",
-                $"token={token}",
-                $"pin={pinCode}",
                 $"host={hostIp}"
             ];
 

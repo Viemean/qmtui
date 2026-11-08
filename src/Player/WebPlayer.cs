@@ -249,30 +249,36 @@ public sealed class WebPlayer : IPlayer
 
         _ = Task.Run(async () =>
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
-            while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
+            try
             {
-                bool shouldFinish = false;
-                double pos = 0;
-                lock (_lock)
+                using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+                while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
                 {
-                    if (!IsPlaying || AudioOutputEnabled) break;
-                    CurrentPositionSeconds += 0.5;
-                    pos = CurrentPositionSeconds;
-                    _server.CurrentPositionSeconds = pos;
-                    if (TotalDurationSeconds > 0 && CurrentPositionSeconds >= TotalDurationSeconds - 0.5)
+                    bool shouldFinish = false;
+                    double pos = 0;
+                    lock (_lock)
                     {
-                        shouldFinish = true;
+                        if (!IsPlaying || AudioOutputEnabled) break;
+                        CurrentPositionSeconds += 0.5;
+                        pos = CurrentPositionSeconds;
+                        _server.CurrentPositionSeconds = pos;
+                        if (TotalDurationSeconds > 0 && CurrentPositionSeconds >= TotalDurationSeconds - 0.5)
+                        {
+                            shouldFinish = true;
+                        }
+                    }
+
+                    PositionUpdated?.Invoke(pos);
+
+                    if (shouldFinish)
+                    {
+                        PlaybackFinished?.Invoke();
+                        break;
                     }
                 }
-
-                PositionUpdated?.Invoke(pos);
-
-                if (shouldFinish)
-                {
-                    PlaybackFinished?.Invoke();
-                    break;
-                }
+            }
+            catch (OperationCanceledException)
+            {
             }
         }, ct);
     }

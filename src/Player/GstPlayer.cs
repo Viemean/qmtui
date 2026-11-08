@@ -446,6 +446,10 @@ public sealed partial class GstPlayer : IPlayer
             {
                 break;
             }
+            catch (ObjectDisposedException)
+            {
+                break;
+            }
 
             if (_disposed) break;
             if (!IsPlaying || _pipeline == 0) continue;
@@ -476,6 +480,27 @@ public sealed partial class GstPlayer : IPlayer
                     {
                         _watchdogStallCount = 0;
                         gst_mini_object_unref(bufMsg);
+                    }
+
+                    nint eosMsg = gst_bus_pop_filtered(bus, GST_MESSAGE_EOS);
+                    if (eosMsg != 0)
+                    {
+                        gst_mini_object_unref(eosMsg);
+                        bool shouldTrigger = false;
+                        lock (_lock)
+                        {
+                            if (!_playbackFinishedTriggered)
+                            {
+                                _playbackFinishedTriggered = true;
+                                shouldTrigger = true;
+                            }
+                        }
+
+                        if (shouldTrigger)
+                        {
+                            AppLogger.Info("GstPlayer", "Bus reported GST_MESSAGE_EOS, track finished");
+                            PlaybackFinished?.Invoke();
+                        }
                     }
                 }
                 finally
