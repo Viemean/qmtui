@@ -52,11 +52,26 @@ public class CommonUtilityTests
     [InlineData("02 - 七里香", "七里香")]
     [InlineData("03 夜曲", "夜曲")]
     [InlineData("[04] 稻香", "稻香")]
+    [InlineData("(01) 晴天", "晴天")]
+    [InlineData("(02) 七里香", "七里香")]
     [InlineData("普通歌曲", "普通歌曲")]
     [InlineData("", "")]
     [InlineData(null, null)]
     public void MusicTitleHelper_CleanTrackNumberPrefix_StripsIndexAccurately(string? input, string? expected)
     {
         Assert.Equal(expected, MusicTitleHelper.CleanTrackNumberPrefix(input!));
+    }
+
+    [Theory]
+    [InlineData("abc", 2, "ab")]
+    [InlineData("你好", 2, "你")]
+    [InlineData("你好", 1, " ")]
+    [InlineData("hello", 5, "hello")]
+    [InlineData("hello world", 6, "hell..")]
+    public void TerminalStringExtensions_TruncateAndPadWide_HandlesNarrowBounds(string text, int width, string expected)
+    {
+        var result = text.TruncateAndPadWide(width);
+        Assert.Equal(expected, result);
+        Assert.Equal(width, result.GetVisualWidth());
     }
 }

@@ -99,6 +99,20 @@ public static class TerminalStringExtensions
             return GetPadding(targetWidth);
         }
 
+        if (targetWidth < 3)
+        {
+            int w = 0;
+            int idx = 0;
+            foreach (var rune in text.EnumerateRunes())
+            {
+                int runeW = rune.GetColumns();
+                if (w + runeW > targetWidth) break;
+                w += runeW;
+                idx += rune.Utf16SequenceLength;
+            }
+            return string.Concat(text.AsSpan(0, idx), GetPadding(targetWidth - w));
+        }
+
         int limit = Math.Max(1, targetWidth - 2);
         int cutCharIndex = -1;
         int cutWidth = 0;

@@ -8,7 +8,7 @@ namespace QmTui.Utils;
 /// </summary>
 public static partial class MusicTitleHelper
 {
-    [GeneratedRegex(@"^(?:\[?\d{1,3}\]?[\.\-_\s]+)(.+)")]
+    [GeneratedRegex(@"^(?:[\[(]?\d{1,3}[\])]?[\.\-_\s]+)(.+)")]
     private static partial Regex TrackNumberPrefixRegex();
 
     /// <summary>
