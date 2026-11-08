@@ -107,97 +107,104 @@ public static partial class WebDavService
             }
         }
 
-        var downloadTask = s_inFlightDownloads.GetOrAdd(localPath, _ => Task.Run(async () =>
-        {
-            var tmpPath = localPath + $".{Environment.TickCount64}.tmp";
-            try
-            {
-                var client = GetHttpClient(server);
-                var uri = BuildFullUri(server, fileHref);
-
-                if (cancellationToken.IsCancellationRequested) return null;
-                progress?.Invoke("正在连接 WebDAV 缓冲音频流...");
-                using var resp = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                if (!resp.IsSuccessStatusCode)
-                {
-                    AppLogger.Warn("WebDavService", $"Failed to download audio {uri}: {resp.StatusCode}");
-                    return null;
-                }
-
-                var totalBytes = resp.Content.Headers.ContentLength ?? -1L;
-                using var remoteStream = await resp.Content.ReadAsStreamAsync(cancellationToken);
-                using var fileStream = new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024);
-
-                byte[] buffer = new byte[64 * 1024];
-                long downloaded = 0;
-                int read;
-                var lastProgressTick = Environment.TickCount64;
-
-                while ((read = await remoteStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)) > 0)
-                {
-                    await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                    downloaded += read;
-
-                    if (Environment.TickCount64 - lastProgressTick > 250)
-                    {
-                        lastProgressTick = Environment.TickCount64;
-                        if (cancellationToken.IsCancellationRequested) break;
-                        if (totalBytes > 0)
-                        {
-                            int pct = (int)((downloaded * 100) / totalBytes);
-                            progress?.Invoke($"正在缓冲 WebDAV 音频: {pct}% ({downloaded / 1024 / 1024}MB / {totalBytes / 1024 / 1024}MB)");
-                        }
-                        else
-                        {
-                            progress?.Invoke($"正在缓冲 WebDAV 音频: {downloaded / 1024 / 1024}MB");
-                        }
-                    }
-                }
-
-                cancellationToken.ThrowIfCancellationRequested();
-                await fileStream.FlushAsync(cancellationToken);
-                fileStream.Dispose();
-
-                if (File.Exists(localPath))
-                {
-                    File.Delete(localPath);
-                }
-                File.Move(tmpPath, localPath);
-
-                var downloadedFi = new FileInfo(localPath);
-                CacheManager.RecordAccess($"webdav/{Path.GetFileName(localPath)}", downloadedFi.Length);
-                CacheManager.EnforceLimitAsync();
-
-                // 尝试用 ATL.NET 补充解析标签并缓存
-                TryUpdateCacheMetadata(server, fileHref, localPath);
-
-                return localPath;
-            }
-            catch (OperationCanceledException)
-            {
-                AppLogger.Info("WebDavService", $"Download audio canceled: {fileHref}");
-                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
-                return null;
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("WebDavService", $"Download audio failed {fileHref}: {ex.Message}");
-                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
-                return null;
-            }
-            finally
-            {
-                s_inFlightDownloads.TryRemove(localPath, out Task<string?>? _);
-            }
-        }, cancellationToken));
+        var lazy = s_inFlightDownloads.GetOrAdd(
+            localPath,
+            _ => new Lazy<Task<string?>>(() => DownloadAudioCoreAsync(server, fileHref, localPath, progress)));
 
         try
         {
-            return await downloadTask.WaitAsync(cancellationToken);
+            return await lazy.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
             return null;
+        }
+    }
+
+    private static async Task<string?> DownloadAudioCoreAsync(
+        WebDavServer server,
+        string fileHref,
+        string localPath,
+        Action<string>? progress)
+    {
+        var tmpPath = localPath + $".{Environment.TickCount64}.tmp";
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        var ct = timeoutCts.Token;
+        try
+        {
+            var client = GetHttpClient(server);
+            var uri = BuildFullUri(server, fileHref);
+
+            progress?.Invoke("正在连接 WebDAV 缓冲音频流...");
+            using var resp = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode)
+            {
+                AppLogger.Warn("WebDavService", $"Failed to download audio {uri}: {resp.StatusCode}");
+                return null;
+            }
+
+            var totalBytes = resp.Content.Headers.ContentLength ?? -1L;
+            using var remoteStream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            using var fileStream = new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024);
+
+            byte[] buffer = new byte[64 * 1024];
+            long downloaded = 0;
+            int read;
+            var lastProgressTick = Environment.TickCount64;
+
+            while ((read = await remoteStream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
+            {
+                await fileStream.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+                downloaded += read;
+
+                if (Environment.TickCount64 - lastProgressTick > 250)
+                {
+                    lastProgressTick = Environment.TickCount64;
+                    if (totalBytes > 0)
+                    {
+                        int pct = (int)((downloaded * 100) / totalBytes);
+                        progress?.Invoke($"正在缓冲 WebDAV 音频: {pct}% ({downloaded / 1024 / 1024}MB / {totalBytes / 1024 / 1024}MB)");
+                    }
+                    else
+                    {
+                        progress?.Invoke($"正在缓冲 WebDAV 音频: {downloaded / 1024 / 1024}MB");
+                    }
+                }
+            }
+
+            await fileStream.FlushAsync(ct).ConfigureAwait(false);
+            fileStream.Dispose();
+
+            if (File.Exists(localPath))
+            {
+                File.Delete(localPath);
+            }
+            File.Move(tmpPath, localPath);
+
+            var downloadedFi = new FileInfo(localPath);
+            CacheManager.RecordAccess($"webdav/{Path.GetFileName(localPath)}", downloadedFi.Length);
+            CacheManager.EnforceLimitAsync();
+
+            // 尝试用 ATL.NET 补充解析标签并缓存
+            TryUpdateCacheMetadata(server, fileHref, localPath);
+
+            return localPath;
+        }
+        catch (OperationCanceledException)
+        {
+            AppLogger.Info("WebDavService", $"Download audio canceled: {fileHref}");
+            try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("WebDavService", $"Download audio failed {fileHref}: {ex.Message}");
+            try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
+            return null;
+        }
+        finally
+        {
+            s_inFlightDownloads.TryRemove(localPath, out _);
         }
     }
 

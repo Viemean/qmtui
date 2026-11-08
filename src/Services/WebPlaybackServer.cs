@@ -214,14 +214,40 @@ public sealed partial class WebPlaybackServer : IDisposable
             string rawPath = parts[1];
             string path = rawPath.Split('?')[0];
 
-            // 提取 Range 请求头
+            // 提取 Range、Host 与 Origin 请求头
             string? rangeHeader = null;
+            string? hostHeader = null;
+            string? originHeader = null;
             foreach (var line in lines)
             {
                 if (line.StartsWith("Range:", StringComparison.OrdinalIgnoreCase))
                 {
                     rangeHeader = line["Range:".Length..].Trim();
-                    break;
+                }
+                else if (line.StartsWith("Host:", StringComparison.OrdinalIgnoreCase))
+                {
+                    hostHeader = line["Host:".Length..].Trim();
+                }
+                else if (line.StartsWith("Origin:", StringComparison.OrdinalIgnoreCase))
+                {
+                    originHeader = line["Origin:".Length..].Trim();
+                }
+            }
+
+            // 校验跨站来源（CSRF 防护）：若存在 Origin 头部，必须与 Host 匹配
+            string? allowedOrigin = null;
+            if (!string.IsNullOrEmpty(originHeader))
+            {
+                if (!string.IsNullOrEmpty(hostHeader) &&
+                    (originHeader.Equals($"http://{hostHeader}", StringComparison.OrdinalIgnoreCase) ||
+                     originHeader.Equals($"https://{hostHeader}", StringComparison.OrdinalIgnoreCase)))
+                {
+                    allowedOrigin = originHeader;
+                }
+                else
+                {
+                    await SendResponseAsync(stream, 403, "Forbidden", "text/plain", "Cross-origin request rejected", ct).ConfigureAwait(false);
+                    return;
                 }
             }
 
@@ -334,7 +360,7 @@ public sealed partial class WebPlaybackServer : IDisposable
             }
             else if (method == "OPTIONS")
             {
-                await SendCorsHeadersAsync(stream, ct).ConfigureAwait(false);
+                await SendCorsHeadersAsync(stream, allowedOrigin, ct).ConfigureAwait(false);
             }
             else
             {
@@ -612,10 +638,11 @@ public sealed partial class WebPlaybackServer : IDisposable
         await stream.FlushAsync(ct).ConfigureAwait(false);
     }
 
-    private static async Task SendCorsHeadersAsync(NetworkStream stream, CancellationToken ct)
+    private static async Task SendCorsHeadersAsync(NetworkStream stream, string? allowedOrigin, CancellationToken ct)
     {
+        var originHeader = !string.IsNullOrEmpty(allowedOrigin) ? $"Access-Control-Allow-Origin: {allowedOrigin}\r\n" : "";
         string headers = "HTTP/1.1 204 No Content\r\n" +
-                         "Access-Control-Allow-Origin: *\r\n" +
+                         originHeader +
                          "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
                          "Access-Control-Allow-Headers: Content-Type, Range\r\n" +
                          "Connection: close\r\n\r\n";

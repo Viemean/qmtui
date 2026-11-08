@@ -40,7 +40,7 @@ public static partial class WebDavService
     private static bool s_loaded;
 
     private static readonly ConcurrentDictionary<string, HttpClient> s_clientCache = new();
-    private static readonly ConcurrentDictionary<string, Task<string?>> s_inFlightDownloads = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, Lazy<Task<string?>>> s_inFlightDownloads = new(StringComparer.OrdinalIgnoreCase);
 
     static WebDavService()
     {

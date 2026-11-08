@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -203,8 +204,8 @@ public sealed partial class WebPlaybackServer
         sb.Append('{');
         sb.Append($"\"type\":\"{eventType}\",");
         sb.Append($"\"isPlaying\":{(IsPlaying ? "true" : "false")},");
-        sb.Append($"\"position\":{CurrentPositionSeconds:F2},");
-        sb.Append($"\"duration\":{TotalDurationSeconds:F2},");
+        sb.Append($"\"position\":{FormatSeconds(CurrentPositionSeconds)},");
+        sb.Append($"\"duration\":{FormatSeconds(TotalDurationSeconds)},");
         sb.Append($"\"volume\":{Volume},");
         sb.Append($"\"audioEnabled\":{(AudioOutputEnabled ? "true" : "false")},");
         sb.Append($"\"isFavorite\":{(IsCurrentSongFavorite ? "true" : "false")},");
@@ -294,4 +295,7 @@ public sealed partial class WebPlaybackServer
             client.Channel.Writer.TryWrite(message);
         }
     }
+
+    private static string FormatSeconds(double v) =>
+        double.IsFinite(v) ? v.ToString("F2", CultureInfo.InvariantCulture) : "0.00";
 }
