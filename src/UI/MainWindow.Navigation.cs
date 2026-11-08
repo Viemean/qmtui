@@ -281,23 +281,29 @@ public sealed partial class MainWindow
 
     private async Task LoadMorePlaylistSongsAsync()
     {
-        if (_isLoadingMorePlaylistSongs || !_hasMorePlaylistSongs || _currentDrilldownPlaylist == null) return;
+        var playlist = _currentDrilldownPlaylist;
+        if (_isLoadingMorePlaylistSongs || !_hasMorePlaylistSongs || playlist == null) return;
 
         _isLoadingMorePlaylistSongs = true;
         var nextPage = _playlistCurrentPage + 1;
 
         Application.Invoke(() =>
         {
-            _songListView.Title = $"歌单: {_currentDrilldownPlaylist.Title} (正在加载更多...)";
-            _controlBar.UpdateStatus($"[正在加载] 正在获取「{_currentDrilldownPlaylist.Title}」更多曲目 (第 {nextPage} 页)...");
+            _songListView.Title = $"歌单: {playlist.Title} (正在加载更多...)";
+            _controlBar.UpdateStatus($"[正在加载] 正在获取「{playlist.Title}」更多曲目 (第 {nextPage} 页)...");
         });
 
         try
         {
-            var moreSongs = await MusicApi.GetPlaylistSongsAsync(_currentDrilldownPlaylist, nextPage, PlaylistPageSize);
+            var moreSongs = await MusicApi.GetPlaylistSongsAsync(playlist, nextPage, PlaylistPageSize);
 
             Application.Invoke(() =>
             {
+                if (_currentViewMode != ViewMode.PlaylistDrilldown || !ReferenceEquals(_currentDrilldownPlaylist, playlist))
+                {
+                    return;
+                }
+
                 if (moreSongs.Count > 0)
                 {
                     _playlistCurrentPage = nextPage;
@@ -307,7 +313,7 @@ public sealed partial class MainWindow
                         _hasMorePlaylistSongs = false;
                     }
 
-                    var title = $"歌单: {_currentDrilldownPlaylist.Title} (共 {currentCount + moreSongs.Count} 首" + (_hasMorePlaylistSongs ? "，向下滚动加载更多" : "，已全部加载") + "，按 Esc 退回)";
+                    var title = $"歌单: {playlist.Title} (共 {currentCount + moreSongs.Count} 首" + (_hasMorePlaylistSongs ? "，向下滚动加载更多" : "，已全部加载") + "，按 Esc 退回)";
                     _songListView.AppendSongs(moreSongs, title);
                     if (_activeSong != null)
                     {
@@ -318,7 +324,7 @@ public sealed partial class MainWindow
                 else
                 {
                     _hasMorePlaylistSongs = false;
-                    _songListView.Title = $"歌单: {_currentDrilldownPlaylist.Title} (共 {_songListView.Songs.Count} 首，已全部加载，按 Esc 退回)";
+                    _songListView.Title = $"歌单: {playlist.Title} (共 {_songListView.Songs.Count} 首，已全部加载，按 Esc 退回)";
                     _controlBar.UpdateStatus($"[已全部加载] 歌单共 {_songListView.Songs.Count} 首曲目");
                 }
             });

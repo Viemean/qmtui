@@ -369,29 +369,18 @@ public sealed partial class MainWindow
     }
 
     /// <summary>
-    /// 将匹配得到的歌词文本持久化写回本地或落盘缓存的 .lrc 文件（包含双语翻译）
+    /// 将匹配得到的歌词文本持久化写回软件自身的私有缓存目录（WebDAV 独立缓存）
+    /// 本地歌曲统一保存在 LocalLyricAutoMatcher 母本库中，严禁写入用户本地音乐目录
     /// </summary>
     private static void SaveMatchedLrcToDisk(Song song, string? playUrl, List<LyricLine> lyrics)
     {
         string? lrcSavePath = null;
-        if (song.IsLocal && !string.IsNullOrEmpty(song.LocalFilePath))
-        {
-            lrcSavePath = Path.ChangeExtension(song.LocalFilePath, ".lrc");
-        }
-        else if (song.IsWebDav)
+        if (song.IsWebDav)
         {
             var server = WebDavService.GetActiveServer();
             if (server != null && !string.IsNullOrEmpty(song.WebDavHref))
             {
                 lrcSavePath = WebDavService.GetLocalLrcCachePath(server, song.WebDavHref);
-            }
-            else if (!string.IsNullOrEmpty(playUrl) && File.Exists(playUrl))
-            {
-                lrcSavePath = Path.ChangeExtension(playUrl, ".lrc");
-            }
-            else if (!string.IsNullOrEmpty(song.LocalFilePath))
-            {
-                lrcSavePath = Path.ChangeExtension(song.LocalFilePath, ".lrc");
             }
         }
 
@@ -420,7 +409,7 @@ public sealed partial class MainWindow
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("MainWindow.Playback", $"Failed to write matched .lrc to disk: {ex.Message}");
+                AppLogger.Warn("MainWindow.Playback", $"Failed to write matched .lrc to cache: {ex.Message}");
             }
         }
     }
@@ -562,38 +551,26 @@ public sealed partial class MainWindow
         // 若当前已处于在线匹配状态，则执行撤销操作：恢复内嵌原始歌词并删除本地生成的 .lrc
         if (s_matchedOnlineSongKeys.Remove(songKey))
         {
-            // 删除本次在线匹配生成的 .lrc 覆盖文件
-            string? lrcPath = null;
-            if (song.IsLocal && !string.IsNullOrEmpty(song.LocalFilePath))
-            {
-                lrcPath = Path.ChangeExtension(song.LocalFilePath, ".lrc");
-            }
-            else if (song.IsWebDav)
+            // 撤销匹配：清理统一母本库路径索引与 WebDAV 专属缓存，严禁触碰或删除用户本地目录的文件
+            LocalLyricAutoMatcher.InvalidateCacheForSong(song, _currentPlayUrl);
+
+            if (song.IsWebDav)
             {
                 var server = WebDavService.GetActiveServer();
                 if (server != null && !string.IsNullOrEmpty(song.WebDavHref))
                 {
-                    lrcPath = WebDavService.GetLocalLrcCachePath(server, song.WebDavHref);
-                }
-                else if (!string.IsNullOrEmpty(_currentPlayUrl) && File.Exists(_currentPlayUrl))
-                {
-                    lrcPath = Path.ChangeExtension(_currentPlayUrl, ".lrc");
-                }
-                else if (!string.IsNullOrEmpty(song.LocalFilePath))
-                {
-                    lrcPath = Path.ChangeExtension(song.LocalFilePath, ".lrc");
-                }
-            }
-
-            if (!string.IsNullOrEmpty(lrcPath) && File.Exists(lrcPath))
-            {
-                try
-                {
-                    File.Delete(lrcPath);
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Warn("MainWindow.Playback", $"Failed to delete lrc file on rollback: {ex.Message}");
+                    var webDavLrc = WebDavService.GetLocalLrcCachePath(server, song.WebDavHref);
+                    if (!string.IsNullOrEmpty(webDavLrc) && File.Exists(webDavLrc))
+                    {
+                        try
+                        {
+                            File.Delete(webDavLrc);
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Warn("MainWindow.Playback", $"Failed to delete webdav lrc cache on rollback: {ex.Message}");
+                        }
+                    }
                 }
             }
 

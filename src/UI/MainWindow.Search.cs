@@ -32,6 +32,8 @@ public sealed partial class MainWindow
         try
         {
             _currentViewMode = ViewMode.Search;
+            _isViewingPlaylistsList = false;
+            _isViewingAlbumsList = false;
             _currentDrilldownPlaylist = null;
             _currentDrilldownAlbum = null;
 

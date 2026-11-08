@@ -339,6 +339,27 @@ public static class LocalLyricAutoMatcher
         return null;
     }
 
+    public static void InvalidateCacheForSong(Song song, string? playUrl = null)
+    {
+        string? pathTarget = !string.IsNullOrEmpty(song.LocalFilePath)
+            ? song.LocalFilePath
+            : (!string.IsNullOrEmpty(song.WebDavHref) ? song.WebDavHref : playUrl);
+
+        if (!string.IsNullOrEmpty(pathTarget))
+        {
+            string pathKey = ComputePathKey(pathTarget);
+            string pathIndexFile = Path.Combine(s_lyricsDir, $"path_{pathKey}.txt");
+            try
+            {
+                if (File.Exists(pathIndexFile))
+                {
+                    File.Delete(pathIndexFile);
+                }
+            }
+            catch { }
+        }
+    }
+
     public static void SaveUnifiedCache(
         string songMid,
         string albumMid,

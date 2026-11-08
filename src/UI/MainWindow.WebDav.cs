@@ -226,7 +226,7 @@ public sealed partial class MainWindow
                 Application.Invoke(() =>
                 {
                     _controlBar.UpdateStatus($"[WebDAV 增量扫描] {prog}");
-                    if (_isWebDavFlatMode && Environment.TickCount64 - lastRefreshTick > 1000)
+                    if (_currentViewMode == ViewMode.WebDav && _isWebDavFlatMode && Environment.TickCount64 - lastRefreshTick > 1000)
                     {
                         lastRefreshTick = Environment.TickCount64;
                         LoadWebDavFlatLibrary(server);
@@ -235,7 +235,10 @@ public sealed partial class MainWindow
             });
 
             _isWebDavFlatMode = true;
-            LoadWebDavFlatLibrary(server);
+            if (_currentViewMode == ViewMode.WebDav)
+            {
+                LoadWebDavFlatLibrary(server);
+            }
             _controlBar.UpdateStatus($"[WebDAV] 扫描完成！曲库现有 {server.CachedSongs?.Count ?? count} 首音频，已切换至平铺曲库 (按 D 可切回目录树)");
         }
         catch (Exception ex)
@@ -277,7 +280,7 @@ public sealed partial class MainWindow
                 Application.Invoke(() =>
                 {
                     _controlBar.UpdateStatus($"[WebDAV 元数据嗅探] {cur}/{total} : {songInfo}");
-                    if (_isWebDavFlatMode && Environment.TickCount64 - lastRefreshTick > 1000)
+                    if (_currentViewMode == ViewMode.WebDav && _isWebDavFlatMode && Environment.TickCount64 - lastRefreshTick > 1000)
                     {
                         lastRefreshTick = Environment.TickCount64;
                         LoadWebDavFlatLibrary(server);
@@ -286,7 +289,7 @@ public sealed partial class MainWindow
             }, ct);
 
             _controlBar.UpdateStatus($"[WebDAV] 元数据嗅探完成！共成功识别 {enriched} 首歌曲信息");
-            if (_isWebDavFlatMode)
+            if (_currentViewMode == ViewMode.WebDav && _isWebDavFlatMode)
             {
                 LoadWebDavFlatLibrary(server);
             }

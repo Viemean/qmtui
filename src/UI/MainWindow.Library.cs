@@ -477,8 +477,8 @@ public sealed partial class MainWindow
             return;
         }
 
-        var sidebarIdx = _sidebarList.SelectedItem ?? 0;
-        bool isFavoriteList = (sidebarIdx == 1 && _currentDrilldownPlaylist == null) || (_currentDrilldownPlaylist?.DirId == 201);
+        bool isFavoriteList = _currentViewMode == ViewMode.Favorite ||
+            (_currentViewMode == ViewMode.PlaylistDrilldown && _currentDrilldownPlaylist?.DirId == 201);
 
         if (isFavoriteList)
         {
@@ -486,16 +486,7 @@ public sealed partial class MainWindow
             var ok = await MusicApi.RemoveSongFromFavoriteAsync(song);
             if (ok)
             {
-                lock (_favoriteSongMids)
-                {
-                    if (!string.IsNullOrEmpty(song.Mid)) _favoriteSongMids.Remove(song.Mid);
-                    if (song.Id > 0) _favoriteSongIds.Remove(song.Id);
-                }
-
-                if (_activeSong?.Mid == song.Mid)
-                {
-                    Application.Invoke(() => _controlBar.SetFavoriteStatus(false));
-                }
+                ApplySongFavoriteState(song, false);
 
                 Application.Invoke(() =>
                 {
@@ -510,22 +501,26 @@ public sealed partial class MainWindow
             return;
         }
 
-        if (_currentDrilldownPlaylist != null)
+        var playlist = _currentDrilldownPlaylist;
+        if (playlist != null)
         {
-            if (!_currentDrilldownPlaylist.IsCreated)
+            if (!playlist.IsCreated)
             {
                 _controlBar.UpdateStatus("[无法移除] 收藏的他人的外部歌单不支持单曲删除");
                 return;
             }
 
-            _controlBar.UpdateStatus($"[正在移除] 正在从歌单「{_currentDrilldownPlaylist.Title}」移除《{song.Title}》...");
-            var ok = await MusicApi.RemoveSongFromPlaylistAsync(_currentDrilldownPlaylist, song);
+            _controlBar.UpdateStatus($"[正在移除] 正在从歌单「{playlist.Title}」移除《{song.Title}》...");
+            var ok = await MusicApi.RemoveSongFromPlaylistAsync(playlist, song);
             if (ok)
             {
                 Application.Invoke(() =>
                 {
-                    _songListView.RemoveSong(song);
-                    _controlBar.UpdateStatus($"[移除成功] 已从歌单「{_currentDrilldownPlaylist.Title}」移除《{song.Title}》");
+                    if (_currentViewMode == ViewMode.PlaylistDrilldown && ReferenceEquals(_currentDrilldownPlaylist, playlist))
+                    {
+                        _songListView.RemoveSong(song);
+                    }
+                    _controlBar.UpdateStatus($"[移除成功] 已从歌单「{playlist.Title}」移除《{song.Title}》");
                 });
             }
             else
