@@ -306,11 +306,11 @@ public sealed partial class MainWindow
             Application.Invoke(() => _controlBar.UpdateQuality(AudioQualityHelper.GetBadge(_actualQualityTier)));
             if (!string.IsNullOrEmpty(song.Mid) && !song.IsLocal && !song.IsWebDav)
             {
-                lyrics = await MusicApi.GetLyricsAsync(song.Mid).ConfigureAwait(false);
+                lyrics = await MusicApi.GetLyricsAsync(song.Mid);
             }
             else if (song.IsLocal && !string.IsNullOrEmpty(song.LocalFilePath) && File.Exists(song.LocalFilePath))
             {
-                lyrics = await QmTui.Services.LocalMusicService.GetLyricsAsync(song).ConfigureAwait(false);
+                lyrics = await QmTui.Services.LocalMusicService.GetLyricsAsync(song);
                 if (!LyricParser.HasWordLevelSync(lyrics))
                 {
                     var cached = LocalLyricAutoMatcher.TryGetCachedLyrics(song, playUrl);
@@ -326,7 +326,7 @@ public sealed partial class MainWindow
                 var server = (!string.IsNullOrEmpty(song.WebDavServerId) ? servers.Find(s => s.Id == song.WebDavServerId) : null)
                              ?? WebDavService.GetActiveServer();
                 lyrics = server != null && !string.IsNullOrEmpty(song.WebDavHref)
-                    ? await WebDavService.EnsureLyricsAsync(server, song).ConfigureAwait(false)
+                    ? await WebDavService.EnsureLyricsAsync(server, song)
                     : [];
 
                 if (!LyricParser.HasWordLevelSync(lyrics))
@@ -388,7 +388,7 @@ public sealed partial class MainWindow
 
             // 通过级联策略加载 WebDAV 内嵌歌词（本地缓存 → 内存缓存 → 远端 .lrc → Range 头部提取）
             lyrics = server != null && !string.IsNullOrEmpty(song.WebDavHref)
-                ? await WebDavService.EnsureLyricsAsync(server, song).ConfigureAwait(false)
+                ? await WebDavService.EnsureLyricsAsync(server, song)
                 : [];
 
             // 同步更新全局激活歌曲与控制栏/MPRIS/AOD 状态

@@ -427,8 +427,9 @@ public sealed class AudioRecognitionDialog : Dialog
             preRollBytes = AudioPreRollManager.TakePreRollBytes(16000 * 2 * 3);
         }
 
-        _recordingSession = AudioRecordingService.StartRecordingSession(_currentSource, preRollBytes);
-        if (!_recordingSession.IsRunning)
+        var session = AudioRecordingService.StartRecordingSession(_currentSource, preRollBytes);
+        _recordingSession = session;
+        if (!session.IsRunning)
         {
             string errMsg = OperatingSystem.IsMacOS()
                 ? "无法启动 macOS 麦克风录音 (请检查系统设置中的麦克风权限)"
@@ -439,9 +440,9 @@ public sealed class AudioRecognitionDialog : Dialog
             return;
         }
 
+        var token = _cts.Token;
         Task.Run(async () =>
         {
-            var token = _cts.Token;
             var sw = Stopwatch.StartNew();
 
             // 麦克风模式延长总时长并加密早期检查点；内录保持原有节奏
@@ -455,7 +456,7 @@ public sealed class AudioRecognitionDialog : Dialog
             bool hasPreRoll = preRollBytes != null && preRollBytes.Length >= (int)(16000 * 2 * 2.6);
             if (hasPreRoll)
             {
-                var preSamples = _recordingSession?.GetSnapshotSamples();
+                var preSamples = session.GetSnapshotSamples();
                 if (preSamples != null && preSamples.Length >= (int)(16000 * 2.6))
                 {
                     Interlocked.Increment(ref inflightRequests);
@@ -520,14 +521,14 @@ public sealed class AudioRecognitionDialog : Dialog
                             checkedSlices[i] = true;
 
                             // 静音检测：最近 0.5s 无有效信号则跳过本切片，减少无效请求
-                            bool hasSignal = _recordingSession?.HasMeaningfulSignal() ?? false;
+                            bool hasSignal = session.HasMeaningfulSignal();
                             if (!hasSignal)
                             {
                                 AppLogger.Force("AudioRecognitionDialog", $"Skipping slice at {sliceCheckpoints[i]:F1}s: no meaningful signal detected.");
                                 continue;
                             }
 
-                            var samples = _recordingSession?.GetSnapshotSamples();
+                            var samples = session.GetSnapshotSamples();
                             if (samples != null && samples.Length >= (int)(16000 * 1.5))
                             {
                                 Interlocked.Increment(ref inflightRequests);
@@ -592,10 +593,9 @@ public sealed class AudioRecognitionDialog : Dialog
             }
             finally
             {
-                if (!_isRecognized)
+                if (!_isRecognized && ReferenceEquals(Interlocked.CompareExchange(ref _recordingSession, null, session), session))
                 {
-                    _recordingSession?.Dispose();
-                    _recordingSession = null;
+                    session.Dispose();
                 }
             }
         });
