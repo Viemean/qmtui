@@ -24,6 +24,7 @@ public sealed unsafe partial class MacMediaSessionService : IDisposable
     private static MacMediaSessionService? s_instance;
     private static nint s_artworkBlock;
     private static nint s_currentArtworkImage;
+    private static readonly Lock s_artworkLock = new();
 
     private nint _mediaPlayerHandle;
     private nint _commandCenter;
@@ -242,15 +243,21 @@ public sealed unsafe partial class MacMediaSessionService : IDisposable
 
     private void ReplaceArtwork(string? coverPath)
     {
-        if (_currentArtwork != 0)
+        lock (s_artworkLock)
         {
-            Release(_currentArtwork);
-            _currentArtwork = 0;
-        }
-        if (s_currentArtworkImage != 0)
-        {
-            Release(s_currentArtworkImage);
-            s_currentArtworkImage = 0;
+            lock (s_artworkLock)
+            {
+                if (_currentArtwork != 0)
+                {
+                    Release(_currentArtwork);
+                    _currentArtwork = 0;
+                }
+                if (s_currentArtworkImage != 0)
+                {
+                    Release(s_currentArtworkImage);
+                    s_currentArtworkImage = 0;
+                }
+            }
         }
         if (!_isReady || string.IsNullOrWhiteSpace(coverPath) || !File.Exists(coverPath)) return;
 
@@ -261,7 +268,10 @@ public sealed unsafe partial class MacMediaSessionService : IDisposable
             var image = SendPtr(Send(Class("NSImage"), Sel("alloc")), Sel("initWithContentsOfFile:"), path);
             if (image == 0) return;
 
-            s_currentArtworkImage = image;
+            lock (s_artworkLock)
+            {
+                s_currentArtworkImage = image;
+            }
 
             var size = SendSizeReturn(image, Sel("size"));
             if (size.Width <= 0 || size.Height <= 0)
@@ -312,7 +322,17 @@ public sealed unsafe partial class MacMediaSessionService : IDisposable
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static nint ProvideArtworkImage(nint block, NativeSize size) => s_currentArtworkImage;
+    private static nint ProvideArtworkImage(nint block, NativeSize size)
+    {
+        lock (s_artworkLock)
+        {
+            var image = s_currentArtworkImage;
+            if (image == 0) return 0;
+            Send(image, Sel("retain"));
+            Send(image, Sel("autorelease"));
+            return image;
+        }
+    }
 
     private static nint CreateCommandTarget()
     {
@@ -479,15 +499,18 @@ public sealed unsafe partial class MacMediaSessionService : IDisposable
                 SendPtr(_nowPlayingCenter, Sel("setNowPlayingInfo:"), 0);
                 SendLong(_nowPlayingCenter, Sel("setPlaybackState:"), 3);
             }
-            if (_currentArtwork != 0)
+            lock (s_artworkLock)
             {
-                Release(_currentArtwork);
-                _currentArtwork = 0;
-            }
-            if (s_currentArtworkImage != 0)
-            {
-                Release(s_currentArtworkImage);
-                s_currentArtworkImage = 0;
+                if (_currentArtwork != 0)
+                {
+                    Release(_currentArtwork);
+                    _currentArtwork = 0;
+                }
+                if (s_currentArtworkImage != 0)
+                {
+                    Release(s_currentArtworkImage);
+                    s_currentArtworkImage = 0;
+                }
             }
             Release(_commandTarget);
             _commandTarget = 0;

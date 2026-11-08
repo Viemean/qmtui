@@ -18,80 +18,89 @@ public sealed unsafe partial class MprisService
         nint invocation,
         nint userData)
     {
-        var iface = Marshal.PtrToStringUTF8(interfaceName) ?? "";
-        var member = Marshal.PtrToStringUTF8(methodName) ?? "";
-
-        AppLogger.Info("MprisService", $"Method called: {iface}.{member}");
-
-        var instance = s_instance;
-        if (instance != null)
+        try
         {
-            if (iface == "org.mpris.MediaPlayer2")
+            var iface = Marshal.PtrToStringUTF8(interfaceName) ?? "";
+            var member = Marshal.PtrToStringUTF8(methodName) ?? "";
+
+            AppLogger.Info("MprisService", $"Method called: {iface}.{member}");
+
+            var instance = s_instance;
+            if (instance != null)
             {
-                switch (member)
+                if (iface == "org.mpris.MediaPlayer2")
                 {
-                    case "Quit":
-                        instance.QuitHandler?.Invoke();
-                        break;
-                    case "Raise":
-                        // CanRaise=false: terminal visibility is owned by the user's terminal emulator.
-                        break;
+                    switch (member)
+                    {
+                        case "Quit":
+                            instance.QuitHandler?.Invoke();
+                            break;
+                        case "Raise":
+                            // CanRaise=false: terminal visibility is owned by the user's terminal emulator.
+                            break;
+                    }
                 }
-            }
-            else if (iface == "org.mpris.MediaPlayer2.Player")
-            {
-                switch (member)
+                else if (iface == "org.mpris.MediaPlayer2.Player")
                 {
-                    case "PlayPause":
-                        _ = instance.PlayPauseHandler?.Invoke();
-                        break;
-                    case "Play":
-                        _ = instance.PlayHandler?.Invoke();
-                        break;
-                    case "Pause":
-                        _ = instance.PauseHandler?.Invoke();
-                        break;
-                    case "Stop":
-                        _ = instance.StopHandler?.Invoke();
-                        break;
-                    case "Next":
-                        _ = instance.NextHandler?.Invoke();
-                        break;
-                    case "Previous":
-                        _ = instance.PreviousHandler?.Invoke();
-                        break;
-                    case "Seek":
-                        if (parameters != 0)
-                        {
-                            nint child = g_variant_get_child_value(parameters, 0);
-                            if (child != 0)
+                    switch (member)
+                    {
+                        case "PlayPause":
+                            _ = instance.PlayPauseHandler?.Invoke();
+                            break;
+                        case "Play":
+                            _ = instance.PlayHandler?.Invoke();
+                            break;
+                        case "Pause":
+                            _ = instance.PauseHandler?.Invoke();
+                            break;
+                        case "Stop":
+                            _ = instance.StopHandler?.Invoke();
+                            break;
+                        case "Next":
+                            _ = instance.NextHandler?.Invoke();
+                            break;
+                        case "Previous":
+                            _ = instance.PreviousHandler?.Invoke();
+                            break;
+                        case "Seek":
+                            if (parameters != 0)
                             {
-                                long offsetUs = g_variant_get_int64(child);
-                                g_variant_unref(child);
-                                _ = instance.SeekHandler?.Invoke(offsetUs / 1_000_000.0);
+                                nint child = g_variant_get_child_value(parameters, 0);
+                                if (child != 0)
+                                {
+                                    long offsetUs = g_variant_get_int64(child);
+                                    g_variant_unref(child);
+                                    _ = instance.SeekHandler?.Invoke(offsetUs / 1_000_000.0);
+                                }
                             }
-                        }
-                        break;
-                    case "SetPosition":
-                        if (parameters != 0)
-                        {
-                            nint child1 = g_variant_get_child_value(parameters, 1);
-                            if (child1 != 0)
+                            break;
+                        case "SetPosition":
+                            if (parameters != 0)
                             {
-                                long posUs = g_variant_get_int64(child1);
-                                g_variant_unref(child1);
-                                _ = instance.SetPositionHandler?.Invoke(posUs / 1_000_000.0);
+                                nint child1 = g_variant_get_child_value(parameters, 1);
+                                if (child1 != 0)
+                                {
+                                    long posUs = g_variant_get_int64(child1);
+                                    g_variant_unref(child1);
+                                    _ = instance.SetPositionHandler?.Invoke(posUs / 1_000_000.0);
+                                }
                             }
-                        }
-                        break;
-                    case "OpenUri":
-                        break;
+                            break;
+                        case "OpenUri":
+                            break;
+                    }
                 }
             }
         }
-
-        // GDBusMethodInvocation takes ownership of this empty result.
-        g_dbus_method_invocation_return_value(invocation, g_variant_new_tuple([], 0));
+        catch (Exception ex)
+        {
+            AppLogger.Error("MprisService", "Error in OnMethodCall", ex);
+        }
+        finally
+        {
+            // GDBusMethodInvocation takes ownership of this empty result.
+            g_dbus_method_invocation_return_value(invocation, g_variant_new_tuple([], 0));
+        }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -104,83 +113,91 @@ public sealed unsafe partial class MprisService
         nint error,
         nint userData)
     {
-        var iface = Marshal.PtrToStringUTF8(interfaceName) ?? "";
-        var prop = Marshal.PtrToStringUTF8(propertyName) ?? "";
-
-        var instance = s_instance;
-        if (instance == null) return 0;
-
-        if (iface == "org.mpris.MediaPlayer2")
+        try
         {
-            switch (prop)
+            var iface = Marshal.PtrToStringUTF8(interfaceName) ?? "";
+            var prop = Marshal.PtrToStringUTF8(propertyName) ?? "";
+
+            var instance = s_instance;
+            if (instance == null) return 0;
+
+            if (iface == "org.mpris.MediaPlayer2")
             {
-                case "CanQuit":
-                    return g_variant_new_boolean(1);
-                case "CanRaise":
-                    return g_variant_new_boolean(0);
-                case "HasTrackList":
-                    return g_variant_new_boolean(0);
-                case "Identity":
-                    return g_variant_new_string("qmtui");
-                case "DesktopEntry":
-                    return g_variant_new_string("qmtui");
-                case "SupportedUriSchemes":
-                    return CreateStringArray();
-                case "SupportedMimeTypes":
-                    return CreateStringArray("audio/mpeg", "audio/flac");
+                switch (prop)
+                {
+                    case "CanQuit":
+                        return g_variant_new_boolean(1);
+                    case "CanRaise":
+                        return g_variant_new_boolean(0);
+                    case "HasTrackList":
+                        return g_variant_new_boolean(0);
+                    case "Identity":
+                        return g_variant_new_string("qmtui");
+                    case "DesktopEntry":
+                        return g_variant_new_string("qmtui");
+                    case "SupportedUriSchemes":
+                        return CreateStringArray();
+                    case "SupportedMimeTypes":
+                        return CreateStringArray("audio/mpeg", "audio/flac");
+                }
             }
+            else if (iface == "org.mpris.MediaPlayer2.Player")
+            {
+                string status;
+                double vol;
+                PlaybackMode mode;
+                Song? song;
+                string? coverPath;
+                double posSec;
+
+                lock (instance._lock)
+                {
+                    status = instance._playbackStatus;
+                    vol = instance._volume;
+                    mode = instance._playbackMode;
+                    song = instance._currentSong;
+                    coverPath = instance._currentCoverPath;
+                    posSec = instance._currentPositionSeconds;
+                }
+
+                var (loopStatus, shuffle) = mode.ToMpris();
+
+                switch (prop)
+                {
+                    case "PlaybackStatus":
+                        return g_variant_new_string(status);
+                    case "LoopStatus":
+                        return g_variant_new_string(loopStatus);
+                    case "Rate":
+                        return g_variant_new_double(1.0);
+                    case "Shuffle":
+                        return g_variant_new_boolean(shuffle ? 1 : 0);
+                    case "Metadata":
+                        return BuildMetadataVariant(song, coverPath);
+                    case "Volume":
+                        return g_variant_new_double(vol);
+                    case "Position":
+                        return g_variant_new_int64((long)(posSec * 1_000_000.0));
+                    case "MinimumRate":
+                    case "MaximumRate":
+                        return g_variant_new_double(1.0);
+                    case "CanGoNext":
+                    case "CanGoPrevious":
+                    case "CanPlay":
+                    case "CanPause":
+                    case "CanSeek":
+                    case "CanControl":
+                        return g_variant_new_boolean(1);
+                }
+            }
+
+            return 0;
         }
-        else if (iface == "org.mpris.MediaPlayer2.Player")
+        catch (Exception ex)
         {
-            string status;
-            double vol;
-            PlaybackMode mode;
-            Song? song;
-            string? coverPath;
-            double posSec;
-
-            lock (instance._lock)
-            {
-                status = instance._playbackStatus;
-                vol = instance._volume;
-                mode = instance._playbackMode;
-                song = instance._currentSong;
-                coverPath = instance._currentCoverPath;
-                posSec = instance._currentPositionSeconds;
-            }
-
-            var (loopStatus, shuffle) = mode.ToMpris();
-
-            switch (prop)
-            {
-                case "PlaybackStatus":
-                    return g_variant_new_string(status);
-                case "LoopStatus":
-                    return g_variant_new_string(loopStatus);
-                case "Rate":
-                    return g_variant_new_double(1.0);
-                case "Shuffle":
-                    return g_variant_new_boolean(shuffle ? 1 : 0);
-                case "Metadata":
-                    return BuildMetadataVariant(song, coverPath);
-                case "Volume":
-                    return g_variant_new_double(vol);
-                case "Position":
-                    return g_variant_new_int64((long)(posSec * 1_000_000.0));
-                case "MinimumRate":
-                case "MaximumRate":
-                    return g_variant_new_double(1.0);
-                case "CanGoNext":
-                case "CanGoPrevious":
-                case "CanPlay":
-                case "CanPause":
-                case "CanSeek":
-                case "CanControl":
-                    return g_variant_new_boolean(1);
-            }
+            AppLogger.Error("MprisService", "Error in OnGetProperty", ex);
+            return 0;
         }
-
-        return 0;
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -194,37 +211,45 @@ public sealed unsafe partial class MprisService
         nint error,
         nint userData)
     {
-        var iface = Marshal.PtrToStringUTF8(interfaceName) ?? "";
-        var prop = Marshal.PtrToStringUTF8(propertyName) ?? "";
-
-        var instance = s_instance;
-        if (instance != null && iface == "org.mpris.MediaPlayer2.Player")
+        try
         {
-            if (prop == "Volume")
-            {
-                double vol = g_variant_get_double(value);
-                instance.VolumeSetHandler?.Invoke(Math.Clamp(vol, 0.0, 1.0));
-                return 1;
-            }
-            if (prop == "LoopStatus")
-            {
-                nint strPtr = g_variant_get_string(value, out _);
-                var loopStr = Marshal.PtrToStringUTF8(strPtr);
-                if (loopStr != null)
-                {
-                    instance.LoopStatusSetHandler?.Invoke(loopStr);
-                }
-                return 1;
-            }
-            if (prop == "Shuffle")
-            {
-                bool shuffle = g_variant_get_boolean(value) != 0;
-                instance.ShuffleSetHandler?.Invoke(shuffle);
-                return 1;
-            }
-        }
+            var iface = Marshal.PtrToStringUTF8(interfaceName) ?? "";
+            var prop = Marshal.PtrToStringUTF8(propertyName) ?? "";
 
-        return 1;
+            var instance = s_instance;
+            if (instance != null && iface == "org.mpris.MediaPlayer2.Player")
+            {
+                if (prop == "Volume")
+                {
+                    double vol = g_variant_get_double(value);
+                    instance.VolumeSetHandler?.Invoke(Math.Clamp(vol, 0.0, 1.0));
+                    return 1;
+                }
+                if (prop == "LoopStatus")
+                {
+                    nint strPtr = g_variant_get_string(value, out _);
+                    var loopStr = Marshal.PtrToStringUTF8(strPtr);
+                    if (loopStr != null)
+                    {
+                        instance.LoopStatusSetHandler?.Invoke(loopStr);
+                    }
+                    return 1;
+                }
+                if (prop == "Shuffle")
+                {
+                    bool shuffle = g_variant_get_boolean(value) != 0;
+                    instance.ShuffleSetHandler?.Invoke(shuffle);
+                    return 1;
+                }
+            }
+
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MprisService", "Error in OnSetProperty", ex);
+            return 1;
+        }
     }
 
     private static nint CreateDictEntry(string key, nint valVariant)

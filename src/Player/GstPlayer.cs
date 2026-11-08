@@ -18,7 +18,7 @@ public sealed partial class GstPlayer : IPlayer
     private const int GST_MESSAGE_EOS = 1;
     private const int GST_MESSAGE_ERROR = 2;
     private const int GST_MESSAGE_WARNING = 4;
-    private const int GST_MESSAGE_BUFFERING = 16;
+    private const int GST_MESSAGE_BUFFERING = 1 << 5; // 32
 
     private nint _pipeline;
     private readonly Lock _lock = new();
@@ -467,39 +467,46 @@ public sealed partial class GstPlayer : IPlayer
             {
                 try
                 {
-                    nint errMsg = gst_bus_pop_filtered(bus, GST_MESSAGE_ERROR);
-                    if (errMsg != 0)
+                    const int combinedMask = GST_MESSAGE_ERROR | GST_MESSAGE_EOS | GST_MESSAGE_BUFFERING;
+                    nint msg;
+                    while ((msg = gst_bus_pop_filtered(bus, combinedMask)) != 0)
                     {
-                        AppLogger.Warn("GstPlayer", "Bus reported GST_MESSAGE_ERROR, triggering watchdog");
-                        gst_mini_object_unref(errMsg);
-                        TriggerWatchdogRecovery();
-                    }
-
-                    nint bufMsg = gst_bus_pop_filtered(bus, GST_MESSAGE_BUFFERING);
-                    if (bufMsg != 0)
-                    {
-                        _watchdogStallCount = 0;
-                        gst_mini_object_unref(bufMsg);
-                    }
-
-                    nint eosMsg = gst_bus_pop_filtered(bus, GST_MESSAGE_EOS);
-                    if (eosMsg != 0)
-                    {
-                        gst_mini_object_unref(eosMsg);
-                        bool shouldTrigger = false;
-                        lock (_lock)
+                        try
                         {
-                            if (!_playbackFinishedTriggered)
+                            int type = Marshal.ReadInt32(msg, 64);
+                            switch (type)
                             {
-                                _playbackFinishedTriggered = true;
-                                shouldTrigger = true;
+                                case GST_MESSAGE_ERROR:
+                                    AppLogger.Warn("GstPlayer", "Bus reported GST_MESSAGE_ERROR, triggering watchdog");
+                                    TriggerWatchdogRecovery();
+                                    break;
+
+                                case GST_MESSAGE_BUFFERING:
+                                    _watchdogStallCount = 0;
+                                    break;
+
+                                case GST_MESSAGE_EOS:
+                                    bool shouldTrigger = false;
+                                    lock (_lock)
+                                    {
+                                        if (!_playbackFinishedTriggered)
+                                        {
+                                            _playbackFinishedTriggered = true;
+                                            shouldTrigger = true;
+                                        }
+                                    }
+
+                                    if (shouldTrigger)
+                                    {
+                                        AppLogger.Info("GstPlayer", "Bus reported GST_MESSAGE_EOS, track finished");
+                                        PlaybackFinished?.Invoke();
+                                    }
+                                    break;
                             }
                         }
-
-                        if (shouldTrigger)
+                        finally
                         {
-                            AppLogger.Info("GstPlayer", "Bus reported GST_MESSAGE_EOS, track finished");
-                            PlaybackFinished?.Invoke();
+                            gst_mini_object_unref(msg);
                         }
                     }
                 }
@@ -544,7 +551,7 @@ public sealed partial class GstPlayer : IPlayer
                     {
                         // 正在播放但进度停滞（容忍 10 秒缓冲与网络抖动）
                         _watchdogStallCount++;
-                        if (_watchdogStallCount >= 40) // 10 秒无进展
+                        if (_watchdogStallCount >= 200) // 200 * 50ms = 10 秒无进展
                         {
                             TriggerWatchdogRecovery();
                         }
