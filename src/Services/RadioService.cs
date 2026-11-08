@@ -21,7 +21,8 @@ public sealed class RadioService
     private readonly List<Song> _queue = [];
     private int _currentIndex;
     private int _playedCount;
-    private bool _isPrefetching;
+    private int _generation;
+    private Task? _activePrefetchTask;
 
     private RadioService() { }
 
@@ -73,11 +74,14 @@ public sealed class RadioService
     /// <returns>电台启动的首支播放曲目；获取失败返回 <see langword="null"/>。</returns>
     public async Task<Song?> StartRadioAsync(int batchSize = 5)
     {
+        int gen;
         lock (_lock)
         {
+            gen = ++_generation;
             _queue.Clear();
             _currentIndex = 0;
             _playedCount = 0;
+            _activePrefetchTask = null;
         }
 
         var songs = await MusicApi.GetGuessRecommendSongsAsync(batchSize).ConfigureAwait(false);
@@ -85,6 +89,7 @@ public sealed class RadioService
 
         lock (_lock)
         {
+            if (gen != _generation) return null;
             _queue.AddRange(songs);
             _playedCount = 1;
             _currentIndex = 0;
@@ -115,44 +120,36 @@ public sealed class RadioService
             return await StartRadioAsync().ConfigureAwait(false);
         }
 
+        int targetIdx;
         lock (_lock)
         {
-            _currentIndex++;
+            targetIdx = _currentIndex + 1;
         }
 
-        bool needFetch;
-        lock (_lock)
-        {
-            needFetch = _currentIndex >= _queue.Count;
-        }
-
-        if (needFetch)
+        if (targetIdx >= count)
         {
             await PrefetchNextBatchAsync().ConfigureAwait(false);
-            lock (_lock)
-            {
-                if (_currentIndex >= _queue.Count)
-                {
-                    _currentIndex = 0;
-                }
-            }
         }
 
         Song? nextSong = null;
         lock (_lock)
         {
-            if (_currentIndex < _queue.Count)
+            if (targetIdx < _queue.Count)
             {
+                _currentIndex = targetIdx;
                 _playedCount++;
                 nextSong = _queue[_currentIndex];
             }
         }
 
-        lock (_lock)
+        if (nextSong != null)
         {
-            if (_queue.Count - _currentIndex <= 3)
+            lock (_lock)
             {
-                _ = Task.Run(PrefetchNextBatchAsync);
+                if (_queue.Count - _currentIndex <= 3)
+                {
+                    _ = Task.Run(PrefetchNextBatchAsync);
+                }
             }
         }
 
@@ -178,20 +175,32 @@ public sealed class RadioService
     /// <summary>
     /// 后台异步预拉取下一批电台推荐歌曲并去重追加
     /// </summary>
-    public async Task PrefetchNextBatchAsync()
+    public Task PrefetchNextBatchAsync()
     {
         lock (_lock)
         {
-            if (_isPrefetching) return;
-            _isPrefetching = true;
-        }
+            if (_activePrefetchTask != null)
+            {
+                return _activePrefetchTask;
+            }
 
+            int gen = _generation;
+            _activePrefetchTask = ExecutePrefetchAsync(gen);
+            return _activePrefetchTask;
+        }
+    }
+
+    private async Task ExecutePrefetchAsync(int expectedGeneration)
+    {
         try
         {
             var moreSongs = await MusicApi.GetGuessRecommendSongsAsync(5).ConfigureAwait(false);
-            if (moreSongs.Count > 0)
+            lock (_lock)
             {
-                AppendUniqueSongs(moreSongs);
+                if (expectedGeneration == _generation && moreSongs.Count > 0)
+                {
+                    AppendUniqueSongsCore(moreSongs);
+                }
             }
         }
         catch (Exception ex)
@@ -202,9 +211,25 @@ public sealed class RadioService
         {
             lock (_lock)
             {
-                _isPrefetching = false;
+                _activePrefetchTask = null;
             }
         }
+    }
+
+    private int AppendUniqueSongsCore(IEnumerable<Song> songs)
+    {
+        var existingMids = new HashSet<string>(_queue.Select(s => s.Mid));
+        int addedCount = 0;
+        foreach (var s in songs)
+        {
+            if (!string.IsNullOrEmpty(s.Mid) && !existingMids.Contains(s.Mid))
+            {
+                _queue.Add(s);
+                existingMids.Add(s.Mid);
+                addedCount++;
+            }
+        }
+        return addedCount;
     }
 
     /// <summary>
@@ -216,18 +241,7 @@ public sealed class RadioService
     {
         lock (_lock)
         {
-            var existingMids = new HashSet<string>(_queue.Select(s => s.Mid));
-            int addedCount = 0;
-            foreach (var s in songs)
-            {
-                if (!string.IsNullOrEmpty(s.Mid) && !existingMids.Contains(s.Mid))
-                {
-                    _queue.Add(s);
-                    existingMids.Add(s.Mid);
-                    addedCount++;
-                }
-            }
-            return addedCount;
+            return AppendUniqueSongsCore(songs);
         }
     }
 
@@ -238,10 +252,11 @@ public sealed class RadioService
     {
         lock (_lock)
         {
+            _generation++;
             _queue.Clear();
             _currentIndex = 0;
             _playedCount = 0;
-            _isPrefetching = false;
+            _activePrefetchTask = null;
         }
     }
 
@@ -252,6 +267,7 @@ public sealed class RadioService
     {
         lock (_lock)
         {
+            _generation++;
             _queue.Clear();
             if (initialSongs != null)
             {
@@ -259,7 +275,7 @@ public sealed class RadioService
             }
             _currentIndex = startIndex;
             _playedCount = playedCount;
-            _isPrefetching = false;
+            _activePrefetchTask = null;
         }
     }
 }

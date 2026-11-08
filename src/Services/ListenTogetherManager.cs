@@ -659,7 +659,8 @@ public sealed class ListenTogetherManager : IDisposable
                                                         try
                                                         {
                                                             PlaybackQueueService.Instance.SetQueue(fullSongs, targetIdx);
-                                                            if (PlaySongHandler != null)
+                                                            var playing = CurrentSongGetter?.Invoke();
+                                                            if (PlaySongHandler != null && playing?.Id != fullSongs[targetIdx].Id)
                                                             {
                                                                 await PlaySongHandler(fullSongs[targetIdx], state.SongOffsetMs / 1000.0).ConfigureAwait(false);
                                                             }

@@ -21,6 +21,7 @@ public static class ListeningFootprintCacheService
     private static readonly Lock s_deltaLock = new();
     private static readonly List<(string DateKey, int PlaySec, long TimestampMs)> s_localDeltas = [];
     private static long s_todayBaselineFetchTimeMs;
+    private static string s_lastDisplayedDateKey = "";
     private static long s_lastDisplayedTodaySec;
 
     static ListeningFootprintCacheService()
@@ -140,15 +141,21 @@ public static class ListeningFootprintCacheService
 
             int uncommittedSec = 0;
             int uncommittedCnt = 0;
+            long finalSec;
             lock (s_deltaLock)
             {
                 var uncommitted = s_localDeltas.Where(d => d.DateKey == todayStr && d.TimestampMs > fetchTime).ToList();
                 uncommittedSec = uncommitted.Sum(d => d.PlaySec);
                 uncommittedCnt = uncommitted.Count;
-            }
 
-            long finalSec = Math.Max(rawReport.ListenTimeSec + uncommittedSec, s_lastDisplayedTodaySec);
-            s_lastDisplayedTodaySec = finalSec;
+                if (s_lastDisplayedDateKey != todayStr)
+                {
+                    s_lastDisplayedDateKey = todayStr;
+                    s_lastDisplayedTodaySec = 0L;
+                }
+                finalSec = Math.Max(rawReport.ListenTimeSec + uncommittedSec, s_lastDisplayedTodaySec);
+                s_lastDisplayedTodaySec = finalSec;
+            }
 
             int finalCnt = rawReport.ListenCnt + uncommittedCnt;
 
@@ -190,9 +197,10 @@ public static class ListeningFootprintCacheService
         lock (s_deltaLock)
         {
             s_localDeltas.Clear();
+            s_lastDisplayedDateKey = "";
+            s_lastDisplayedTodaySec = 0L;
         }
         s_todayBaselineFetchTimeMs = 0L;
-        s_lastDisplayedTodaySec = 0L;
 
         try
         {
