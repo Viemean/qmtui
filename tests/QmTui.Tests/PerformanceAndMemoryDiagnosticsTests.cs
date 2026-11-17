@@ -13,8 +13,11 @@ using Terminal.Gui.Views;
 using Xunit;
 using Xunit.Abstractions;
 
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
+
 namespace QmTui.Tests;
 
+[Collection("PerformanceAndMemoryDiagnostics")]
 public class PerformanceAndMemoryDiagnosticsTests
 {
     private readonly ITestOutputHelper _output;
@@ -81,6 +84,7 @@ public class PerformanceAndMemoryDiagnosticsTests
             // 预热与基线内存采样
             GC.Collect();
             GC.WaitForPendingFinalizers();
+            GC.Collect();
             long baselineAllocated = GC.GetTotalMemory(true);
 
             var sw = Stopwatch.StartNew();
@@ -103,9 +107,10 @@ public class PerformanceAndMemoryDiagnosticsTests
 
             // 触发内存管理器主动修剪并等待后台收敛
             MemoryManager.TrimNow();
-            System.Threading.Thread.Sleep(50);
+            System.Threading.Thread.Sleep(100);
             GC.Collect();
             GC.WaitForPendingFinalizers();
+            GC.Collect();
 
             long finalAllocated = GC.GetTotalMemory(true);
             long leakGrowth = finalAllocated - baselineAllocated;
