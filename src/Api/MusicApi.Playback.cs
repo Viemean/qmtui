@@ -113,6 +113,16 @@ public sealed partial class MusicApi
                     var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
                     if (renewed)
                     {
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await RefreshCurrentUserProfileAsync().ConfigureAwait(false);
+                            }
+                            catch
+                            {
+                            }
+                        }, CancellationToken.None);
                         return await ProbeSongQualitiesInternalAsync(songMid, mediaMid, canRetryWithRenew: false, refineMetadata, ct).ConfigureAwait(false);
                     }
                 }

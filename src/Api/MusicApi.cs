@@ -20,6 +20,7 @@ public sealed partial class MusicApi
     private static readonly int[] s_part1Indexes = [23, 14, 6, 36, 16, 40, 7, 19];
     private static readonly int[] s_part2Indexes = [16, 1, 32, 12, 19, 27, 8, 5];
     private static readonly byte[] s_scrambleValues = [89, 39, 179, 150, 218, 82, 58, 252, 177, 52, 186, 123, 120, 64, 242, 133, 143, 161, 121, 179];
+    private static readonly HashSet<int> s_expiredAuthCodes = [1000, 2000, 104400, 104401];
 
     static MusicApi()
     {

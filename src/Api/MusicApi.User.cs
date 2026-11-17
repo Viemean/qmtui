@@ -47,52 +47,77 @@ public sealed partial class MusicApi
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
+            int rootCode = root.TryGetProperty("code", out var rc) && rc.ValueKind == JsonValueKind.Number ? rc.GetInt32() : 0;
+            int profileCode = root.TryGetProperty("profile", out var pElem) && pElem.TryGetProperty("code", out var pc) && pc.ValueKind == JsonValueKind.Number ? pc.GetInt32() : 0;
+            int vipCode = root.TryGetProperty("vip", out var vElem) && vElem.TryGetProperty("code", out var vc) && vc.ValueKind == JsonValueKind.Number ? vc.GetInt32() : 0;
+
+            var isCodeExpired = s_expiredAuthCodes.Contains(rootCode) || s_expiredAuthCodes.Contains(profileCode) || s_expiredAuthCodes.Contains(vipCode);
+            var hasProfileData = TryGetResponseData(root, "profile", out var profileData);
+            var hasVipData = TryGetResponseData(root, "vip", out var vipData);
+
+            var isGuestVipResponse = false;
+            if (hasVipData && vipData.TryGetProperty("identity", out var checkId))
+            {
+                var level = ReadInt(checkId, "level");
+                var musicLevel = vipData.TryGetProperty("userinfo", out var uInfo) ? ReadInt(uInfo, "music_level") : 0;
+                var overdate = ReadString(checkId, "overdate");
+                var hugeEnd = ReadString(checkId, "HugeVipEnd");
+                isGuestVipResponse = level == 0 && musicLevel == 0 && string.IsNullOrWhiteSpace(overdate) && string.IsNullOrWhiteSpace(hugeEnd);
+            }
+
+            var isSilentDowngrade = UserSession.Current.IsVip && isGuestVipResponse;
+
+            if (canRetryWithRenew && (isCodeExpired || isSilentDowngrade || !hasProfileData || !hasVipData))
+            {
+                AppLogger.Info("MusicApi", $"Detected expired or downgraded credentials (code={vipCode}, silentDowngrade={isSilentDowngrade}), attempting auto refresh...");
+                var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
+                if (renewed)
+                {
+                    return await RefreshCurrentUserProfileInternalAsync(canRetryWithRenew: false, ct).ConfigureAwait(false);
+                }
+            }
+
             var changed = false;
-            var hasProfile = false;
-            if (TryGetResponseData(root, "profile", out var profileData) &&
+            if (hasProfileData &&
                 profileData.TryGetProperty("Info", out var info) &&
                 info.TryGetProperty("BaseInfo", out var baseInfo))
             {
-                hasProfile = true;
                 changed |= SetString(baseInfo, "Name", value => UserSession.Current.Nick = value);
                 changed |= SetString(baseInfo, "EncryptedUin", value => UserSession.Current.EncryptedUin = value);
                 changed |= SetString(baseInfo, "Avatar", value => UserSession.Current.AvatarUrl = value);
             }
 
-            var hasVipIdentity = false;
-            if (TryGetResponseData(root, "vip", out var vipData))
+            if (hasVipData)
             {
                 if (vipData.TryGetProperty("identity", out var identity))
                 {
-                    hasVipIdentity = true;
                     var isHugeVip = ReadInt(identity, "HugeVip") > 0;
                     var isSvip = isHugeVip || ReadInt(vipData, "svip") > 0;
                     var isVip = isSvip || ReadInt(identity, "vip") > 0;
-                    UserSession.Current.IsSvip = isSvip;
-                    UserSession.Current.IsVip = isVip;
-                    UserSession.Current.VipLevel = ReadInt(identity, "level");
-                    UserSession.Current.VipExpireAt = ReadString(identity, "HugeVipEnd");
-                    if (string.IsNullOrWhiteSpace(UserSession.Current.VipExpireAt))
-                    {
-                        UserSession.Current.VipExpireAt = ReadString(identity, "overdate");
-                    }
-                    changed = true;
-                }
-                if (vipData.TryGetProperty("userinfo", out var userInfo))
-                {
-                    UserSession.Current.MusicLevel = ReadInt(userInfo, "music_level");
-                    changed = true;
-                }
-            }
+                    var level = ReadInt(identity, "level");
+                    var overdate = ReadString(identity, "overdate");
+                    var hugeEnd = ReadString(identity, "HugeVipEnd");
+                    var musicLevel = vipData.TryGetProperty("userinfo", out var userInfo) ? ReadInt(userInfo, "music_level") : 0;
 
-            // 若未成功获取 VIP 身份节点且允许重试续期，则尝试自动刷新 Token
-            if (canRetryWithRenew && (!hasProfile || !hasVipIdentity))
-            {
-                AppLogger.Info("MusicApi", "Session VIP status invalid or expired, attempting automatic token renewal...");
-                var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
-                if (renewed)
+                    var isGuestResult = !isVip && level == 0 && musicLevel == 0 && string.IsNullOrWhiteSpace(overdate) && string.IsNullOrWhiteSpace(hugeEnd);
+
+                    if (!isGuestResult || !UserSession.Current.IsVip)
+                    {
+                        UserSession.Current.IsSvip = isSvip;
+                        UserSession.Current.IsVip = isVip;
+                        UserSession.Current.VipLevel = level;
+                        UserSession.Current.VipExpireAt = !string.IsNullOrWhiteSpace(hugeEnd) ? hugeEnd : overdate;
+                        changed = true;
+                    }
+                }
+                if (vipData.TryGetProperty("userinfo", out var userInfoNode))
                 {
-                    return await RefreshCurrentUserProfileInternalAsync(canRetryWithRenew: false, ct).ConfigureAwait(false);
+                    var mLevel = ReadInt(userInfoNode, "music_level");
+                    if (mLevel > 0 || !UserSession.Current.IsVip)
+                    {
+                        UserSession.Current.MusicLevel = mLevel;
+                        changed = true;
+                    }
                 }
             }
 
@@ -101,7 +126,7 @@ public sealed partial class MusicApi
                 UserSession.Current.Save();
                 AppLogger.Info("MusicApi", $"Account profile refreshed: {UserSession.Current.Nick}, VIP={UserSession.Current.IsVip}, VIP level={UserSession.Current.VipLevel}, music level={UserSession.Current.MusicLevel}");
             }
-            return changed;
+            return true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

@@ -89,6 +89,37 @@ public class OfficialAppTokenRefreshTests
     }
 
     [Fact]
+    public async Task EnsureMusicKeyAsync_WithLoginType6_GracefullyHandlesNetwork()
+    {
+        var originalCookies = UserSession.Current.Cookies;
+        var originalUin = UserSession.Current.Uin;
+        var originalKey = UserSession.Current.MusicKey;
+
+        try
+        {
+            UserSession.Current.Uin = "10001";
+            UserSession.Current.MusicKey = "";
+            UserSession.Current.Cookies = new Dictionary<string, string>
+            {
+                ["uin"] = "10001",
+                ["refresh_token"] = "mock_invalid_refresh_token",
+                ["refresh_key"] = "mock_refresh_key",
+                ["tmeLoginType"] = "6"
+            };
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            var result = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, cts.Token);
+            Assert.False(result);
+        }
+        finally
+        {
+            UserSession.Current.Uin = originalUin;
+            UserSession.Current.MusicKey = originalKey;
+            UserSession.Current.Cookies = originalCookies;
+        }
+    }
+
+    [Fact]
     [Trait("Category", "LocalSessionProbe")]
     public async Task ProbeLocalSessionRenewAsync()
     {

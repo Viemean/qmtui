@@ -164,6 +164,11 @@ public sealed partial class MusicApi
     /// <returns>收藏歌曲查询结果；若未登录或请求失败返回空结果集。</returns>
     public static async Task<FavoriteSongsResult> GetFavoriteSongsAsync(int page = 1, int pageSize = 100, CancellationToken ct = default)
     {
+        return await GetFavoriteSongsInternalAsync(page, pageSize, canRetryWithRenew: true, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<FavoriteSongsResult> GetFavoriteSongsInternalAsync(int page, int pageSize, bool canRetryWithRenew, CancellationToken ct)
+    {
         if (!UserSession.Current.IsLoggedIn) return new FavoriteSongsResult([], 0, false);
 
         await LoginService.EnsureMusicKeyAsync(ct).ConfigureAwait(false);
@@ -191,6 +196,19 @@ public sealed partial class MusicApi
 
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
+
+            int rootCode = root.TryGetProperty("code", out var rc) && rc.ValueKind == JsonValueKind.Number ? rc.GetInt32() : 0;
+            int favCode = root.TryGetProperty("req_fav", out var fObj) && fObj.TryGetProperty("code", out var fc) && fc.ValueKind == JsonValueKind.Number ? fc.GetInt32() : 0;
+
+            if (canRetryWithRenew && (s_expiredAuthCodes.Contains(rootCode) || s_expiredAuthCodes.Contains(favCode)))
+            {
+                AppLogger.Info("MusicApi", "GetFavoriteSongsAsync: token expired, refreshing credentials...");
+                if (await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false))
+                {
+                    return await GetFavoriteSongsInternalAsync(page, pageSize, canRetryWithRenew: false, ct).ConfigureAwait(false);
+                }
+            }
+
             var list = new List<Song>(pageSize > 0 ? pageSize : 30);
             int total = 0;
             bool hasMore = false;
@@ -252,6 +270,11 @@ public sealed partial class MusicApi
     /// <returns>歌单列表；若未登录或请求失败返回空列表。</returns>
     public static async Task<List<Playlist>> GetPlaylistsAsync(CancellationToken ct = default)
     {
+        return await GetPlaylistsInternalAsync(canRetryWithRenew: true, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<List<Playlist>> GetPlaylistsInternalAsync(bool canRetryWithRenew, CancellationToken ct)
+    {
         if (!UserSession.Current.IsLoggedIn) return [];
 
         await LoginService.EnsureMusicKeyAsync(ct).ConfigureAwait(false);
@@ -279,6 +302,20 @@ public sealed partial class MusicApi
 
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
+
+            int rootCode = root.TryGetProperty("code", out var rc) && rc.ValueKind == JsonValueKind.Number ? rc.GetInt32() : 0;
+            int selfCode = root.TryGetProperty("self_playlists", out var sObj) && sObj.TryGetProperty("code", out var sc) && sc.ValueKind == JsonValueKind.Number ? sc.GetInt32() : 0;
+            int favCode = root.TryGetProperty("fav_playlists", out var fObj) && fObj.TryGetProperty("code", out var fc) && fc.ValueKind == JsonValueKind.Number ? fc.GetInt32() : 0;
+
+            if (canRetryWithRenew && (s_expiredAuthCodes.Contains(rootCode) || s_expiredAuthCodes.Contains(selfCode) || s_expiredAuthCodes.Contains(favCode)))
+            {
+                AppLogger.Info("MusicApi", "GetPlaylistsAsync: token expired, refreshing credentials...");
+                if (await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false))
+                {
+                    return await GetPlaylistsInternalAsync(canRetryWithRenew: false, ct).ConfigureAwait(false);
+                }
+            }
+
             var playlists = new List<Playlist>(32);
 
             if (root.TryGetProperty("self_playlists", out var selfObj) &&
@@ -517,7 +554,7 @@ public sealed partial class MusicApi
                     return true;
                 }
 
-                if ((code == 1000 || code == 10000 || code == 80105) && canRetryWithRenew)
+                if ((s_expiredAuthCodes.Contains(code) || code == 10000 || code == 80105) && canRetryWithRenew)
                 {
                     AppLogger.Info("MusicApi", $"AddSongToPlaylistAsync returned auth/rate error {code}, attempting credential renewal...");
                     var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
@@ -593,7 +630,7 @@ public sealed partial class MusicApi
                     return true;
                 }
 
-                if ((code == 1000 || code == 10000 || code == 80105) && canRetryWithRenew)
+                if ((s_expiredAuthCodes.Contains(code) || code == 10000 || code == 80105) && canRetryWithRenew)
                 {
                     AppLogger.Info("MusicApi", $"RemoveSongFromPlaylistAsync returned auth/rate error {code}, attempting credential renewal...");
                     var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
@@ -784,7 +821,7 @@ public sealed partial class MusicApi
                     return (true, dissId, "创建成功");
                 }
 
-                if ((code == 1000 || code == 10000 || code == 80105) && canRetryWithRenew)
+                if ((s_expiredAuthCodes.Contains(code) || code == 10000 || code == 80105) && canRetryWithRenew)
                 {
                     AppLogger.Info("MusicApi", $"CreatePlaylistAsync returned auth/rate error {code}, attempting credential renewal...");
                     var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
@@ -859,7 +896,7 @@ public sealed partial class MusicApi
                 {
                     int code = codeProp.GetInt32();
                     if (code == 0) return true;
-                    if ((code == 1000 || code == 10000 || code == 80105) && canRetryWithRenew)
+                    if ((s_expiredAuthCodes.Contains(code) || code == 10000 || code == 80105) && canRetryWithRenew)
                     {
                         var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
                         if (renewed)
@@ -898,7 +935,7 @@ public sealed partial class MusicApi
                 {
                     int code = codeProp.GetInt32();
                     if (code == 0) return true;
-                    if ((code == 1000 || code == 10000 || code == 80105) && canRetryWithRenew)
+                    if ((s_expiredAuthCodes.Contains(code) || code == 10000 || code == 80105) && canRetryWithRenew)
                     {
                         var renewed = await LoginService.EnsureMusicKeyAsync(forceRefresh: true, ct).ConfigureAwait(false);
                         if (renewed)

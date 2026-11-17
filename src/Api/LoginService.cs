@@ -450,7 +450,9 @@ public sealed partial class LoginService
 
         var rawLoginType = GetJsonString(data, "tmeLoginType");
         var isWeChat = type == QrLoginType.WeChat || rawLoginType == "1" || musicKey.StartsWith("W_X_");
-        var actualLoginType = isWeChat ? "1" : "2";
+        var actualLoginType = (type == QrLoginType.OfficialApp || rawLoginType == "6")
+            ? "6"
+            : (isWeChat ? "1" : "2");
 
         var cookies = new Dictionary<string, string>
         {
@@ -571,7 +573,7 @@ public sealed partial class LoginService
                            (!string.IsNullOrEmpty(currentKey) && currentKey.StartsWith("W_X_"));
 
             var refreshKey = cookies.TryGetValue("refresh_key", out var rk) ? rk : "";
-            var rawLoginType = cookies.TryGetValue("tmeLoginType", out var rlt) && int.TryParse(rlt, out var lti) ? lti : (isWeChat ? 1 : 2);
+            var rawLoginType = cookies.TryGetValue("tmeLoginType", out var rlt) && int.TryParse(rlt, out var lti) && (lti == 1 || lti == 2 || lti == 6) ? lti : (isWeChat ? 1 : 2);
 
             var refreshToken = cookies.TryGetValue("refresh_token", out var rt) && !string.IsNullOrEmpty(rt) ? rt
                 : (isWeChat
@@ -880,7 +882,9 @@ public sealed partial class LoginService
             var isWeChat = (cookies.TryGetValue("tmeLoginType", out var lt) && lt == "1") ||
                            (!string.IsNullOrEmpty(currentMusicKey) && currentMusicKey.StartsWith("W_X_")) ||
                            loginType == 1;
-            var actualLoginType = isWeChat ? 1 : 2;
+            var actualLoginType = (loginType == 1 || loginType == 2 || loginType == 6)
+                ? loginType
+                : (isWeChat ? 1 : 2);
 
             var targetOpenid = openid;
             if (string.IsNullOrEmpty(targetOpenid))
@@ -953,14 +957,14 @@ public sealed partial class LoginService
 
             var newRefreshToken = GetJsonString(data, "refresh_token");
             if (string.IsNullOrEmpty(newRefreshToken) && actualLoginType == 1) newRefreshToken = GetJsonString(data, "psrf_wxrefresh_token");
-            if (string.IsNullOrEmpty(newRefreshToken) && actualLoginType == 2) newRefreshToken = GetJsonString(data, "psrf_qqrefresh_token");
+            if (string.IsNullOrEmpty(newRefreshToken) && (actualLoginType == 2 || actualLoginType == 6)) newRefreshToken = GetJsonString(data, "psrf_qqrefresh_token");
             if (string.IsNullOrEmpty(newRefreshToken)) newRefreshToken = refreshToken;
 
             if (!string.IsNullOrEmpty(newRefreshToken))
             {
                 cookieDict["refresh_token"] = newRefreshToken;
                 if (actualLoginType == 1) cookieDict["psrf_wxrefresh_token"] = newRefreshToken;
-                if (actualLoginType == 2) cookieDict["psrf_qqrefresh_token"] = newRefreshToken;
+                if (actualLoginType == 2 || actualLoginType == 6) cookieDict["psrf_qqrefresh_token"] = newRefreshToken;
             }
 
             AddCredentialCookie(data, cookieDict, "refresh_key", "refresh_key");
