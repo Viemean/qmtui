@@ -477,7 +477,47 @@ public sealed partial class GstPlayer : IPlayer
                             switch (type)
                             {
                                 case GST_MESSAGE_ERROR:
-                                    AppLogger.Warn("GstPlayer", "Bus reported GST_MESSAGE_ERROR, triggering watchdog");
+                                    string errorDetails = "Unknown error";
+                                    try
+                                    {
+                                        gst_message_parse_error(msg, out nint gerr, out nint dbg);
+                                        if (gerr != 0)
+                                        {
+                                            try
+                                            {
+                                                nint msgPtr = Marshal.ReadIntPtr(gerr, 8);
+                                                if (msgPtr != 0)
+                                                {
+                                                    errorDetails = Marshal.PtrToStringUTF8(msgPtr) ?? "Unknown error";
+                                                }
+                                            }
+                                            finally
+                                            {
+                                                g_error_free(gerr);
+                                            }
+                                        }
+                                        if (dbg != 0)
+                                        {
+                                            try
+                                            {
+                                                var dbgStr = Marshal.PtrToStringUTF8(dbg);
+                                                if (!string.IsNullOrEmpty(dbgStr))
+                                                {
+                                                    errorDetails += $" ({dbgStr})";
+                                                }
+                                            }
+                                            finally
+                                            {
+                                                g_free(dbg);
+                                            }
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        errorDetails = $"Failed to parse GError: {ex.Message}";
+                                    }
+
+                                    AppLogger.Warn("GstPlayer", $"Bus reported GST_MESSAGE_ERROR: {errorDetails}");
                                     TriggerWatchdogRecovery();
                                     break;
 
@@ -686,6 +726,7 @@ public sealed partial class GstPlayer : IPlayer
     }
 
     private const string LibGObject = "libgobject-2.0.so.0";
+    private const string LibGLib = "libglib-2.0.so.0";
 
     [LibraryImport(LibGst)]
     private static partial void gst_init(nint argc, nint argv);
@@ -743,4 +784,13 @@ public sealed partial class GstPlayer : IPlayer
 
     [LibraryImport(LibGst)]
     private static partial void gst_mini_object_unref(nint obj);
+
+    [LibraryImport(LibGst)]
+    private static partial void gst_message_parse_error(nint message, out nint gerror, out nint debug);
+
+    [LibraryImport(LibGLib)]
+    private static partial void g_error_free(nint error);
+
+    [LibraryImport(LibGLib)]
+    private static partial void g_free(nint mem);
 }

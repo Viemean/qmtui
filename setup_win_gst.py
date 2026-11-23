@@ -35,6 +35,7 @@ AUDIO_PLUGIN_WHITELIST = {
     # 音频解码器
     "gstflac.dll",
     "gstmpg123.dll",
+    "gstmediafoundation.dll",
     "gstisomp4.dll",
     "gstogg.dll",
     "gstvorbis.dll",
@@ -364,12 +365,10 @@ def main():
     installer_path = os.path.join(args.cache_dir, installer_filename)
     extract_temp_dir = os.path.join(args.cache_dir, f"extracted_{gst_arch}_{args.version}")
 
-    # 1. 确保安装包存在
-    download_file(url, installer_path)
-
-    # 2. 静默解包
+    # 1. 优先检查本地已解包缓存
     bin_found, _, _ = locate_gst_directories(extract_temp_dir)
     if not bin_found:
+        download_file(url, installer_path)
         unpack_installer(installer_path, extract_temp_dir)
     else:
         print(f"[setup_win_gst] 使用本地已解包缓存: {extract_temp_dir}")
