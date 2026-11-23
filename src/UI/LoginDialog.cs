@@ -19,6 +19,7 @@ public sealed class LoginDialog : Dialog
     private LoginHttpServer? _httpServer;
     private LoginService.QrLoginType _loginType = LoginService.QrLoginType.Qq;
     private object? _uiTimerToken;
+    private volatile bool _isChildModalActive;
 
     private static Scheme TransparentDialogScheme => MikuTheme.TransparentDialog;
 
@@ -34,6 +35,7 @@ public sealed class LoginDialog : Dialog
     private readonly Label _qrStatusLabel;
     private readonly Label _qrTipLabel;
     private readonly Label _providerLabel;
+    private readonly Label _credStatusLabel;
     private readonly ListView _qrView;
 
     public LoginDialog(Action onLoginSuccess)
@@ -42,7 +44,7 @@ public sealed class LoginDialog : Dialog
 
         Title = "账号扫码登录";
         Width = 74;
-        Height = 32;
+        Height = 34;
         X = Pos.Center();
         Y = Pos.Center();
         SetScheme(TransparentDialogScheme);
@@ -104,13 +106,30 @@ public sealed class LoginDialog : Dialog
             Y = 0
         };
 
-        Add(webTabBtn, qrTabBtn, logoutBtn, closeBtn, qqBtn, weChatBtn, appLoginBtn, _providerLabel);
+        var credBtn = new Button
+        {
+            Text = "独立凭据 (4)",
+            X = 2,
+            Y = 4,
+            ShadowStyle = ShadowStyles.None
+        };
+        credBtn.SetScheme(TransparentDialogScheme);
+
+        _credStatusLabel = new Label
+        {
+            Text = "",
+            X = Pos.Right(credBtn) + 2,
+            Y = 4
+        };
+        _credStatusLabel.SetScheme(TransparentDialogScheme);
+
+        Add(webTabBtn, qrTabBtn, logoutBtn, closeBtn, qqBtn, weChatBtn, appLoginBtn, _providerLabel, credBtn, _credStatusLabel);
 
         // ==================== 1. 网页登录容器 (默认激活) ====================
         _webContainer = new View
         {
             X = 0,
-            Y = 4,
+            Y = 6,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
             Visible = true
@@ -186,7 +205,7 @@ public sealed class LoginDialog : Dialog
         _qrContainer = new View
         {
             X = 0,
-            Y = 4,
+            Y = 6,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
             Visible = false
@@ -312,6 +331,12 @@ public sealed class LoginDialog : Dialog
                 SelectProvider(LoginService.QrLoginType.OfficialApp);
                 return;
             }
+            if (c == '4')
+            {
+                k.Handled = true;
+                OpenPlaybackCredentialsDialog();
+                return;
+            }
             if (c == 'R')
             {
                 k.Handled = true;
@@ -326,8 +351,51 @@ public sealed class LoginDialog : Dialog
             }
         };
 
+        credBtn.Accepting += (s, e) => OpenPlaybackCredentialsDialog();
+        UpdatePlaybackCredentialsStatus();
+
         // 启动网络扫码服务与轮询
         StartQrLoginFlow();
+    }
+
+    private void OpenPlaybackCredentialsDialog()
+    {
+        _isChildModalActive = true;
+        try
+        {
+            var dlg = new PlaybackCredentialsDialog(() =>
+            {
+                UpdatePlaybackCredentialsStatus();
+            });
+            Application.Run(dlg);
+        }
+        finally
+        {
+            _isChildModalActive = false;
+            SetNeedsDraw();
+        }
+        UpdatePlaybackCredentialsStatus();
+    }
+
+    private void UpdatePlaybackCredentialsStatus()
+    {
+        var creds = QmTui.Services.PlaybackCredentialsManager.CurrentCredentials;
+        if (creds != null)
+        {
+            string name = string.IsNullOrEmpty(creds.Nick) ? creds.Uin : $"{creds.Nick} ({creds.Uin})";
+            if (QmTui.Services.PlaybackCredentialsManager.IsCredentialInvalid(creds))
+            {
+                _credStatusLabel.Text = $"[已失效] {name}";
+            }
+            else
+            {
+                _credStatusLabel.Text = $"已绑定: {name}";
+            }
+        }
+        else
+        {
+            _credStatusLabel.Text = "";
+        }
     }
 
     private volatile bool _refreshRequested;
@@ -363,7 +431,10 @@ public sealed class LoginDialog : Dialog
         _uiTimerToken = Application.AddTimeout(TimeSpan.FromMilliseconds(250), () =>
         {
             if (_cts.IsCancellationRequested) return false;
-            SetNeedsDraw();
+            if (!_isChildModalActive)
+            {
+                SetNeedsDraw();
+            }
             return true;
         });
 

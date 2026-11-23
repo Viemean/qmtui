@@ -54,15 +54,14 @@ public sealed partial class MusicApi
     {
         if (string.IsNullOrEmpty(mediaMid) || mediaMid.Contains("://") || mediaMid.Contains('/')) mediaMid = songMid;
 
-        await LoginService.EnsureMusicKeyAsync(false, ct).ConfigureAwait(false);
+        if (!PlaybackCredentialsManager.HasCustomCredentials)
+        {
+            await LoginService.EnsureMusicKeyAsync(false, ct).ConfigureAwait(false);
+        }
 
         var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
-        var uin = string.IsNullOrEmpty(UserSession.Current.Uin) ? "0" : UserSession.Current.Uin;
-        var authst = !string.IsNullOrEmpty(UserSession.Current.MusicKey)
-            ? UserSession.Current.MusicKey
-            : (UserSession.Current.Cookies.TryGetValue("qm_keyst", out var mk) && !string.IsNullOrEmpty(mk)
-                ? mk
-                : (UserSession.Current.Cookies.TryGetValue("qqmusic_key", out var qmk) ? qmk : ""));
+        var uin = PlaybackCredentialsManager.GetActiveUin();
+        var authst = PlaybackCredentialsManager.GetActiveAuthst();
 
         var requests = AudioQualityHelper.ProbeRequests.Where(r => DeviceAudioCapability.IsTierSupported(r.Tier)).ToArray();
         var requestJson = new StringBuilder(1536);
@@ -91,7 +90,7 @@ public sealed partial class MusicApi
             req.Headers.TryAddWithoutValidation("Origin", "https://y.qq.com");
             req.Headers.Referrer = new Uri("https://y.qq.com/");
 
-            var cookieHeader = UserSession.Current.GetCookieHeader();
+            var cookieHeader = PlaybackCredentialsManager.GetActiveCookieHeader();
             if (!string.IsNullOrEmpty(cookieHeader))
             {
                 req.Headers.Add("Cookie", cookieHeader);
@@ -103,7 +102,7 @@ public sealed partial class MusicApi
             using var doc = JsonDocument.Parse(respStr);
             var options = ParseProbedQualities(doc.RootElement, requests);
 
-            if (canRetryWithRenew && UserSession.Current.IsLoggedIn)
+            if (canRetryWithRenew && UserSession.Current.IsLoggedIn && !PlaybackCredentialsManager.HasCustomCredentials)
             {
                 var hasVipSource = options.Any(o => o.Tier > AudioQualityTier.HQ && o.FileSizeBytes > 0);
                 var hasVipUrl = options.Any(o => o.Tier > AudioQualityTier.HQ && o.Available);

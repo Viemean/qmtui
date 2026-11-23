@@ -1414,8 +1414,19 @@ public sealed partial class MainWindow : Window
         Application.KeyDown += async (s, k) => await HandleGlobalKeyDownAsync(k);
 
         // 绑定播放器回调
+        long lastModalPositionTick = 0;
         _player.PositionUpdated += pos =>
         {
+            if (Application.TopRunnableView != null && !(Application.TopRunnableView is MainWindow))
+            {
+                long now = Environment.TickCount64;
+                if (now - lastModalPositionTick < 1000)
+                {
+                    return;
+                }
+                lastModalPositionTick = now;
+            }
+
             Application.Invoke(() =>
             {
                 UpdateProgress(pos);
