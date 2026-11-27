@@ -57,16 +57,38 @@ public record Playlist(
     int SongCount,
     long Tid = 0,
     bool IsFav = false,
-    string PicUrl = ""
+    string PicUrl = "",
+    long OwnerUin = 0
 )
 {
-    public bool IsMyFavorite => DirId == 201;
+    /// <summary>非 0 表示这是他人（或指定 QQ 号）的歌单，读取时必须带上所有者。</summary>
+    public bool IsOwnedByOther => OwnerUin > 0;
+
+    public bool IsMyFavorite => DirId == 201 && !IsOwnedByOther;
 
     public string Title => Name;
     public int SongNum => SongCount;
-    public bool IsCreated => !IsFav;
+    public bool IsCreated => !IsFav && !IsOwnedByOther;
 
     public string DisplayTitle => IsMyFavorite
         ? $"[我喜欢] ({SongCount} 首)"
         : (IsFav ? $"[收藏] {Name} ({SongCount} 首)" : $"{Name} ({SongCount} 首)");
 }
+
+/// <summary>
+/// QQ 音乐用户搜索结果。
+/// </summary>
+public sealed record UserSummary(
+    string Name,
+    string EncryptUin,
+    string Uin,
+    int FansNum,
+    int PlaylistCount,
+    bool IsMyself,
+    string Identify = ""
+);
+
+/// <summary>
+/// 公开歌单详情（元数据 + 完整歌曲列表）。
+/// </summary>
+public sealed record PublicPlaylistDetail(Playlist Playlist, List<Song> Songs);
