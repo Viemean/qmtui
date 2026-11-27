@@ -43,6 +43,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="QmTui.Tests" />
+    <!-- NativeAOT：保留 DriverImpl._output 的反射元数据，供 src/UI/NativeCursorOutput.cs 使用 -->
+    <TrimmerRootDescriptor Include="ILLink.Descriptors.xml" />
   </ItemGroup>
 
   <ItemGroup>

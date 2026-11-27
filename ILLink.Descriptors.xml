@@ -1,0 +1,12 @@
+<!--
+  NativeAOT 默认不保留私有字段的反射元数据，src/UI/NativeCursorOutput.cs 需要反射拿到
+  DriverImpl._output 才能替换成不隐藏光标的包装层。这里只为该字段保留元数据。
+  Terminal.Gui 修掉每帧 hide/show 光标后，连同 NativeCursorOutput.cs 一起删除。
+-->
+<linker>
+  <assembly fullname="Terminal.Gui">
+    <type fullname="Terminal.Gui.Drivers.DriverImpl">
+      <field name="_output" />
+    </type>
+  </assembly>
+</linker>
