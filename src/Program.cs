@@ -222,6 +222,8 @@ public static partial class Program
             using (player)
             {
                 Application.Init();
+                // 去掉 TG 每帧 hide/show 光标：保留终端原生光标（含 kitty 的闪烁动效），详见 NativeCursorOutput。
+                NativeCursorGuard.Install();
                 if (Application.Driver != null)
                 {
                     if (OperatingSystem.IsLinux())
