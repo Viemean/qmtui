@@ -41,6 +41,12 @@ internal sealed class NativeCursorOutput : IOutput
 
     public void Write(IOutputBuffer buffer)
     {
+        if (_inner.IsLegacyConsole)
+        {
+            _inner.Write(buffer);
+            return;
+        }
+
         // 同步输出（DECSET 2026）：让一帧在终端侧原子呈现。去掉每帧的 ?25l 之后，超长帧在慢链路上
         // 可能被终端分段渲染、露出光标停在中间格子；不支持该私有模式的终端会忽略，无副作用。
         _inner.Write("\x1b[?2026h".AsSpan());

@@ -80,6 +80,17 @@ public class NativeCursorOutputTests
         Assert.Equal(new[] { "\x1b[?2026h", "<frame>", "\x1b[?2026l" }, inner.Writes);
     }
 
+    [Fact]
+    public void Write_LegacyConsole_SkipsSynchronizedUpdate()
+    {
+        var inner = new RecordingOutput { IsLegacyConsole = true };
+        var output = new NativeCursorOutput(inner);
+
+        output.Write((IOutputBuffer)null!);
+
+        Assert.Equal(new[] { "<frame>" }, inner.Writes);
+    }
+
     // NativeCursorGuard.Install 靠反射找 DriverImpl 里的 IOutput 字段；TG 升级改动结构时这里先失败。
     [Fact]
     public void DriverImpl_StillHasAnOutputField()
