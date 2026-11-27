@@ -139,6 +139,81 @@ public sealed partial class MusicApi
         }
     }
 
+    /// <summary>
+    /// 按昵称搜索 QQ 音乐用户。
+    /// </summary>
+    /// <param name="query">用户昵称关键词。</param>
+    /// <param name="page">分页页码，默认 1。</param>
+    /// <param name="pageSize">单页条数，默认 30。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>匹配的用户列表；无结果或请求失败返回空列表。</returns>
+    public static async Task<List<UserSummary>> SearchUsersAsync(string query, int page = 1, int pageSize = 30, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return [];
+
+        try
+        {
+            var escapedQuery = JsonEncodedText.Encode(query).ToString();
+            var payload = $$"""
+            {
+              "music.search.SearchCgiService": {
+                "module": "music.search.SearchCgiService",
+                "method": "DoSearchForQQMusicDesktop",
+                "param": {
+                  "query": "{{escapedQuery}}",
+                  "page_num": {{page}},
+                  "num_per_page": {{pageSize}},
+                  "search_type": 8
+                }
+              }
+            }
+            """;
+
+            var json = await PostAg1Async(payload, ct).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("music.search.SearchCgiService", out var svc) &&
+                svc.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("body", out var body) &&
+                body.TryGetProperty("user", out var userObj) &&
+                userObj.TryGetProperty("list", out var userArray) &&
+                userArray.ValueKind == JsonValueKind.Array)
+            {
+                var list = new List<UserSummary>(userArray.GetArrayLength());
+                foreach (var item in userArray.EnumerateArray())
+                {
+                    var name = ReadString(item, "title");
+                    var encryptUin = ReadString(item, "encrypt_uin");
+                    var uin = ReadString(item, "uin");
+                    if (string.IsNullOrWhiteSpace(name) ||
+                        (string.IsNullOrWhiteSpace(encryptUin) && string.IsNullOrWhiteSpace(uin)))
+                    {
+                        continue;
+                    }
+
+                    list.Add(new UserSummary(
+                        Name: name,
+                        EncryptUin: encryptUin,
+                        Uin: uin,
+                        FansNum: ReadInt(item, "fans_num"),
+                        PlaylistCount: ReadInt(item, "diss_num"),
+                        IsMyself: ReadBool(item, "is_myself"),
+                        Identify: ReadString(item, "identify_title")
+                    ));
+                }
+                return list;
+            }
+
+            return [];
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MusicApi", $"SearchUsersAsync error for '{query}'", ex);
+            return [];
+        }
+    }
+
     private static int GetCurrentLoginType()
     {
         if (UserSession.Current.Cookies.TryGetValue("tmeLoginType", out var loginType) && int.TryParse(loginType, out var parsed))
@@ -180,5 +255,18 @@ public sealed partial class MusicApi
         if (!source.TryGetProperty(property, out var value)) return 0;
         if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number)) return number;
         return value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out number) ? number : 0;
+    }
+
+    private static bool ReadBool(JsonElement source, string property)
+    {
+        if (!source.TryGetProperty(property, out var value)) return false;
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.Number => value.TryGetInt32(out var number) && number != 0,
+            JsonValueKind.String => value.GetString() is { } text &&
+                (text == "1" || string.Equals(text, "true", StringComparison.OrdinalIgnoreCase)),
+            _ => false
+        };
     }
 }

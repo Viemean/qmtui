@@ -51,9 +51,11 @@ public sealed partial class MainWindow : Window
     private readonly Button _searchSongsBtn;
     private readonly Button _searchPlaylistsBtn;
     private readonly Button _searchAlbumsBtn;
+    private readonly Button _searchUsersBtn;
     private readonly Dictionary<string, List<Song>> _cachedSearchSongs = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<Playlist>> _cachedSearchPlaylists = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<Album>> _cachedSearchAlbums = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<UserSummary>> _cachedSearchUsers = new(StringComparer.OrdinalIgnoreCase);
     private readonly Button _userStatusBtn;
     private readonly Button _recognizeBtn;
     private readonly Button _webBtn;
@@ -157,6 +159,10 @@ public sealed partial class MainWindow : Window
     private List<Album> _cachedAlbums = [];
     private bool _isViewingAlbumsList;
 
+    private List<Playlist> _cachedUserPlaylists = [];
+    private string _currentUserName = "";
+    private ViewMode _playlistDrilldownOrigin = ViewMode.Other;
+
     // 云端最近播放增量拉取的 updateTime 锚点（0 表示首次全量）
     private long _lastRecentCloudUpdateTime;
 
@@ -164,7 +170,8 @@ public sealed partial class MainWindow : Window
     {
         Songs,
         Playlists,
-        Albums
+        Albums,
+        Users
     }
 
     private enum ViewMode
@@ -176,6 +183,7 @@ public sealed partial class MainWindow : Window
         GuessRecommend,
         PlaylistDrilldown,
         PlaylistsList,
+        UserPlaylists,
         FavoriteAlbums,
         AlbumDrilldown,
         ArtistDetail,
@@ -410,6 +418,21 @@ public sealed partial class MainWindow : Window
         _searchAlbumsBtn.KeyBindings.Remove(Key.Space);
         _searchAlbumsBtn.Accepting += async (s, e) => await OnContextAction3Async();
         Add(_searchAlbumsBtn);
+
+        _searchUsersBtn = new Button
+        {
+            Text = "[4用户]",
+            NoDecorations = true,
+            X = Pos.Right(_searchAlbumsBtn) + 1,
+            Y = 0,
+            ShadowStyle = ShadowStyles.None,
+            CanFocus = false,
+            Visible = false,
+            TabStop = Terminal.Gui.ViewBase.TabBehavior.NoStop
+        };
+        _searchUsersBtn.KeyBindings.Remove(Key.Space);
+        _searchUsersBtn.Accepting += async (s, e) => await OnContextAction4Async();
+        Add(_searchUsersBtn);
 
         // 初始化顶部按钮的独立防重叠自适应布局
         UpdateTopRightButtonsLayout();
@@ -1914,7 +1937,7 @@ public sealed partial class MainWindow : Window
     internal void UpdateTopRightButtonsLayout()
     {
         if (_userStatusBtn == null || _recognizeBtn == null || _webBtn == null || _themeBtn == null || _helpBtn == null || _searchField == null ||
-            _searchSongsBtn == null || _searchPlaylistsBtn == null || _searchAlbumsBtn == null) return;
+            _searchSongsBtn == null || _searchPlaylistsBtn == null || _searchAlbumsBtn == null || _searchUsersBtn == null) return;
 
         // 最右侧：主题切换按钮 [主题:自动] / [主题:亮色] / [主题:暗色] (右侧保留 1 列安全留白)
         var themeText = GetThemeButtonText();
@@ -1966,6 +1989,10 @@ public sealed partial class MainWindow : Window
         {
             contextButtonsWidth += _searchAlbumsBtn.Text.ToString().GetVisualWidth() + 1;
         }
+        if (_searchUsersBtn?.Visible == true)
+        {
+            contextButtonsWidth += _searchUsersBtn.Text.ToString().GetVisualWidth() + 1;
+        }
 
         int categoryOffset = contextButtonsWidth > 0 ? contextButtonsWidth + 2 : 2;
         _searchField.Width = Dim.Fill(recAnchorOffset + categoryOffset);
@@ -1984,6 +2011,11 @@ public sealed partial class MainWindow : Window
         if (_searchAlbumsBtn?.Visible == true)
         {
             _searchAlbumsBtn.X = currentX;
+            currentX = Pos.Right(_searchAlbumsBtn) + 1;
+        }
+        if (_searchUsersBtn?.Visible == true)
+        {
+            _searchUsersBtn.X = currentX;
         }
 
         SetNeedsLayout();
@@ -2131,6 +2163,14 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async Task OnContextAction4Async()
+    {
+        if (_currentViewMode == ViewMode.Search)
+        {
+            await SwitchSearchCategoryAsync(SearchCategory.Users);
+        }
+    }
+
     internal void UpdateSearchCategoryVisibility(bool visible = true)
     {
         _ = visible;
@@ -2144,13 +2184,14 @@ public sealed partial class MainWindow : Window
 
     internal void UpdateTopContextButtons()
     {
-        if (_searchSongsBtn == null || _searchPlaylistsBtn == null || _searchAlbumsBtn == null) return;
+        if (_searchSongsBtn == null || _searchPlaylistsBtn == null || _searchAlbumsBtn == null || _searchUsersBtn == null) return;
 
         if (_isImmersiveMode || _isNowPlayingViewActive || _isAodMode)
         {
             _searchSongsBtn.Visible = false;
             _searchPlaylistsBtn.Visible = false;
             _searchAlbumsBtn.Visible = false;
+            _searchUsersBtn.Visible = false;
             UpdateTopRightButtonsLayout();
             return;
         }
@@ -2161,14 +2202,17 @@ public sealed partial class MainWindow : Window
                 _searchSongsBtn.Text = "[1单曲]";
                 _searchPlaylistsBtn.Text = "[2歌单]";
                 _searchAlbumsBtn.Text = "[3专辑]";
+                _searchUsersBtn.Text = "[4用户]";
 
                 _searchSongsBtn.Visible = true;
                 _searchPlaylistsBtn.Visible = true;
                 _searchAlbumsBtn.Visible = true;
+                _searchUsersBtn.Visible = true;
 
                 _searchSongsBtn.SetScheme(_searchCategory == SearchCategory.Songs ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
                 _searchPlaylistsBtn.SetScheme(_searchCategory == SearchCategory.Playlists ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
                 _searchAlbumsBtn.SetScheme(_searchCategory == SearchCategory.Albums ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
+                _searchUsersBtn.SetScheme(_searchCategory == SearchCategory.Users ? MikuTheme.SearchCategoryActive : MikuTheme.SearchCategoryDim);
                 break;
 
             case ViewMode.ArtistDetail:
@@ -2181,6 +2225,7 @@ public sealed partial class MainWindow : Window
                 _searchSongsBtn.Visible = true;
                 _searchPlaylistsBtn.Visible = _singerSubMode == SingerSubMode.Songs;
                 _searchAlbumsBtn.Visible = true;
+                _searchUsersBtn.Visible = false;
 
                 _searchSongsBtn.SetScheme(MikuTheme.SearchCategoryDim);
                 _searchPlaylistsBtn.SetScheme(MikuTheme.SearchCategoryDim);
@@ -2195,6 +2240,7 @@ public sealed partial class MainWindow : Window
                 _searchSongsBtn.Visible = true;
                 _searchPlaylistsBtn.Visible = true;
                 _searchAlbumsBtn.Visible = true;
+                _searchUsersBtn.Visible = false;
 
                 _searchSongsBtn.SetScheme(MikuTheme.SearchCategoryDim);
                 _searchPlaylistsBtn.SetScheme(MikuTheme.SearchCategoryDim);
@@ -2209,6 +2255,7 @@ public sealed partial class MainWindow : Window
                 _searchSongsBtn.Visible = true;
                 _searchPlaylistsBtn.Visible = true;
                 _searchAlbumsBtn.Visible = true;
+                _searchUsersBtn.Visible = false;
 
                 _searchSongsBtn.SetScheme(MikuTheme.SearchCategoryDim);
                 _searchPlaylistsBtn.SetScheme(MikuTheme.SearchCategoryDim);
@@ -2219,6 +2266,7 @@ public sealed partial class MainWindow : Window
                 _searchSongsBtn.Visible = false;
                 _searchPlaylistsBtn.Visible = false;
                 _searchAlbumsBtn.Visible = false;
+                _searchUsersBtn.Visible = false;
                 break;
         }
 
@@ -2227,6 +2275,7 @@ public sealed partial class MainWindow : Window
         _searchSongsBtn.SetNeedsDraw();
         _searchPlaylistsBtn.SetNeedsDraw();
         _searchAlbumsBtn.SetNeedsDraw();
+        _searchUsersBtn.SetNeedsDraw();
     }
 
     public void UpdateLyricTitle(string text)

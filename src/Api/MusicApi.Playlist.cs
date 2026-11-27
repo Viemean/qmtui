@@ -368,7 +368,178 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
-    /// 获取指定歌单内的所有歌曲（自建歌单与外部收藏歌单均支持）。
+    /// 获取指定 QQ 号用户的公开歌单列表（包含 dirId 201 的“我喜欢”）。
+    /// </summary>
+    /// <param name="uin">目标用户的数字 QQ 号。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>歌单列表；请求失败或 uin 无效返回空列表。</returns>
+    public static async Task<List<Playlist>> GetUserPlaylistsAsync(long uin, CancellationToken ct = default)
+    {
+        if (uin <= 0) return [];
+
+        var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
+        var commUin = UserSession.Current.IsLoggedIn ? UserSession.Current.Uin : "0";
+        var payload = $"{{\"comm\":{{\"uin\":\"{commUin}\",\"format\":\"json\",\"ct\":19,\"cv\":1,\"authst\":\"\"}}," +
+            $"\"user_playlists\":{{\"module\":\"music.musicasset.PlaylistBaseRead\",\"method\":\"GetPlaylistByUin\",\"param\":{{\"uin\":\"{uin}\"}}}}}}";
+
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, url);
+            req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+            var cookieHeader = UserSession.Current.GetCookieHeader();
+            if (!string.IsNullOrEmpty(cookieHeader)) req.Headers.Add("Cookie", cookieHeader);
+
+            using var resp = await s_httpClient.SendAsync(req, ct).ConfigureAwait(false);
+            var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("user_playlists", out var listObj) &&
+                listObj.TryGetProperty("data", out var dataObj) &&
+                dataObj.TryGetProperty("v_playlist", out var playlistArray) &&
+                playlistArray.ValueKind == JsonValueKind.Array)
+            {
+                var list = new List<Playlist>(playlistArray.GetArrayLength());
+                foreach (var item in playlistArray.EnumerateArray())
+                {
+                    long dirId = item.TryGetProperty("dirId", out var d) && d.ValueKind == JsonValueKind.Number ? d.GetInt64() : 0;
+                    if (dirId <= 0) continue;
+
+                    string name = item.TryGetProperty("dirName", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() ?? "" : "";
+                    int count = item.TryGetProperty("songNum", out var c) && c.ValueKind == JsonValueKind.Number ? c.GetInt32() : 0;
+                    long tid = item.TryGetProperty("tid", out var t) && t.ValueKind == JsonValueKind.Number ? t.GetInt64() : 0;
+                    string pic = item.TryGetProperty("picUrl", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() ?? "" : "";
+
+                    if (dirId == 201 && string.IsNullOrWhiteSpace(name)) name = "我喜欢";
+                    if (string.IsNullOrWhiteSpace(name)) name = "未命名歌单";
+
+                    list.Add(new Playlist(
+                        DirId: dirId,
+                        Name: name,
+                        SongCount: count,
+                        Tid: tid,
+                        IsFav: false,
+                        PicUrl: pic,
+                        OwnerUin: uin
+                    ));
+                }
+                return list;
+            }
+
+            return [];
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MusicApi", $"GetUserPlaylistsAsync (uin: {uin}) error", ex);
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// 读取公开歌单详情：元数据 + 完整歌曲列表（无需登录）。
+    /// </summary>
+    /// <param name="disstid">歌单数字 ID。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>歌单详情；无法读取时返回 <see langword="null"/>。</returns>
+    public static async Task<PublicPlaylistDetail?> GetPublicPlaylistAsync(long disstid, CancellationToken ct = default)
+    {
+        if (disstid <= 0) return null;
+
+        var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
+        var commUin = UserSession.Current.IsLoggedIn ? UserSession.Current.Uin : "0";
+        var payload = $"{{\"comm\":{{\"uin\":\"{commUin}\",\"format\":\"json\",\"ct\":19,\"cv\":1,\"authst\":\"\"}}," +
+            $"\"req_diss\":{{\"module\":\"music.srfDissInfo.aiDissInfo\",\"method\":\"uniform_get_Dissinfo\"," +
+            $"\"param\":{{\"disstid\":{disstid},\"userinfo\":1,\"tag\":1}}}}}}";
+
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, url);
+            req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+            var cookieHeader = UserSession.Current.GetCookieHeader();
+            if (!string.IsNullOrEmpty(cookieHeader)) req.Headers.Add("Cookie", cookieHeader);
+
+            using var resp = await s_httpClient.SendAsync(req, ct).ConfigureAwait(false);
+            var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("req_diss", out var dissObj) ||
+                !dissObj.TryGetProperty("data", out var dataObj))
+            {
+                return null;
+            }
+
+            // 无效/私密歌单会返回 dirinfo 空壳，用业务 code 区分。
+            if (dataObj.TryGetProperty("code", out var dataCodeProp) &&
+                dataCodeProp.ValueKind == JsonValueKind.Number &&
+                dataCodeProp.GetInt32() != 0)
+            {
+                return null;
+            }
+
+            var songs = new List<Song>();
+            if (dataObj.TryGetProperty("songlist", out var songArray) && songArray.ValueKind == JsonValueKind.Array)
+            {
+                songs.Capacity = songArray.GetArrayLength();
+                foreach (var item in songArray.EnumerateArray())
+                {
+                    var song = ParseSongFromElement(item);
+                    if (song != null) songs.Add(song);
+                }
+            }
+
+            string name = "";
+            int count = songs.Count;
+            string pic = "";
+            if (dataObj.TryGetProperty("dirinfo", out var dirInfo) && dirInfo.ValueKind == JsonValueKind.Object)
+            {
+                if (dirInfo.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String)
+                {
+                    name = titleProp.GetString() ?? "";
+                }
+                if (dirInfo.TryGetProperty("songnum", out var songNumProp) && songNumProp.ValueKind == JsonValueKind.Number)
+                {
+                    count = songNumProp.GetInt32();
+                }
+                if (dirInfo.TryGetProperty("picurl", out var picProp) && picProp.ValueKind == JsonValueKind.String)
+                {
+                    pic = picProp.GetString() ?? "";
+                }
+                if (dirInfo.TryGetProperty("host_nick", out var nickProp) && nickProp.ValueKind == JsonValueKind.String)
+                {
+                    var nick = nickProp.GetString() ?? "";
+                    if (!string.IsNullOrWhiteSpace(nick))
+                    {
+                        name = string.IsNullOrWhiteSpace(name) ? nick : $"{name} - {nick}";
+                    }
+                }
+            }
+            else if (songs.Count == 0)
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(name)) name = $"歌单 {disstid}";
+
+            var playlist = new Playlist(
+                DirId: disstid,
+                Name: name,
+                SongCount: count > 0 ? count : songs.Count,
+                Tid: disstid,
+                IsFav: true,
+                PicUrl: pic
+            );
+            return new PublicPlaylistDetail(playlist, songs);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MusicApi", $"GetPublicPlaylistAsync (disstid: {disstid}) error", ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 获取指定歌单内的所有歌曲（自建歌单、他人歌单与外部收藏歌单均支持）。
     /// </summary>
     /// <param name="playlist">目标歌单实例。</param>
     /// <param name="page">分页页码，默认 1。</param>
@@ -377,12 +548,15 @@ public sealed partial class MusicApi
     /// <returns>解析后的曲目列表；若未登录或请求失败返回空列表。</returns>
     public static async Task<List<Song>> GetPlaylistSongsAsync(Playlist playlist, int page = 1, int pageSize = 100, CancellationToken ct = default)
     {
-        if (!playlist.IsFav)
+        if (!playlist.IsFav || playlist.OwnerUin > 0)
         {
-            if (!UserSession.Current.IsLoggedIn) return [];
-            await LoginService.EnsureMusicKeyAsync(ct).ConfigureAwait(false);
+            if (playlist.OwnerUin == 0)
+            {
+                if (!UserSession.Current.IsLoggedIn) return [];
+                await LoginService.EnsureMusicKeyAsync(ct).ConfigureAwait(false);
+            }
 
-            var uin = UserSession.Current.Uin;
+            var uin = playlist.OwnerUin > 0 ? playlist.OwnerUin.ToString() : UserSession.Current.Uin;
             var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
             var payload = $"{{\"comm\":{{\"uin\":\"{uin}\",\"format\":\"json\",\"ct\":19,\"cv\":1,\"authst\":\"\"}}," +
                 $"\"req_pl\":{{\"module\":\"music.musicasset.PlaylistDetailRead\",\"method\":\"GetUniformSongDetailInfo\"," +
@@ -422,44 +596,37 @@ public sealed partial class MusicApi
         }
         else
         {
-            var url = "https://u.y.qq.com/cgi-bin/musicu.fcg";
-            var uin = UserSession.Current.IsLoggedIn ? UserSession.Current.Uin : "0";
-            var payload = $"{{\"comm\":{{\"uin\":\"{uin}\",\"format\":\"json\",\"ct\":19,\"cv\":1,\"authst\":\"\"}}," +
-                $"\"req_diss\":{{\"module\":\"music.srfDissInfo.aiDissInfo\",\"method\":\"uniform_get_Dissinfo\"," +
-                $"\"param\":{{\"disstid\":{playlist.Tid},\"userinfo\":1,\"tag\":1}}}}}}";
+            var detail = await GetPublicPlaylistAsync(playlist.Tid, ct).ConfigureAwait(false);
+            return detail?.Songs ?? [];
+        }
+    }
 
-            try
+    /// <summary>
+    /// 获取歌单曲目页，并告知是否已经拿到全量。
+    /// </summary>
+    /// <param name="playlist">目标歌单实例。</param>
+    /// <param name="page">分页页码，默认 1。</param>
+    /// <param name="pageSize">单页条数，默认 100（服务端上限）。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>曲目列表与完整度；<c>IsComplete</c> 为 <see langword="true"/> 时无需再加载更多。</returns>
+    public static async Task<(List<Song> Songs, bool IsComplete)> GetPlaylistSongsPageAsync(
+        Playlist playlist, int page = 1, int pageSize = 100, CancellationToken ct = default)
+    {
+        // 他人歌单带 tid 时走 uniform_get_Dissinfo：一次返回全量。
+        // 分页接口每页上限 100，3000 首要 30 个请求。
+        if (playlist.OwnerUin > 0 && playlist.Tid > 0 && page == 1)
+        {
+            var detail = await GetPublicPlaylistAsync(playlist.Tid, ct).ConfigureAwait(false);
+            if (detail is { Songs.Count: > 0 })
             {
-                using var req = new HttpRequestMessage(HttpMethod.Post, url);
-                req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
-                var cookieHeader = UserSession.Current.GetCookieHeader();
-                if (!string.IsNullOrEmpty(cookieHeader)) req.Headers.Add("Cookie", cookieHeader);
-
-                using var resp = await s_httpClient.SendAsync(req, ct).ConfigureAwait(false);
-                var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-                if (root.TryGetProperty("req_diss", out var dissObj) &&
-                    dissObj.TryGetProperty("data", out var dataObj) &&
-                    dataObj.TryGetProperty("songlist", out var songArray) &&
-                    songArray.ValueKind == JsonValueKind.Array)
-                {
-                    var list = new List<Song>(songArray.GetArrayLength());
-                    foreach (var item in songArray.EnumerateArray())
-                    {
-                        var song = ParseSongFromElement(item);
-                        if (song != null) list.Add(song);
-                    }
-                    return list;
-                }
-                return [];
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("MusicApi", $"GetPlaylistSongsAsync (tid: {playlist.Tid}) error", ex);
-                return [];
+                return (detail.Songs, true);
             }
         }
+
+        var songs = await GetPlaylistSongsAsync(playlist, page, pageSize, ct).ConfigureAwait(false);
+        // IsFav 且非他人歌单时，GetPlaylistSongsAsync 内部已经走 uniform_get_Dissinfo 全量。
+        var complete = playlist.IsFav && !playlist.IsOwnedByOther;
+        return (songs, complete);
     }
 
     /// <summary>

@@ -478,15 +478,26 @@ public sealed partial class MainWindow
         {
             ShowLyricView();
         }
+        else if (_currentViewMode == ViewMode.UserPlaylists)
+        {
+            ReturnToUsersSearch();
+        }
         else if (_currentDrilldownPlaylist != null)
         {
-            if (_searchCategory == SearchCategory.Playlists && !string.IsNullOrEmpty(_lastSearchQuery))
+            switch (_playlistDrilldownOrigin)
             {
-                await ExecuteSearchAsync();
-            }
-            else
-            {
-                await LoadPlaylistsAsync();
+                case ViewMode.UserPlaylists:
+                    RenderUserPlaylists();
+                    break;
+                case ViewMode.Search when _searchCategory == SearchCategory.Users:
+                    ReturnToUsersSearch();
+                    break;
+                case ViewMode.Search when _searchCategory == SearchCategory.Playlists && !string.IsNullOrEmpty(_lastSearchQuery):
+                    await ExecuteSearchAsync();
+                    break;
+                default:
+                    await LoadPlaylistsAsync();
+                    break;
             }
         }
         else if (_currentDrilldownAlbum != null)
