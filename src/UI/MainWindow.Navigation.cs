@@ -238,6 +238,7 @@ public sealed partial class MainWindow
             {
                 if (idx >= 0 && idx < _cachedPlaylists.Count)
                 {
+                    _playlistDrilldownOrigin = ViewMode.PlaylistsList;
                     await DrilldownPlaylistAsync(_cachedPlaylists[idx]);
                 }
             });
@@ -245,7 +246,117 @@ public sealed partial class MainWindow
         });
     }
 
-    private async Task DrilldownPlaylistAsync(Playlist playlist)
+    private async Task OpenUserPlaylistsAsync(UserSummary user)
+    {
+        long uin = 0;
+        if (user.IsMyself ||
+            (UserSession.Current.IsLoggedIn &&
+             !string.IsNullOrEmpty(UserSession.Current.EncryptedUin) &&
+             string.Equals(user.EncryptUin, UserSession.Current.EncryptedUin, StringComparison.Ordinal)))
+        {
+            _ = long.TryParse(UserSession.Current.Uin, out uin);
+        }
+        else
+        {
+            _ = long.TryParse(user.Uin, out uin);
+        }
+
+        if (uin <= 0)
+        {
+            // 搜索只回 encrypt_uin，拿不到数字 QQ 号时让用户补填。
+            ShowQqNumberPrompt(user.Name, qq => _ = LoadUserPlaylistsAsync(qq, user.Name));
+            return;
+        }
+
+        await LoadUserPlaylistsAsync(uin, user.Name);
+    }
+
+    private async Task LoadUserPlaylistsAsync(long uin, string displayName)
+    {
+        _currentViewMode = ViewMode.UserPlaylists;
+        _currentUserName = displayName;
+        _currentDrilldownPlaylist = null;
+        _isViewingPlaylistsList = false;
+        _isViewingAlbumsList = false;
+        _hasMoreSearchResults = false;
+        UpdateSearchCategoryVisibility(false);
+        _songListView.SetMessage($"正在加载 {displayName} 的歌单...", $"{displayName} 的歌单 (加载中)");
+
+        var playlists = await MusicApi.GetUserPlaylistsAsync(uin);
+        Application.Invoke(() => ShowUserPlaylists(displayName, playlists));
+    }
+
+    private void ShowUserPlaylists(string displayName, List<Playlist> playlists)
+    {
+        _currentUserName = displayName;
+        _cachedUserPlaylists = playlists;
+        RenderUserPlaylists();
+    }
+
+    private void RenderUserPlaylists()
+    {
+        _currentViewMode = ViewMode.UserPlaylists;
+        _currentDrilldownPlaylist = null;
+        UpdateSearchCategoryVisibility(false);
+
+        if (_cachedUserPlaylists.Count == 0)
+        {
+            _songListView.SetMessage(
+                "该用户没有公开歌单，或数字 QQ 号无效",
+                $"{_currentUserName} 的歌单: 0 个 (按 Esc 返回)");
+            return;
+        }
+
+        var items = new List<string>(_cachedUserPlaylists.Count);
+        for (int i = 0; i < _cachedUserPlaylists.Count; i++)
+        {
+            var playlist = _cachedUserPlaylists[i];
+            var label = playlist.DirId == 201 ? "我喜欢" : playlist.Title;
+            items.Add($"{(i + 1):D2}  {label}  (共 {playlist.SongNum} 首)");
+        }
+
+        _songListView.SetCustomItems(
+            items,
+            $"{_currentUserName} 的歌单: 共 {_cachedUserPlaylists.Count} 个 (Enter 查看 / Esc 返回)",
+            async idx =>
+            {
+                if (idx >= 0 && idx < _cachedUserPlaylists.Count)
+                {
+                    _playlistDrilldownOrigin = ViewMode.UserPlaylists;
+                    await DrilldownPlaylistAsync(_cachedUserPlaylists[idx]);
+                }
+            });
+
+        _songListView.SetFocusToList();
+    }
+
+    private async Task OpenPublicPlaylistAsync(long disstid)
+    {
+        _songListView.SetMessage("正在打开歌单...", $"歌单 {disstid} (加载中)");
+        UpdateSearchCategoryVisibility(true);
+
+        var detail = await MusicApi.GetPublicPlaylistAsync(disstid);
+        Application.Invoke(() =>
+        {
+            if (detail == null)
+            {
+                _songListView.SetMessage(
+                    "无法打开该歌单。请检查链接/ID，或该歌单可能已被删除/设为私密",
+                    $"歌单 {disstid} (打开失败)");
+                return;
+            }
+
+            RenderPublicPlaylist(detail);
+        });
+    }
+
+    private void RenderPublicPlaylist(PublicPlaylistDetail detail)
+    {
+        _playlistDrilldownOrigin = ViewMode.Search;
+        _ = DrilldownPlaylistAsync(detail.Playlist, detail.Songs);
+    }
+
+    private async Task DrilldownPlaylistAsync(Playlist playlist, List<Song>? preloadedSongs = null)
     {
         _currentViewMode = ViewMode.PlaylistDrilldown;
         UpdateSearchCategoryVisibility(false);
@@ -258,7 +369,17 @@ public sealed partial class MainWindow
 
         _songListView.SetMessage($"正在加载歌单「{playlist.Title}」歌曲...", $"歌单: {playlist.Title} (加载中)");
 
-        var songs = await MusicApi.GetPlaylistSongsAsync(playlist, 1, PlaylistPageSize);
+        List<Song> songs;
+        bool isComplete;
+        if (preloadedSongs != null)
+        {
+            songs = preloadedSongs;
+            isComplete = true;
+        }
+        else
+        {
+            (songs, isComplete) = await MusicApi.GetPlaylistSongsPageAsync(playlist, 1, PlaylistPageSize);
+        }
 
         Application.Invoke(() =>
         {
@@ -268,7 +389,7 @@ public sealed partial class MainWindow
                 return;
             }
 
-            _hasMorePlaylistSongs = songs.Count >= PlaylistPageSize;
+            _hasMorePlaylistSongs = !isComplete && songs.Count >= PlaylistPageSize;
             var title = $"歌单: {playlist.Title} (共 {songs.Count} 首" + (_hasMorePlaylistSongs ? "，向下滚动加载更多" : "，已全部加载") + "，按 Esc 退回)";
             _songListView.SetSongs(songs, title);
             if (_activeSong != null)

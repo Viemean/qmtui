@@ -434,6 +434,94 @@ public sealed partial class MainWindow
         }
     }
 
+    private void ShowQqNumberPrompt(string displayName, Action<long> onConfirm)
+    {
+        long confirmedUin = 0;
+        using var dlg = new Dialog
+        {
+            Title = $"输入 {displayName} 的 QQ 号",
+            Width = 54,
+            Height = 8,
+            X = Pos.Center(),
+            Y = Pos.Center()
+        };
+        dlg.SetScheme(TransparentDialogScheme);
+
+        var label = new Label
+        {
+            Text = $"未能获取 {displayName} 的数字 QQ 号，请手动输入：",
+            X = 2,
+            Y = 1
+        };
+        label.SetScheme(TransparentDialogScheme);
+
+        var field = new TextField
+        {
+            X = 2,
+            Y = 3,
+            Width = Dim.Fill(2)
+        };
+        field.SetScheme(TransparentDialogScheme);
+        field.EnableMiddleClickPaste();
+
+        void DoConfirm()
+        {
+            var text = field.Text?.ToString()?.Trim() ?? "";
+            if (!text.All(char.IsAsciiDigit) || !long.TryParse(text, out var qq) || qq <= 0)
+            {
+                _controlBar.UpdateStatus("QQ 号无效，请输入纯数字");
+                return;
+            }
+            confirmedUin = qq;
+            Application.RequestStop(dlg);
+        }
+
+        var okBtn = new Button
+        {
+            Text = "确定 (Enter)",
+            X = Pos.Center() - 13,
+            Y = Pos.AnchorEnd(1),
+            ShadowStyle = ShadowStyles.None
+        };
+        okBtn.SetScheme(TransparentDialogScheme);
+        okBtn.Accepting += (s, e) => DoConfirm();
+
+        var cancelBtn = new Button
+        {
+            Text = "取消 (Esc)",
+            X = Pos.Center() + 3,
+            Y = Pos.AnchorEnd(1),
+            ShadowStyle = ShadowStyles.None
+        };
+        cancelBtn.SetScheme(TransparentDialogScheme);
+        cancelBtn.Accepting += (s, e) => Application.RequestStop(dlg);
+
+        field.KeyDown += (s, k) =>
+        {
+            if (k == Key.Enter || k.AsRune.Value == '\r' || k.AsRune.Value == '\n')
+            {
+                k.Handled = true;
+                DoConfirm();
+            }
+        };
+        dlg.KeyDown += (s, k) =>
+        {
+            if (k == Key.Esc || k.AsRune.Value == 'q' || k.AsRune.Value == 'Q')
+            {
+                k.Handled = true;
+                Application.RequestStop(dlg);
+            }
+        };
+
+        dlg.Add(label, field, okBtn, cancelBtn);
+        MikuTheme.ApplyTo(dlg, TransparentDialogScheme);
+        field.SetFocus();
+
+        RunModalDialog(dlg);
+
+        if (confirmedUin > 0) onConfirm(confirmedUin);
+    }
+
     private bool _isAudioRecognitionActive;
 
     private void ShowAudioRecognitionDialog()

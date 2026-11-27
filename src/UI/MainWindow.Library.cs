@@ -456,7 +456,7 @@ public sealed partial class MainWindow
         }
 
         bool isFavoriteList = _currentViewMode == ViewMode.Favorite ||
-            (_currentViewMode == ViewMode.PlaylistDrilldown && _currentDrilldownPlaylist?.DirId == 201);
+            (_currentViewMode == ViewMode.PlaylistDrilldown && _currentDrilldownPlaylist?.IsMyFavorite == true);
 
         if (isFavoriteList)
         {

@@ -329,6 +329,12 @@ public sealed partial class MainWindow
                 await OnContextAction3Async();
                 return;
             }
+            if ((k == Key.D4 || c == '4') && _searchUsersBtn.Visible)
+            {
+                k.Handled = true;
+                await OnContextAction4Async();
+                return;
+            }
         }
 
         if (_currentViewMode == ViewMode.PlaylistsList && !_isSearchActive)

@@ -1,6 +1,7 @@
 using Terminal.Gui.App;
 using QmTui.Api;
 using QmTui.Models;
+using QmTui.Utils;
 
 namespace QmTui.UI;
 
@@ -21,6 +22,13 @@ public sealed partial class MainWindow
         if (!string.IsNullOrEmpty(text))
         {
             await ExecuteSearchAsync();
+        }
+        else if (category == SearchCategory.Users)
+        {
+            _songListView.SetMessage(
+                "输入昵称搜索用户；或输入 QQ 号 / 粘贴完整歌单链接直接打开",
+                "搜索用户");
+            _songListView.SetFocusToList();
         }
     }
 
@@ -49,6 +57,7 @@ public sealed partial class MainWindow
                 _cachedSearchSongs.Clear();
                 _cachedSearchPlaylists.Clear();
                 _cachedSearchAlbums.Clear();
+                _cachedSearchUsers.Clear();
             }
 
             _lastSearchQuery = text;
@@ -69,6 +78,9 @@ public sealed partial class MainWindow
                     _searchAlbumsCurrentPage = 1;
                     _hasMoreSearchAlbums = true;
                     await ExecuteSearchAlbumsAsync(text);
+                    break;
+                case SearchCategory.Users:
+                    await ExecuteSearchUsersAsync(text);
                     break;
             }
         }
@@ -156,12 +168,149 @@ public sealed partial class MainWindow
         {
             if (idx >= 0 && idx < _cachedPlaylists.Count)
             {
+                _playlistDrilldownOrigin = ViewMode.Search;
                 await DrilldownPlaylistAsync(_cachedPlaylists[idx]);
             }
         });
 
         _songListView.SetFocusToList();
         UpdateSearchCategoryVisibility(true);
+    }
+
+    private async Task ExecuteSearchUsersAsync(string text)
+    {
+        switch (QQMusicLinkParser.Classify(text, out var value))
+        {
+            case SearchInputKind.PlaylistLink:
+                await OpenPublicPlaylistAsync(value);
+                return;
+
+            case SearchInputKind.ShortShareLink:
+                _songListView.SetMessage(
+                    "暂不支持短链接，请在浏览器中打开后复制完整歌单链接",
+                    "搜索用户 (不支持短链)");
+                UpdateSearchCategoryVisibility(true);
+                return;
+
+            case SearchInputKind.NumericId:
+                await OpenNumericTargetAsync(value);
+                return;
+
+            default:
+                _songListView.SetMessage("正在搜索用户...", $"搜索「{text}」用户中...");
+                if (_cachedSearchUsers.TryGetValue(text, out var cached))
+                {
+                    Application.Invoke(() => RenderSearchUsers(cached));
+                    return;
+                }
+
+                var users = await MusicApi.SearchUsersAsync(text);
+                _cachedSearchUsers[text] = [.. users];
+                Application.Invoke(() => RenderSearchUsers(users));
+                return;
+        }
+    }
+
+    private async Task OpenNumericTargetAsync(long value)
+    {
+        _songListView.SetMessage("正在解析输入...", $"数字 {value} (解析中)");
+
+        // 同一个数字可能既是 QQ 号又是歌单 ID（如 1359968530），两个都查再让用户选。
+        var userPlaylists = await MusicApi.GetUserPlaylistsAsync(value);
+        var playlist = await MusicApi.GetPublicPlaylistAsync(value);
+        Application.Invoke(() => RenderNumericTargets(value, userPlaylists, playlist));
+    }
+
+    private void RenderNumericTargets(long value, List<Playlist> userPlaylists, PublicPlaylistDetail? playlist)
+    {
+        _currentViewMode = ViewMode.Search;
+        _currentDrilldownPlaylist = null;
+        UpdateSearchCategoryVisibility(true);
+
+        switch (QQMusicLinkParser.ChooseNumericTarget(userPlaylists.Count, playlist != null))
+        {
+            case NumericTargetKind.None:
+                _songListView.SetMessage(
+                    $"{value} 既不是有效的 QQ 号，也不是可打开的公开歌单",
+                    $"数字 {value} (无结果)");
+                return;
+            case NumericTargetKind.UserPlaylists:
+                ShowUserPlaylists($"QQ {value}", userPlaylists);
+                return;
+            case NumericTargetKind.PublicPlaylist:
+                RenderPublicPlaylist(playlist!);
+                return;
+        }
+
+        var items = new List<string>
+        {
+            $"01  QQ {value} 的歌单 ({userPlaylists.Count} 个)",
+            $"02  歌单 {value}: {playlist!.Playlist.Title} ({playlist.Playlist.SongCount} 首)"
+        };
+        _songListView.SetCustomItems(
+            items,
+            $"「{value}」既是 QQ 号也是歌单 ID，请选择 (Enter 确认 / Esc 返回)",
+            async idx =>
+            {
+                if (idx == 0) ShowUserPlaylists($"QQ {value}", userPlaylists);
+                else RenderPublicPlaylist(playlist);
+                await Task.CompletedTask;
+            });
+        _songListView.SetFocusToList();
+    }
+
+    private void RenderSearchUsers(List<UserSummary> users)
+    {
+        _currentViewMode = ViewMode.Search;
+        _currentDrilldownPlaylist = null;
+        UpdateSearchCategoryVisibility(true);
+
+        if (users.Count == 0)
+        {
+            _songListView.SetMessage(
+                "未找到相关用户。可输入 QQ 号或粘贴歌单链接直接打开",
+                "搜索用户: 0 位");
+            return;
+        }
+
+        var items = new List<string>(users.Count);
+        for (int i = 0; i < users.Count; i++)
+        {
+            var user = users[i];
+            var identify = string.IsNullOrWhiteSpace(user.Identify) ? "" : $" [{user.Identify}]";
+            items.Add($"{(i + 1):D2}  {user.Name}{identify}  (粉丝 {user.FansNum} / 歌单 {user.PlaylistCount})");
+        }
+
+        _songListView.SetCustomItems(
+            items,
+            $"搜索用户: 共 {users.Count} 位 (Enter 查看歌单 / Esc 关闭)",
+            async idx =>
+            {
+                if (idx >= 0 && idx < users.Count)
+                {
+                    await OpenUserPlaylistsAsync(users[idx]);
+                }
+            });
+
+        _songListView.SetFocusToList();
+    }
+
+    private void ReturnToUsersSearch()
+    {
+        _currentViewMode = ViewMode.Search;
+        _currentDrilldownPlaylist = null;
+        UpdateSearchCategoryVisibility(true);
+
+        if (_cachedSearchUsers.TryGetValue(_lastSearchQuery, out var users) && users.Count > 0)
+        {
+            RenderSearchUsers(users);
+            return;
+        }
+
+        _songListView.SetMessage(
+            "输入昵称搜索用户；或输入 QQ 号 / 粘贴完整歌单链接直接打开",
+            "搜索用户");
+        _songListView.SetFocusToList();
     }
 
     private async Task ExecuteSearchAlbumsAsync(string text)
