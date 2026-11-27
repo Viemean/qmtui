@@ -162,6 +162,7 @@ public sealed partial class MainWindow : Window
     private List<Playlist> _cachedUserPlaylists = [];
     private string _currentUserName = "";
     private ViewMode _playlistDrilldownOrigin = ViewMode.Other;
+    private (long Value, List<Playlist> UserPlaylists, PublicPlaylistDetail? Playlist)? _cachedNumericSearchTarget;
 
     // 云端最近播放增量拉取的 updateTime 锚点（0 表示首次全量）
     private long _lastRecentCloudUpdateTime;

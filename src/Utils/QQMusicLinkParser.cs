@@ -26,14 +26,17 @@ public enum NumericTargetKind
 /// </summary>
 public static partial class QQMusicLinkParser
 {
-    // 匹配 .../playlist/<id>、.../taoge/<id>、taoge.html?id=<id>、?disstid=<id>、#disstid=<id>
-    [GeneratedRegex(@"(?:/(?:playlist|taoge)/|taoge\.html\?id=|(?:[?&#]|^)disstid=)(\d+)", RegexOptions.IgnoreCase)]
+    // 匹配 .../playlist/<id>、.../taoge/<id>、taoge.html?...id=<id>、?disstid=<id>、#disstid=<id>
+    [GeneratedRegex(@"(?:/(?:playlist|taoge)/|taoge\.html\?(?:[^#]*&)?id=|(?:[?&#]|^)disstid=)(\d+)", RegexOptions.IgnoreCase)]
     private static partial Regex PlaylistIdRegex();
 
     [GeneratedRegex(@"c6\.y\.qq\.com/base/fcgi-bin/u", RegexOptions.IgnoreCase)]
     private static partial Regex ShortLinkRegex();
 
     /// <summary>分类输入；<paramref name="value"/> 仅在链接或纯数字时大于 0。</summary>
+    /// <param name="raw">原始搜索输入文本。</param>
+    /// <param name="value">解析出的歌单或数字 ID；非此类输入时为 0。</param>
+    /// <returns>输入类型分类。</returns>
     public static SearchInputKind Classify(string? raw, out long value)
     {
         value = 0;
@@ -58,6 +61,9 @@ public static partial class QQMusicLinkParser
     }
 
     /// <summary>根据 QQ 号歌单数与公开歌单探测结果决定数字输入的目标。</summary>
+    /// <param name="userPlaylistCount">该数字作为 QQ 号查到的公开歌单数量。</param>
+    /// <param name="hasPublicPlaylist">该数字作为歌单 ID 是否存在可访问的公开歌单。</param>
+    /// <returns>数字输入对应的目标类型。</returns>
     public static NumericTargetKind ChooseNumericTarget(int userPlaylistCount, bool hasPublicPlaylist) =>
         (userPlaylistCount > 0, hasPublicPlaylist) switch
         {

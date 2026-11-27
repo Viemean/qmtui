@@ -263,12 +263,49 @@ public sealed partial class MainWindow
 
         if (uin <= 0)
         {
-            // 搜索只回 encrypt_uin，拿不到数字 QQ 号时让用户补填。
-            ShowQqNumberPrompt(user.Name, qq => _ = LoadUserPlaylistsAsync(qq, user.Name));
+            if (!UserSession.Current.IsLoggedIn)
+            {
+                _controlBar.UpdateStatus("请先按 U 键登录后，再查看该用户的公开歌单（也可直接输入数字 QQ 号或歌单链接）");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(user.EncryptUin))
+            {
+                _controlBar.UpdateStatus($"未能获取 {user.Name} 的用户标识，无法加载歌单");
+                return;
+            }
+
+            await LoadUserPlaylistsByEuinAsync(user.EncryptUin, user.Name);
             return;
         }
 
         await LoadUserPlaylistsAsync(uin, user.Name);
+    }
+
+    private async Task LoadUserPlaylistsByEuinAsync(string encryptUin, string displayName)
+    {
+        _currentViewMode = ViewMode.UserPlaylists;
+        _currentUserName = displayName;
+        _currentDrilldownPlaylist = null;
+        _isViewingPlaylistsList = false;
+        _isViewingAlbumsList = false;
+        _hasMoreSearchResults = false;
+        UpdateSearchCategoryVisibility(false);
+        _songListView.SetMessage($"正在加载 {displayName} 的歌单...", $"{displayName} 的歌单 (加载中)");
+
+        var playlists = await MusicApi.GetUserPlaylistsByEuinAsync(encryptUin);
+        Application.Invoke(() =>
+        {
+            if (playlists == null)
+            {
+                _songListView.SetMessage(
+                    "获取该用户公开歌单失败，请确认登录态有效后重试（也可直接输入数字 QQ 号）",
+                    $"{displayName} 的歌单 (加载失败，按 Esc 返回)");
+                return;
+            }
+
+            ShowUserPlaylists(displayName, playlists);
+        });
     }
 
     private async Task LoadUserPlaylistsAsync(long uin, string displayName)
@@ -336,24 +373,24 @@ public sealed partial class MainWindow
         UpdateSearchCategoryVisibility(true);
 
         var detail = await MusicApi.GetPublicPlaylistAsync(disstid);
-        Application.Invoke(() =>
+        if (detail == null)
         {
-            if (detail == null)
+            Application.Invoke(() =>
             {
                 _songListView.SetMessage(
                     "无法打开该歌单。请检查链接/ID，或该歌单可能已被删除/设为私密",
                     $"歌单 {disstid} (打开失败)");
-                return;
-            }
+            });
+            return;
+        }
 
-            RenderPublicPlaylist(detail);
-        });
+        await RenderPublicPlaylistAsync(detail);
     }
 
-    private void RenderPublicPlaylist(PublicPlaylistDetail detail)
+    private Task RenderPublicPlaylistAsync(PublicPlaylistDetail detail)
     {
         _playlistDrilldownOrigin = ViewMode.Search;
-        _ = DrilldownPlaylistAsync(detail.Playlist, detail.Songs);
+        return DrilldownPlaylistAsync(detail.Playlist, detail.Songs);
     }
 
     private async Task DrilldownPlaylistAsync(Playlist playlist, List<Song>? preloadedSongs = null)

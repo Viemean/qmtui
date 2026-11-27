@@ -11,6 +11,7 @@ public class QQMusicLinkParserTests
     [InlineData("https://y.qq.com/n/yqq/playlist/8277217796.html")]
     [InlineData("https://y.qq.com/n/ryqq/taoge/8277217796")]
     [InlineData("https://i.y.qq.com/n2/m/share/details/taoge.html?id=8277217796")]
+    [InlineData("https://i.y.qq.com/n2/m/share/details/taoge.html?ADTAG=newyqq.taoge&id=8277217796")]
     [InlineData("https://y.qq.com/share?disstid=8277217796")]
     [InlineData("disstid=8277217796")]
     public void Classify_PlaylistLink_ReturnsId(string input)

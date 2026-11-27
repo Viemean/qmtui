@@ -215,10 +215,11 @@ public sealed partial class MainWindow
     {
         _songListView.SetMessage("正在解析输入...", $"数字 {value} (解析中)");
 
-        // 同一个数字可能既是 QQ 号又是歌单 ID（如 1359968530），两个都查再让用户选。
-        var userPlaylists = await MusicApi.GetUserPlaylistsAsync(value);
-        var playlist = await MusicApi.GetPublicPlaylistAsync(value);
-        Application.Invoke(() => RenderNumericTargets(value, userPlaylists, playlist));
+        // 同一个数字可能既是 QQ 号又是歌单 ID（如 1359968530），并行探测两个目标再让用户选。
+        var userTask = MusicApi.GetUserPlaylistsAsync(value);
+        var playlistTask = MusicApi.GetPublicPlaylistAsync(value);
+        await Task.WhenAll(userTask, playlistTask);
+        Application.Invoke(() => RenderNumericTargets(value, userTask.Result, playlistTask.Result));
     }
 
     private void RenderNumericTargets(long value, List<Playlist> userPlaylists, PublicPlaylistDetail? playlist)
@@ -230,18 +231,22 @@ public sealed partial class MainWindow
         switch (QQMusicLinkParser.ChooseNumericTarget(userPlaylists.Count, playlist != null))
         {
             case NumericTargetKind.None:
+                _cachedNumericSearchTarget = null;
                 _songListView.SetMessage(
                     $"{value} 既不是有效的 QQ 号，也不是可打开的公开歌单",
                     $"数字 {value} (无结果)");
                 return;
             case NumericTargetKind.UserPlaylists:
+                _cachedNumericSearchTarget = null;
                 ShowUserPlaylists($"QQ {value}", userPlaylists);
                 return;
             case NumericTargetKind.PublicPlaylist:
-                RenderPublicPlaylist(playlist!);
+                _cachedNumericSearchTarget = null;
+                _ = RenderPublicPlaylistAsync(playlist!);
                 return;
         }
 
+        _cachedNumericSearchTarget = (value, userPlaylists, playlist);
         var items = new List<string>
         {
             $"01  QQ {value} 的歌单 ({userPlaylists.Count} 个)",
@@ -253,8 +258,7 @@ public sealed partial class MainWindow
             async idx =>
             {
                 if (idx == 0) ShowUserPlaylists($"QQ {value}", userPlaylists);
-                else RenderPublicPlaylist(playlist);
-                await Task.CompletedTask;
+                else await RenderPublicPlaylistAsync(playlist);
             });
         _songListView.SetFocusToList();
     }
@@ -300,6 +304,13 @@ public sealed partial class MainWindow
         _currentViewMode = ViewMode.Search;
         _currentDrilldownPlaylist = null;
         UpdateSearchCategoryVisibility(true);
+
+        if (_cachedNumericSearchTarget is { } numericTarget &&
+            string.Equals(_lastSearchQuery, numericTarget.Value.ToString(), StringComparison.Ordinal))
+        {
+            RenderNumericTargets(numericTarget.Value, numericTarget.UserPlaylists, numericTarget.Playlist);
+            return;
+        }
 
         if (_cachedSearchUsers.TryGetValue(_lastSearchQuery, out var users) && users.Count > 0)
         {

@@ -368,6 +368,197 @@ public sealed partial class MusicApi
     }
 
     /// <summary>
+    /// 通过加密 UIN 获取指定用户的公开歌单列表（需登录态）。
+    /// </summary>
+    /// <param name="encryptUin">目标用户的加密 UIN（<c>encrypt_uin</c>）。</param>
+    /// <param name="ct">异步操作取消令牌。</param>
+    /// <returns>成功时返回歌单列表（可能为空）；未登录或接口鉴权/请求失败时返回 <see langword="null"/>。</returns>
+    public static async Task<List<Playlist>?> GetUserPlaylistsByEuinAsync(string encryptUin, CancellationToken ct = default)
+    {
+        if (!UserSession.Current.IsLoggedIn || string.IsNullOrWhiteSpace(encryptUin))
+        {
+            return null;
+        }
+
+        var homepageResult = await TryGetUserPlaylistsFromUnifiedHomepageAsync(encryptUin, ct).ConfigureAwait(false);
+        if (homepageResult is { Count: > 0 })
+        {
+            return homepageResult;
+        }
+
+        var legacyResult = await TryGetUserPlaylistsFromLegacyProfileAsync(encryptUin, ct).ConfigureAwait(false);
+        if (legacyResult != null)
+        {
+            return legacyResult;
+        }
+
+        return homepageResult;
+    }
+
+    private static async Task<List<Playlist>?> TryGetUserPlaylistsFromUnifiedHomepageAsync(string encryptUin, CancellationToken ct)
+    {
+        try
+        {
+            var escapedEuin = JsonEncodedText.Encode(encryptUin).ToString();
+            var payload = $$"""
+            {
+              "req": {
+                "module": "music.UnifiedHomepage.UnifiedHomepageSrv",
+                "method": "GetHomepageTabDetail",
+                "param": {
+                  "uin": "{{escapedEuin}}",
+                  "IsQueryTabDetail": 1,
+                  "TabID": "disc",
+                  "PageNum": 0,
+                  "PageSize": 30,
+                  "Order": 0
+                }
+              }
+            }
+            """;
+
+            var json = await PostAg1Async(payload, ct).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("req", out var reqObj) ||
+                !reqObj.TryGetProperty("code", out var codeProp) ||
+                codeProp.ValueKind != JsonValueKind.Number ||
+                codeProp.GetInt32() != 0 ||
+                !reqObj.TryGetProperty("data", out var dataObj))
+            {
+                return null;
+            }
+
+            if (!dataObj.TryGetProperty("DiscTab", out var discTab) ||
+                !discTab.TryGetProperty("List", out var listArray) ||
+                listArray.ValueKind != JsonValueKind.Array)
+            {
+                return [];
+            }
+
+            var list = new List<Playlist>(listArray.GetArrayLength());
+            foreach (var item in listArray.EnumerateArray())
+            {
+                long dissid = ReadLongFlexible(item, "Dissid");
+                if (dissid <= 0) continue;
+
+                var title = item.TryGetProperty("Title", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? "" : "";
+                var pic = item.TryGetProperty("Picurl", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() ?? "" : "";
+                var subtitle = item.TryGetProperty("Subtitle", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() ?? "" : "";
+                int count = ParseLeadingSongCount(subtitle);
+
+                if (string.IsNullOrWhiteSpace(title)) title = $"歌单 {dissid}";
+
+                list.Add(new Playlist(
+                    DirId: dissid,
+                    Name: title,
+                    SongCount: count,
+                    Tid: dissid,
+                    IsFav: true,
+                    PicUrl: pic
+                ));
+            }
+
+            return list;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MusicApi", "TryGetUserPlaylistsFromUnifiedHomepageAsync error", ex);
+            return null;
+        }
+    }
+
+    private static async Task<List<Playlist>?> TryGetUserPlaylistsFromLegacyProfileAsync(string encryptUin, CancellationToken ct)
+    {
+        try
+        {
+            var url = $"https://c6.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg?userid={Uri.EscapeDataString(encryptUin)}&cid=205360838&ct=20&cv=2276&reqfrom=1&reqtype=0&format=json";
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Referrer = new Uri("https://y.qq.com/");
+            var cookieHeader = UserSession.Current.GetCookieHeader();
+            if (!string.IsNullOrEmpty(cookieHeader)) req.Headers.Add("Cookie", cookieHeader);
+
+            using var resp = await s_httpClient.SendAsync(req, ct).ConfigureAwait(false);
+            var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("code", out var codeProp) ||
+                codeProp.ValueKind != JsonValueKind.Number ||
+                codeProp.GetInt32() != 0 ||
+                !root.TryGetProperty("data", out var dataObj))
+            {
+                return null;
+            }
+
+            if (dataObj.TryGetProperty("creator", out var creatorObj) &&
+                creatorObj.TryGetProperty("diss_lock", out var lockProp) &&
+                lockProp.ValueKind == JsonValueKind.Number &&
+                lockProp.GetInt32() == 1)
+            {
+                return [];
+            }
+
+            if (!dataObj.TryGetProperty("mydiss", out var mydissObj) ||
+                !mydissObj.TryGetProperty("list", out var listArray) ||
+                listArray.ValueKind != JsonValueKind.Array)
+            {
+                return [];
+            }
+
+            var list = new List<Playlist>(listArray.GetArrayLength());
+            foreach (var item in listArray.EnumerateArray())
+            {
+                long dissid = ReadLongFlexible(item, "dissid");
+                if (dissid <= 0) continue;
+
+                var title = item.TryGetProperty("title", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? "" : "";
+                var pic = item.TryGetProperty("picurl", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() ?? "" : "";
+                int count = item.TryGetProperty("songnum", out var c) && c.ValueKind == JsonValueKind.Number ? c.GetInt32() : 0;
+                if (count == 0 && item.TryGetProperty("subtitle", out var s) && s.ValueKind == JsonValueKind.String)
+                {
+                    count = ParseLeadingSongCount(s.GetString() ?? "");
+                }
+
+                if (string.IsNullOrWhiteSpace(title)) title = $"歌单 {dissid}";
+
+                list.Add(new Playlist(
+                    DirId: dissid,
+                    Name: title,
+                    SongCount: count,
+                    Tid: dissid,
+                    IsFav: true,
+                    PicUrl: pic
+                ));
+            }
+
+            return list;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MusicApi", "TryGetUserPlaylistsFromLegacyProfileAsync error", ex);
+            return null;
+        }
+    }
+
+    private static long ReadLongFlexible(JsonElement source, string property)
+    {
+        if (!source.TryGetProperty(property, out var value)) return 0;
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number)) return number;
+        return value.ValueKind == JsonValueKind.String && long.TryParse(value.GetString(), out number) ? number : 0;
+    }
+
+    private static int ParseLeadingSongCount(string subtitle)
+    {
+        if (string.IsNullOrWhiteSpace(subtitle)) return 0;
+        var span = subtitle.AsSpan().TrimStart();
+        int len = 0;
+        while (len < span.Length && char.IsAsciiDigit(span[len])) len++;
+        return len > 0 && int.TryParse(span[..len], out var count) ? count : 0;
+    }
+
+    /// <summary>
     /// 获取指定 QQ 号用户的公开歌单列表（包含 dirId 201 的“我喜欢”）。
     /// </summary>
     /// <param name="uin">目标用户的数字 QQ 号。</param>
@@ -477,7 +668,7 @@ public sealed partial class MusicApi
                 return null;
             }
 
-            var songs = new List<Song>();
+            List<Song> songs = [];
             if (dataObj.TryGetProperty("songlist", out var songArray) && songArray.ValueKind == JsonValueKind.Array)
             {
                 songs.Capacity = songArray.GetArrayLength();
